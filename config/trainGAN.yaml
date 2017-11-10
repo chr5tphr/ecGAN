@@ -1,0 +1,19 @@
+device: 'cpu'
+device_id: 0
+
+batch_size: 32
+nepochs: 10
+
+data_func: 'get_mnist_single'
+data_args: []
+data_kwargs: {}
+
+netG: 'GenFC'
+paramG: NULL
+saveG: NULL
+netD: 'DiscrFC'
+paramD: NULL
+saveD: NULL
+
+log: '/tmp/test.log'
+genout: '/tmp/testgen.pdf'

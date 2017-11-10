@@ -4,7 +4,12 @@ import mxnet as mx
 from mxnet import gluon, autograd, nd
 from mxnet.gluon import nn
 
+nets = {}
+def register_net(obj):
+    nets[obj.__name__] = obj
+    return obj
 
+@register_net
 class GenFC(nn.Sequential):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
@@ -15,6 +20,7 @@ class GenFC(nn.Sequential):
             self.add(nn.Dropout(.5))
             self.add(nn.Dense(784,activation='tanh'))
 
+@register_net
 class DiscrFC(nn.Sequential):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
@@ -29,7 +35,7 @@ class DiscrFC(nn.Sequential):
             self.add(nn.Dropout(.5))
             self.add(nn.Dense(2))
 
-def train_GAN(data,batch_size,netG,netD,ctx,nepochs,loglist=None):
+def train_GAN(data,batch_size,netG,netD,ctx,nepochs,logger=None):
 
     train_data = mx.gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
 
@@ -82,7 +88,5 @@ def train_GAN(data,batch_size,netG,netD,ctx,nepochs,loglist=None):
 
         name, acc = metric.get()
         metric.reset()
-        if loglist is not None:
-            loglist.append((name,acc,(time.time() - tic)))
-            # print('\nbinary training acc at epoch %d: %s=%f' % (epoch, name, acc))
-            # print('time: %f' % (time.time() - tic))
+        if logger is not None:
+            logger.info('netD training acc epoch %04d: %s=%f , time: %f',epoch, name, acc, (time.time() - tic))
