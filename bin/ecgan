@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-import sys
 from ecGAN import cli
 
-def main(argv):
-    cli.call(argv)
+def main():
+    cli.call()
 
 if __name__ == '__main__':
-    main(sys.argv)
+    main()
