@@ -2,13 +2,54 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import mxnet as mx
-from mxnet import nd
 import logging
+
+from mxnet import nd
+from string import Template
 
 data_funcs = {}
 def register_data_func(func):
     data_funcs[func.__name__] = func
     return func
+
+class Config(dict):
+
+    default_config = {
+        'device':           'cpu',
+        'device_id':        0,
+        'netG':             'GenFC',
+        'netD':             'DiscrFC',
+        'data_func':        'get_mnist_single',
+        'data_args':        [],
+        'data_kwargs':      {},
+        'batch_size':       32,
+        'nepochs':          10,
+        'start_epoch':      10,
+        'chkfreq':          0,
+        'paramD':           None,
+        'paramG':           None,
+        'saveD':            None,
+        'saveG':            None,
+        'log':              None,
+        'genout':           None,
+    }
+
+    def __init__(self,fname=None,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.update(__class__.default_config)
+        if fname:
+            with open(fname,'r') as fp:
+                self.update(yaml.safe_load(fp))
+
+    def __getattr__(self,name):
+        try:
+            return self.__getitem__(name)
+        except KeyError as err:
+            raise AttributeError(err)
+
+    def sub(self,param,**kwargs):
+        return Template(self[param]).safe_substitute(self,**kwargs)
+
 
 def plot_data(data):
     snum = int(len(data)**.5)

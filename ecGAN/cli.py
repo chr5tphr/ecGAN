@@ -3,10 +3,11 @@ mpl.use('Agg')
 import yaml
 import mxnet as mx
 import sys
+
 from argparse import ArgumentParser
 
 from ecGAN.net import nets,train_GAN
-from ecGAN.util import data_funcs,mkfilelogger,plot_data
+from ecGAN.util import data_funcs,mkfilelogger,plot_data,Config
 
 commands = {}
 def register_command(func):
@@ -29,42 +30,43 @@ def train(argv):
 
     args = parser.parse_args(argv)
 
-    config = {}
-    if args.config:
-        with open(args.config,'r') as fp:
-            config.update(yaml.safe_load(fp))
+    config = Config(args.config)
 
-    _train(args,**config)
+    _train(args,config)
 
-def _train(args,**config):
-    ctx = mx.context.Context(config.get('device','cpu'),config.get('device_id',0))
+def _train(args,config):
+    ctx = mx.context.Context(config.device,config.device_id)
 
-    batch_size = config.get('batch_size',32)
-    nepochs = config.get('nepochs',10)
+    batch_size = config.batch_size
+    nepochs = config.nepochs
+    start_epoch = config.start_epoch
+    chkfreq = config.chkfreq
 
-    data = data_funcs[config.get('data_func','get_mnist_single')](*(config.get('data_args',[])),**(config.get('data_kwargs',{})))
+    data = data_funcs[config.data_func](*(config.data_args),**(config.data_kwargs))
 
-    netG = nets[config.get('netG','GenFC')]()
-    if config.get('paramG'):
-        netG.load_params(config['paramG'],ctx=ctx)
+    netG = nets[config.netG]()
+    if 'paramG' in config:
+        netG.load_params(config.paramG,ctx=ctx)
     else:
         netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
-    netD = nets[config.get('netD','DiscrFC')]()
-    if config.get('paramD'):
-        netD.load_params(config['paramD'],ctx=ctx)
+    netD = nets[config.netD]()
+    if 'paramD' in config:
+        netD.load_params(config.paramD,ctx=ctx)
     else:
         netD.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
 
     logger = None
-    if config.get('log'):
-        logger = mkfilelogger('training',config['log'])
+    if 'log' in config:
+        logger = mkfilelogger('training',config.sub('log'))
 
     train_GAN(data,batch_size,netG,netD,ctx,nepochs=nepochs,logger=logger)
 
-    if config.get('saveG'):
-        netG.save_params(config['saveG'])
-    if config.get('saveD'):
-        netD.save_params(config['saveD'])
+    if chkfreq <= 0:
+        epoch = start_epoch + nepochs - 1
+        if 'saveG' in config:
+            netG.save_params(config.sub('saveG',epoch=epoch))
+        if 'saveD' in config:
+            netD.save_params(config.sub('saveD',epoch=epoch))
 
 @register_command
 def generate(argv):
@@ -80,17 +82,17 @@ def generate(argv):
 
     _generate(args,**config)
 
-def _generate(args,**config):
-    ctx = mx.context.Context(config.get('device','cpu'),config.get('device_id',0))
+def _generate(args,config):
+    ctx = mx.context.Context(config.device, config.device_id)
 
-    netG = nets[config.get('netG','GenFC')]()
-    if config.get('paramG'):
-        netG.load_params(config['paramG'],ctx=ctx)
+    netG = nets[config.netG]()
+    if 'paramG' in config:
+        netG.load_params(config.sub('paramG'),ctx=ctx)
     else:
         netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
 
-    fig = plot_data(netG(nd.random_normal(shape=(25, 32), ctx=ctx)))
-    if config.get('genout'):
-        fig.savefig(config['genout'])
+    fig = plot_data(netG(mx.nd.random_normal(shape=(25, 32), ctx=ctx)))
+    if 'genout' in config:
+        fig.savefig(config.sub('genout'))
     else:
         fig.show()

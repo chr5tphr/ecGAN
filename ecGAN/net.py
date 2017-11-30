@@ -3,6 +3,7 @@ import time
 import mxnet as mx
 from mxnet import gluon, autograd, nd
 from mxnet.gluon import nn
+from string import Template
 
 nets = {}
 def register_net(obj):
@@ -35,7 +36,13 @@ class DiscrFC(nn.Sequential):
             self.add(nn.Dropout(.5))
             self.add(nn.Dense(2))
 
-def train_GAN(data,batch_size,netG,netD,ctx,nepochs,logger=None):
+def train_GAN(data,batch_size,netG,netD,ctx,nepochs,**kwargs):
+
+    logger = kwargs.get('logger')
+    config = kwargs.get('config',{})
+
+    chkfreq = config.get('chkfreq',0)
+    start_epoch = config.get('start_epoch',0)
 
     train_data = mx.gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
 
@@ -50,7 +57,7 @@ def train_GAN(data,batch_size,netG,netD,ctx,nepochs,logger=None):
     fake_label = nd.uniform(low=0.,high=.3,shape=(batch_size,),ctx=ctx)
     metric = mx.metric.Accuracy()
 
-    for epoch in range(nepochs):
+    for epoch in range(start_epoch, start_epoch + nepochs):
         tic = time.time()
         # train_data.reset()
         for i, data in enumerate(train_data):
@@ -90,3 +97,10 @@ def train_GAN(data,batch_size,netG,netD,ctx,nepochs,logger=None):
         metric.reset()
         if logger is not None:
             logger.info('netD training acc epoch %04d: %s=%f , time: %f',epoch, name, acc, (time.time() - tic))
+
+        if (chkfreq > 0) and ( ( (epoch + 1) % chkfreq) == 0):
+            config.update(epoch=epoch)
+            if 'saveG' in config:
+                netG.save_params(config.sub('saveG'))
+            if 'saveD' in config:
+                netD.save_params(config.sub('saveD'))
