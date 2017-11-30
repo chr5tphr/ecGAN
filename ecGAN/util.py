@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import mxnet as mx
 from mxnet import nd
+import logging
 
 data_funcs = {}
 def register_data_func(func):

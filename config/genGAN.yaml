@@ -9,11 +9,11 @@ data_args: []
 data_kwargs: {'train':True,'label':5}
 
 netG: 'GenFC'
-paramG: NULL
-saveG: /home/chrstphr/projects/ecGAN/result/G.params
+paramG: /home/chrstphr/projects/ecGAN/result/G.params
+saveG: NULL
 netD: 'DiscrFC'
-paramD: NULL
-saveD: /home/chrstphr/projects/ecGAN/result/D.params
+paramD: /home/chrstphr/projects/ecGAN/result/D.params
+saveD: NULL
 
 log: '/home/chrstphr/projects/ecGAN/result/test.log'
 genout: '/home/chrstphr/projects/ecGAN/result/testgen.pdf'

@@ -5,7 +5,7 @@ import mxnet as mx
 import sys
 from argparse import ArgumentParser
 
-from ecGAN.net import nets
+from ecGAN.net import nets,train_GAN
 from ecGAN.util import data_funcs,mkfilelogger,plot_data
 
 commands = {}
@@ -18,7 +18,7 @@ def call():
 
     parser.add_argument('command',choices=commands.keys())
 
-    args,rargv = parser.parse_known_args(sys.argv)
+    args,rargv = parser.parse_known_args(sys.argv[1:])
 
     commands[args.command](rargv)
 
@@ -46,12 +46,12 @@ def _train(args,**config):
 
     netG = nets[config.get('netG','GenFC')]()
     if config.get('paramG'):
-        netG.load_params(config['paramG'])
+        netG.load_params(config['paramG'],ctx=ctx)
     else:
         netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
     netD = nets[config.get('netD','DiscrFC')]()
     if config.get('paramD'):
-        netD.load_params(config['paramD'])
+        netD.load_params(config['paramD'],ctx=ctx)
     else:
         netD.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
 
@@ -85,7 +85,7 @@ def _generate(args,**config):
 
     netG = nets[config.get('netG','GenFC')]()
     if config.get('paramG'):
-        netG.load_params(config['paramG'])
+        netG.load_params(config['paramG'],ctx=ctx)
     else:
         netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
 

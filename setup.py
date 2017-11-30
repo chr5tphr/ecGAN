@@ -5,7 +5,7 @@ setup(
     packages=find_packages(),
     entry_points={
         'console_scripts': [
-            'ecgan = ecGAN.cli.call'
+            'ecgan = ecGAN.cli:call'
         ]
     },
     install_requires=[
