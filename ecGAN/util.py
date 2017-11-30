@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import mxnet as mx
 import logging
+import yaml
 
 from mxnet import nd
 from string import Template

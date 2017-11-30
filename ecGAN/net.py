@@ -99,8 +99,7 @@ def train_GAN(data,batch_size,netG,netD,ctx,nepochs,**kwargs):
             logger.info('netD training acc epoch %04d: %s=%f , time: %f',epoch, name, acc, (time.time() - tic))
 
         if (chkfreq > 0) and ( ( (epoch + 1) % chkfreq) == 0):
-            config.update(epoch=epoch)
-            if 'saveG' in config:
-                netG.save_params(config.sub('saveG'))
-            if 'saveD' in config:
-                netD.save_params(config.sub('saveD'))
+            if config.saveG:
+                netG.save_params(config.sub('saveG',epoch=epoch+1))
+            if config.saveD:
+                netD.save_params(config.sub('saveD',epoch=epoch+1))

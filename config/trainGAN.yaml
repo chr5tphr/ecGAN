@@ -1,8 +1,12 @@
+root_dir: '/home/chrstphr/projects/ecGAN/result'
+
 device: 'cpu'
 device_id: 0
 
 batch_size: 32
 nepochs: 10
+start_epoch: 10
+chkfreq: 0
 
 data_func: 'get_mnist_single'
 data_args: []
@@ -10,10 +14,10 @@ data_kwargs: {'train':True,'label':5}
 
 netG: 'GenFC'
 paramG: NULL
-saveG: /home/chrstphr/projects/ecGAN/result/G.params
+saveG: '${root_dir}/G.${epoch}.params'
 netD: 'DiscrFC'
 paramD: NULL
-saveD: /home/chrstphr/projects/ecGAN/result/D.params
+saveD: '${root_dir}/D.${epoch}.params'
 
-log: '/home/chrstphr/projects/ecGAN/result/test.log'
-genout: '/home/chrstphr/projects/ecGAN/result/testgen.pdf'
+log: '${root_dir}/test.log'
+genout: '${root_dir}/testgen.pdf'
