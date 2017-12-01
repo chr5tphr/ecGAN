@@ -23,6 +23,8 @@ setup(
         ['requests==2.18.4'],
         ['six==1.11.0'],
         ['urllib3==1.22'],
-        ['PyYAML==3.12']
+        ['PyYAML==3.12'],
+        ['Pillow==4.3.0'],
+        ['imageio==2.2.0']
     ]
 )

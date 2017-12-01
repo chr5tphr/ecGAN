@@ -2,9 +2,11 @@ import matplotlib as mpl
 mpl.use('Agg')
 import yaml
 import mxnet as mx
+import numpy as np
 import sys
 
 from argparse import ArgumentParser
+from imageio import imwrite
 
 from ecGAN.net import nets,GAN
 from ecGAN.util import data_funcs,mkfilelogger,plot_data,Config
@@ -73,11 +75,14 @@ def generate(args,config):
     if config.log:
         logger = mkfilelogger('generation',config.sub('log'))
 
-    fig = plot_data(netG(mx.nd.random_normal(shape=(25, 32), ctx=ctx)))
+
     if config.genout:
         fpath = config.sub('genout')
-        fig.savefig(fpath)
+        gdat = ((netG(mx.nd.random_normal(shape=(25, 32), ctx=ctx)) + 1) * 255/2).asnumpy().astype(np.uint8)
+        snum = int(len(gdat)**.5)
+        imwrite(fpath, gdat[:snum**2].reshape(snum,snum,28,28).transpose(0,2,1,3).reshape(snum*28,snum*28))
         if logger:
             logger.info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',config.netG,config.sub('paramG'),config.sub('genout'))
     else:
+        fig = plot_data(netG(mx.nd.random_normal(shape=(25, 32), ctx=ctx)))
         fig.show()

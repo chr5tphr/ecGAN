@@ -65,6 +65,7 @@ def plot_data(data):
     ax.hlines(np.arange(1,snum)*28,0,snum*28)
     ax.vlines(np.arange(1,snum)*28,0,snum*28)
     fig.tight_layout()
+    ax.set
     return fig
 
 @register_data_func
