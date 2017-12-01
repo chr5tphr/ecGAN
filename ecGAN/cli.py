@@ -6,7 +6,7 @@ import sys
 
 from argparse import ArgumentParser
 
-from ecGAN.net import nets,train_GAN
+from ecGAN.net import nets,GAN
 from ecGAN.util import data_funcs,mkfilelogger,plot_data,Config
 
 commands = {}
@@ -55,12 +55,6 @@ def train(args,config):
     model = GAN(netG=netG,netD=netD,ctx=ctx,logger=logger,config=config)
     model.train(data,batch_size,nepochs)
 
-    if save_freq <= 0:
-        epoch = start_epoch + nepochs
-        if config.saveG:
-            netG.save_params(config.sub('saveG',epoch=epoch))
-        if config.saveD:
-            netD.save_params(config.sub('saveD',epoch=epoch))
 
 @register_command
 def generate(args,config):
@@ -72,8 +66,15 @@ def generate(args,config):
     else:
         netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
 
+    logger = None
+    if config.log:
+        logger = mkfilelogger('generation',config.sub('log'))
+
     fig = plot_data(netG(mx.nd.random_normal(shape=(25, 32), ctx=ctx)))
     if config.genout:
-        fig.savefig(config.sub('genout'))
+        fpath = config.sub('genout')
+        fig.savefig(fpath)
+        if logger:
+            logger.info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',config.netG,config.sub('paramG'),config.sub('genout'))
     else:
         fig.show()

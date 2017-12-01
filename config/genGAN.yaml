@@ -20,4 +20,4 @@ paramD: '${root_dir}/D.${start_epoch}.params'
 saveD: NULL
 
 log: '${root_dir}/test.log'
-genout: '${root_dir}/testgen.pdf'
+genout: '${root_dir}/testgen.${start_epoch}.png'

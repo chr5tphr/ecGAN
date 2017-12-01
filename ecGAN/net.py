@@ -116,8 +116,14 @@ class GAN(object):
             if logger:
                 logger.info('netD training acc epoch %04d: %s=%f , time: %f',epoch, name, acc, (time.time() - tic))
 
-            if (save_freq > 0) and not ( (epoch + 1) % save_freq):
+            if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
                 if config.saveG:
-                    netG.save_params(config.sub('saveG',epoch=epoch+1))
+                    fpath = config.sub('saveG',epoch=epoch+1)
+                    netG.save_params(fpath)
+                    if logger:
+                        logger.info('Saved generator \'%s\' checkpoint epoch %04f in file \'%s\'.',config.netG,epoch+1,fpath)
                 if config.saveD:
-                    netD.save_params(config.sub('saveD',epoch=epoch+1))
+                    fpath = config.sub('saveD',epoch=epoch+1)
+                    netD.save_params(fpath)
+                    if logger:
+                        logger.info('Saved discriminator \'%s\' checkpoint epoch %04f in file \'%s\'.',config.netD,epoch+1,fpath)
