@@ -86,3 +86,6 @@ def generate(args,config):
     else:
         fig = plot_data(netG(mx.nd.random_normal(shape=(25, 32), ctx=ctx)))
         fig.show()
+
+if __name__ == '__main__':
+    call()
