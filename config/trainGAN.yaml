@@ -6,7 +6,7 @@ device_id: 0
 batch_size: 32
 nepochs: 10
 start_epoch: 0
-save_freq: 0
+save_freq: 5
 
 data_func: 'get_mnist_single'
 data_args: []
