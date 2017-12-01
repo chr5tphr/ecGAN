@@ -75,55 +75,63 @@ class GAN(object):
         fake_label = nd.uniform(low=0.,high=.3,shape=(batch_size,),ctx=ctx)
         metric = mx.metric.Accuracy()
 
-        for epoch in range(start_epoch, start_epoch + nepochs):
-            tic = time.time()
-            # train_data.reset()
-            for i, data in enumerate(train_data):
-                ############################
-                # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-                ###########################
+        epoch = start_epoch
 
-                data = data.as_in_context(ctx).reshape((-1,784))
+        try:
+            for epoch in range(start_epoch, start_epoch + nepochs):
+                tic = time.time()
+                # train_data.reset()
+                for i, data in enumerate(train_data):
+                    ############################
+                    # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+                    ###########################
 
-                noise = nd.random_normal(shape=(data.shape[0], 32), ctx=ctx)
+                    data = data.as_in_context(ctx).reshape((-1,784))
 
-                with autograd.record():
-                    real_output = netD(data)
-                    errD_real = loss(real_output, real_label)
+                    noise = nd.random_normal(shape=(data.shape[0], 32), ctx=ctx)
 
-                    fake = netG(noise)
-                    fake_output = netD(fake.detach())
-                    errD_fake = loss(fake_output, fake_label)
-                    errD = errD_real + errD_fake
-                    errD.backward()
+                    with autograd.record():
+                        real_output = netD(data)
+                        errD_real = loss(real_output, real_label)
 
-                trainerD.step(batch_size)
-                metric.update([real_label,], [real_output,])
-                metric.update([fake_label,], [fake_output,])
+                        fake = netG(noise)
+                        fake_output = netD(fake.detach())
+                        errD_fake = loss(fake_output, fake_label)
+                        errD = errD_real + errD_fake
+                        errD.backward()
 
-                ############################
-                # (2) Update G network: maximize log(D(G(z)))
-                ###########################
-                with autograd.record():
-                    output = netD(fake)
-                    errG = loss(output, real_label)
-                    errG.backward()
+                    trainerD.step(batch_size)
+                    metric.update([real_label,], [real_output,])
+                    metric.update([fake_label,], [fake_output,])
 
-                trainerG.step(batch_size)
+                    ############################
+                    # (2) Update G network: maximize log(D(G(z)))
+                    ###########################
+                    with autograd.record():
+                        output = netD(fake)
+                        errG = loss(output, real_label)
+                        errG.backward()
 
-            name, acc = metric.get()
-            metric.reset()
-            if logger:
-                logger.info('netD training acc epoch %04d: %s=%f , time: %f',epoch, name, acc, (time.time() - tic))
+                    trainerG.step(batch_size)
 
-            if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
-                if config.saveG:
-                    fpath = config.sub('saveG',epoch=epoch+1)
-                    netG.save_params(fpath)
-                    if logger:
-                        logger.info('Saved generator \'%s\' checkpoint epoch %04d in file \'%s\'.',config.netG,epoch+1,fpath)
-                if config.saveD:
-                    fpath = config.sub('saveD',epoch=epoch+1)
-                    netD.save_params(fpath)
-                    if logger:
-                        logger.info('Saved discriminator \'%s\' checkpoint epoch %04d in file \'%s\'.',config.netD,epoch+1,fpath)
+                name, acc = metric.get()
+                metric.reset()
+                if logger:
+                    logger.info('netD training acc epoch %04d: %s=%f , time: %f',epoch, name, acc, (time.time() - tic))
+                if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
+                    self.checkpoint(epoch+1)
+        except KeyboardInterrupt:
+            logger.info('Training interrupted by user.')
+            self.checkpoint('I%d'%epoch)
+
+    def checkpoint(self,epoch):
+        if self.config.saveG:
+            fpath = self.config.sub('saveG',epoch=epoch)
+            self.netG.save_params(fpath)
+            if self.logger:
+                self.logger.info('Saved generator \'%s\' checkpoint epoch %s in file \'%s\'.',self.netG,epoch,fpath)
+        if config.saveD:
+            fpath = self.config.sub('saveD',epoch=epoch)
+            self.netD.save_params(fpath)
+            if self.logger:
+                self.logger.info('Saved discriminator \'%s\' checkpoint epoch %s in file \'%s\'.',self.netD,epoch,fpath)
