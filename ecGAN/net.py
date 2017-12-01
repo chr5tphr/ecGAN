@@ -121,9 +121,9 @@ class GAN(object):
                     fpath = config.sub('saveG',epoch=epoch+1)
                     netG.save_params(fpath)
                     if logger:
-                        logger.info('Saved generator \'%s\' checkpoint epoch %04f in file \'%s\'.',config.netG,epoch+1,fpath)
+                        logger.info('Saved generator \'%s\' checkpoint epoch %04d in file \'%s\'.',config.netG,epoch+1,fpath)
                 if config.saveD:
                     fpath = config.sub('saveD',epoch=epoch+1)
                     netD.save_params(fpath)
                     if logger:
-                        logger.info('Saved discriminator \'%s\' checkpoint epoch %04f in file \'%s\'.',config.netD,epoch+1,fpath)
+                        logger.info('Saved discriminator \'%s\' checkpoint epoch %04d in file \'%s\'.',config.netD,epoch+1,fpath)

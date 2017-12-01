@@ -19,10 +19,13 @@ def call():
 
     parser.add_argument('command',choices=commands.keys())
     parser.add_argument('-f','--config')
+    parser.add_argument('-u','--update')
 
     args = parser.parse_args(sys.argv[1:])
 
     config = Config(args.config)
+    if args.update:
+        config.update(yaml.safe_load(args.update))
 
     commands[args.command](args,config)
 
