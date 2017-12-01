@@ -26,7 +26,7 @@ class Config(dict):
         'batch_size':       32,
         'nepochs':          10,
         'start_epoch':      10,
-        'chkfreq':          0,
+        'save_freq':          0,
         'paramD':           None,
         'paramG':           None,
         'saveD':            None,

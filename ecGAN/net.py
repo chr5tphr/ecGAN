@@ -36,70 +36,88 @@ class DiscrFC(nn.Sequential):
             self.add(nn.Dropout(.5))
             self.add(nn.Dense(2))
 
-def train_GAN(data,batch_size,netG,netD,ctx,nepochs,**kwargs):
+class GAN(object):
+    def __init__(self,netG,netD,ctx,**kwargs):
+        self.logger = kwargs.get('logger')
+        self.config = kwargs.get('config',{})
 
-    logger = kwargs.get('logger')
-    config = kwargs.get('config',{})
+        self.save_freq = self.config.save_freq
+        self.start_epoch = self.config.get('start_epoch',0)
 
-    chkfreq = config.get('chkfreq',0)
-    start_epoch = config.get('start_epoch',0)
+        self.netG = netG
+        self.netD = netD
 
-    train_data = mx.gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
+        self.ctx = ctx
 
-    # loss
-    loss = gluon.loss.SoftmaxCrossEntropyLoss()
+    def train(self,data,batch_size,nepochs):
 
-    # trainer for the generator and the discriminator
-    trainerG = gluon.Trainer(netG.collect_params(), 'adam', {'learning_rate': 0.01})
-    trainerD = gluon.Trainer(netD.collect_params(), 'adam', {'learning_rate': 0.05})
+        logger = self.logger
+        config = self.config
 
-    real_label = nd.uniform(low=.7,high=1.2,shape=(batch_size,),ctx=ctx)
-    fake_label = nd.uniform(low=0.,high=.3,shape=(batch_size,),ctx=ctx)
-    metric = mx.metric.Accuracy()
+        save_freq = self.save_freq
+        start_epoch = self.start_epoch
 
-    for epoch in range(start_epoch, start_epoch + nepochs):
-        tic = time.time()
-        # train_data.reset()
-        for i, data in enumerate(train_data):
-            ############################
-            # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-            ###########################
+        netG = self.netG
+        netD = self.netD
 
-            data = data.as_in_context(ctx).reshape((-1,784))
+        ctx = self.ctx
 
-            noise = nd.random_normal(shape=(data.shape[0], 32), ctx=ctx)
+        train_data = mx.gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
 
-            with autograd.record():
-                real_output = netD(data)
-                errD_real = loss(real_output, real_label)
+        # loss
+        loss = gluon.loss.SoftmaxCrossEntropyLoss()
 
-                fake = netG(noise)
-                fake_output = netD(fake.detach())
-                errD_fake = loss(fake_output, fake_label)
-                errD = errD_real + errD_fake
-                errD.backward()
+        # trainer for the generator and the discriminator
+        trainerG = gluon.Trainer(netG.collect_params(), 'adam', {'learning_rate': 0.01})
+        trainerD = gluon.Trainer(netD.collect_params(), 'adam', {'learning_rate': 0.05})
 
-            trainerD.step(batch_size)
-            metric.update([real_label,], [real_output,])
-            metric.update([fake_label,], [fake_output,])
+        real_label = nd.uniform(low=.7,high=1.2,shape=(batch_size,),ctx=ctx)
+        fake_label = nd.uniform(low=0.,high=.3,shape=(batch_size,),ctx=ctx)
+        metric = mx.metric.Accuracy()
 
-            ############################
-            # (2) Update G network: maximize log(D(G(z)))
-            ###########################
-            with autograd.record():
-                output = netD(fake)
-                errG = loss(output, real_label)
-                errG.backward()
+        for epoch in range(start_epoch, start_epoch + nepochs):
+            tic = time.time()
+            # train_data.reset()
+            for i, data in enumerate(train_data):
+                ############################
+                # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+                ###########################
 
-            trainerG.step(batch_size)
+                data = data.as_in_context(ctx).reshape((-1,784))
 
-        name, acc = metric.get()
-        metric.reset()
-        if logger is not None:
-            logger.info('netD training acc epoch %04d: %s=%f , time: %f',epoch, name, acc, (time.time() - tic))
+                noise = nd.random_normal(shape=(data.shape[0], 32), ctx=ctx)
 
-        if (chkfreq > 0) and ( ( (epoch + 1) % chkfreq) == 0):
-            if config.saveG:
-                netG.save_params(config.sub('saveG',epoch=epoch+1))
-            if config.saveD:
-                netD.save_params(config.sub('saveD',epoch=epoch+1))
+                with autograd.record():
+                    real_output = netD(data)
+                    errD_real = loss(real_output, real_label)
+
+                    fake = netG(noise)
+                    fake_output = netD(fake.detach())
+                    errD_fake = loss(fake_output, fake_label)
+                    errD = errD_real + errD_fake
+                    errD.backward()
+
+                trainerD.step(batch_size)
+                metric.update([real_label,], [real_output,])
+                metric.update([fake_label,], [fake_output,])
+
+                ############################
+                # (2) Update G network: maximize log(D(G(z)))
+                ###########################
+                with autograd.record():
+                    output = netD(fake)
+                    errG = loss(output, real_label)
+                    errG.backward()
+
+                trainerG.step(batch_size)
+
+            name, acc = metric.get()
+            metric.reset()
+            if logger:
+                logger.info('netD training acc epoch %04d: %s=%f , time: %f',epoch, name, acc, (time.time() - tic))
+
+            if (save_freq > 0) and not ( (epoch + 1) % save_freq):
+                if config.saveG:
+                    netG.save_params(config.sub('saveG',epoch=epoch+1))
+                if config.saveD:
+                    netD.save_params(config.sub('saveD',epoch=epoch+1))

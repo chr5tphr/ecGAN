@@ -18,29 +18,22 @@ def call():
     parser = ArgumentParser()
 
     parser.add_argument('command',choices=commands.keys())
-
-    args,rargv = parser.parse_known_args(sys.argv[1:])
-
-    commands[args.command](rargv)
-
-@register_command
-def train(argv):
-    parser = ArgumentParser()
     parser.add_argument('-f','--config')
 
-    args = parser.parse_args(argv)
+    args = parser.parse_args(sys.argv[1:])
 
     config = Config(args.config)
 
-    _train(args,config)
+    commands[args.command](args,config)
 
-def _train(args,config):
+@register_command
+def train(args,config):
     ctx = mx.context.Context(config.device,config.device_id)
 
     batch_size = config.batch_size
     nepochs = config.nepochs
     start_epoch = config.start_epoch
-    chkfreq = config.chkfreq
+    save_freq = config.save_freq
 
     data = data_funcs[config.data_func](*(config.data_args),**(config.data_kwargs))
 
@@ -59,9 +52,10 @@ def _train(args,config):
     if config.log:
         logger = mkfilelogger('training',config.sub('log'))
 
-    train_GAN(data,batch_size,netG,netD,ctx,nepochs=nepochs,logger=logger)
+    model = GAN(netG=netG,netD=netD,ctx=ctx,logger=logger,config=config)
+    model.train(data,batch_size,nepochs)
 
-    if chkfreq <= 0:
+    if save_freq <= 0:
         epoch = start_epoch + nepochs
         if config.saveG:
             netG.save_params(config.sub('saveG',epoch=epoch))
@@ -69,17 +63,7 @@ def _train(args,config):
             netD.save_params(config.sub('saveD',epoch=epoch))
 
 @register_command
-def generate(argv):
-    parser = ArgumentParser()
-    parser.add_argument('-f','--config')
-
-    args = parser.parse_args(argv)
-
-    config = Config(args.config)
-
-    _generate(args,config)
-
-def _generate(args,config):
+def generate(args,config):
     ctx = mx.context.Context(config.device, config.device_id)
 
     netG = nets[config.netG]()
