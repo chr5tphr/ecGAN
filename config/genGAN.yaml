@@ -13,11 +13,11 @@ data_args: []
 data_kwargs: {'train':True,'label':5}
 
 netG: 'GenFC'
-paramG: '${root_dir}/G.${start_epoch}.params'
+paramG: '${root_dir}/${netG}.${start_epoch}.params'
 saveG: NULL
 netD: 'DiscrFC'
-paramD: '${root_dir}/D.${start_epoch}.params'
+paramD: '${root_dir}/${netD}.${start_epoch}.params'
 saveD: NULL
 
-log: '${root_dir}/test.log'
-genout: '${root_dir}/testgen.${start_epoch}.png'
+log: '${root_dir}/logfile.log'
+genout: '${root_dir}/gen.${netG}.${start_epoch}.png'
