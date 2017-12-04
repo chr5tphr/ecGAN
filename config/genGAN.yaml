@@ -14,10 +14,10 @@ data_kwargs: {'train':True,'label':5}
 
 model: 'GAN'
 netG: 'GenFC'
-paramG: '${root_dir}/params/${model}.${netG}.${epoch}.params'
+paramG: '${root_dir}/params/${model}.${netG}.${start_epoch}.params'
 saveG: NULL
 netD: 'DiscrFC'
-paramD: '${root_dir}/params/${model}.${netD}.${epoch}.params'
+paramD: '${root_dir}/params/${model}.${netD}.${start_epoch}.params'
 saveD: NULL
 
 log: '${root_dir}/log/${model}.log'

@@ -7,6 +7,7 @@ import sys
 
 from argparse import ArgumentParser
 from imageio import imwrite
+from mxnet import nd
 
 from ecGAN.net import nets
 from ecGAN.model import models
@@ -76,9 +77,9 @@ def generate(args,config):
     if config.log:
         logger = mkfilelogger('generation',config.sub('log'))
 
-    data = mx.nd.random_normal(shape=(30, 32), ctx=ctx)
+    data = nd.random_normal(shape=(30, 32), ctx=ctx)
     if config.model == 'CGAN':
-        data = nd.concat(data, nd.one_hot(nd.repeat(nd.arange(10),3),10), dim=1))
+        data = nd.concat(data, nd.one_hot(nd.repeat(nd.arange(10),3),10), dim=1)
 
     if config.genout:
         fpath = config.sub('genout')

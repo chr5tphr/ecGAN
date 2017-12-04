@@ -13,11 +13,11 @@ data_args: []
 data_kwargs: {'train':True}
 
 model: 'CGAN'
-netG: 'GenFC'
-paramG: '${root_dir}/params/${model}.${netG}.${epoch}.params'
+netG: 'CGenFC'
+paramG: '${root_dir}/params/${model}.${netG}.${start_epoch}.params'
 saveG: NULL
-netD: 'DiscrFC'
-paramD: '${root_dir}/params/${model}.${netD}.${epoch}.params'
+netD: 'CDiscrFC'
+paramD: '${root_dir}/params/${model}.${netD}.${start_epoch}.params'
 saveD: NULL
 
 log: '${root_dir}/log/${model}.log'

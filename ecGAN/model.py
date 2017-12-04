@@ -1,5 +1,7 @@
+import mxnet as mx
 from time import time
-from mxnet import gluon, autograd, nd, metric
+from mxnet import gluon, autograd, nd
+
 
 models = {}
 def register_model(obj):
@@ -26,7 +28,7 @@ class GAN(object):
             self.netG.save_params(fpath)
             if self.logger:
                 self.logger.info('Saved generator \'%s\' checkpoint epoch %s in file \'%s\'.',self.config.netG,epoch,fpath)
-        if config.saveD:
+        if self.config.saveD:
             fpath = self.config.sub('saveD',epoch=epoch)
             self.netD.save_params(fpath)
             if self.logger:
@@ -56,7 +58,7 @@ class GAN(object):
 
         real_label = nd.uniform(low=.7,high=1.2,shape=(batch_size,),ctx=ctx)
         fake_label = nd.uniform(low=0.,high=.3,shape=(batch_size,),ctx=ctx)
-        metric = metric.Accuracy()
+        metric = mx.metric.Accuracy()
 
         epoch = start_epoch
 
@@ -133,7 +135,7 @@ class CGAN(GAN):
 
         real_label = nd.uniform(low=.7,high=1.2,shape=(batch_size,),ctx=ctx)
         fake_label = nd.uniform(low=0.,high=.3,shape=(batch_size,),ctx=ctx)
-        metric = metric.Accuracy()
+        metric = mx.metric.Accuracy()
 
         epoch = start_epoch
 
@@ -150,17 +152,18 @@ class CGAN(GAN):
                     cond = cond.as_in_context(ctx)
                     cond_one_hot = nd.one_hot(cond, 10)
 
-                    data_cond = nd.concat([data,cond_one_hot],dim=1)
+                    data_cond = nd.concat(data,cond_one_hot,dim=1)
 
                     noise = nd.random_normal(shape=(data.shape[0], 32), ctx=ctx)
-                    noise_cond = nd.concat([noise,cond_one_hot],dim=1)
+                    noise_cond = nd.concat(noise,cond_one_hot,dim=1)
 
                     with autograd.record():
                         real_output = netD(data_cond)
                         errD_real = loss(real_output, real_label)
 
                         fake = netG(noise_cond)
-                        fake_output = netD(fake.detach())
+                        fake_cond = nd.concat(fake,cond_one_hot,dim=1)
+                        fake_output = netD(fake_cond.detach())
                         errD_fake = loss(fake_output, fake_label)
                         errD = errD_real + errD_fake
                         errD.backward()
@@ -173,7 +176,7 @@ class CGAN(GAN):
                     # (2) Update G network: maximize log(D(G(z)))
                     ###########################
                     with autograd.record():
-                        output = netD(fake)
+                        output = netD(fake_cond)
                         errG = loss(output, real_label)
                         errG.backward()
 
