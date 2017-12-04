@@ -8,11 +8,11 @@ nepochs: 10
 start_epoch: 0
 save_freq: 5
 
-data_func: 'get_mnist_single'
+data_func: 'get_mnist'
 data_args: []
-data_kwargs: {'train':True,'label':5}
+data_kwargs: {'train':True}
 
-model: 'GAN'
+model: 'CGAN'
 netG: 'GenFC'
 paramG: NULL
 saveG: '${root_dir}/params/${model}.${netG}.${epoch}.params'

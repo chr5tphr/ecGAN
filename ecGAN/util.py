@@ -20,6 +20,7 @@ class Config(dict):
         'device_id':        0,
         'netG':             'GenFC',
         'netD':             'DiscrFC',
+        'model':            'GAN',
         'data_func':        'get_mnist_single',
         'data_args':        [],
         'data_kwargs':      {},
@@ -69,11 +70,20 @@ def plot_data(data):
     return fig
 
 @register_data_func
-def get_mnist(train,batch_size):
+def get_mnist(train):
     def transform(data,label):
         data = (data.astype(np.float32)/255.)*2. - 1.
         label = label.astype(np.float32)
         return data,label
+
+    return mx.gluon.data.vision.MNIST(train=train,transform=transform)
+
+@register_data_func
+def get_mnist_cond(train):
+    def transform(data,label):
+        data = (data.astype(np.float32)/255.)*2. - 1.
+        label = label.astype(np.float32)
+        return data,nd.one_hot(label,10)
 
     return mx.gluon.data.vision.MNIST(train=train,transform=transform)
 

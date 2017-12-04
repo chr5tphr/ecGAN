@@ -8,7 +8,8 @@ import sys
 from argparse import ArgumentParser
 from imageio import imwrite
 
-from ecGAN.net import nets,GAN
+from ecGAN.net import nets
+from ecGAN.model import models
 from ecGAN.util import data_funcs,mkfilelogger,plot_data,Config
 
 commands = {}
@@ -16,12 +17,13 @@ def register_command(func):
     commands[func.__name__] = func
     return func
 
-def call():
+def main():
     parser = ArgumentParser()
 
     parser.add_argument('command',choices=commands.keys())
     parser.add_argument('-f','--config')
     parser.add_argument('-u','--update')
+    parser.add_argument('--condition',type=int)
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -57,7 +59,7 @@ def train(args,config):
     if config.log:
         logger = mkfilelogger('training',config.sub('log'))
 
-    model = GAN(netG=netG,netD=netD,ctx=ctx,logger=logger,config=config)
+    model = models[config.model](netG=netG,netD=netD,ctx=ctx,logger=logger,config=config)
     model.train(data,batch_size,nepochs)
 
 
@@ -75,17 +77,20 @@ def generate(args,config):
     if config.log:
         logger = mkfilelogger('generation',config.sub('log'))
 
+    data = mx.nd.random_normal(shape=(25, 32), ctx=ctx)
+    if args.condition:
+        data = nd.concat(data,nd.one_hot(nd.array([[args.condition]])),dim=1)
 
     if config.genout:
         fpath = config.sub('genout')
-        gdat = ((netG(mx.nd.random_normal(shape=(25, 32), ctx=ctx)) + 1) * 255/2).asnumpy().astype(np.uint8)
+        gdat = ((netG(data) + 1) * 255/2).asnumpy().astype(np.uint8)
         snum = int(len(gdat)**.5)
         imwrite(fpath, gdat[:snum**2].reshape(snum,snum,28,28).transpose(0,2,1,3).reshape(snum*28,snum*28))
         if logger:
             logger.info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',config.netG,config.sub('paramG'),config.sub('genout'))
     else:
-        fig = plot_data(netG(mx.nd.random_normal(shape=(25, 32), ctx=ctx)))
+        fig = plot_data(netG(data))
         fig.show()
 
 if __name__ == '__main__':
-    call()
+    main()
