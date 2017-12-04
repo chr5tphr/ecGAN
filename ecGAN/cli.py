@@ -77,20 +77,23 @@ def generate(args,config):
     if config.log:
         logger = mkfilelogger('generation',config.sub('log'))
 
-    data = nd.random_normal(shape=(30, 32), ctx=ctx)
+    noise = nd.random_normal(shape=(30, 32), ctx=ctx)
+    gdat = None
     if config.model == 'CGAN':
-        data = nd.concat(data, nd.one_hot(nd.repeat(nd.arange(10),3),10), dim=1)
+        gdat = netG(noise, nd.one_hot(nd.repeat(nd.arange(10),3),10))
+    else:
+        gdat = netG(noise)
 
     if config.genout:
         fpath = config.sub('genout')
-        gdat = ((netG(data) + 1) * 255/2).asnumpy().astype(np.uint8)
+        gdat = ((gdat + 1) * 255/2).asnumpy().astype(np.uint8)
         # snum = int(len(gdat)**.5)
         # imwrite(fpath, gdat[:snum**2].reshape(snum,snum,28,28).transpose(0,2,1,3).reshape(snum*28,snum*28))
         imwrite(fpath, gdat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
         if logger:
             logger.info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',config.netG,config.sub('paramG'),config.sub('genout'))
     else:
-        fig = plot_data(netG(data))
+        fig = plot_data(gdat)
         fig.show()
 
 if __name__ == '__main__':

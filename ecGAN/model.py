@@ -143,27 +143,23 @@ class CGAN(GAN):
             for epoch in range(start_epoch, start_epoch + nepochs):
                 tic = time()
                 # train_data.reset()
-                for i, (data,cond) in enumerate(data_iter):
+                for i, (data,cond_dense) in enumerate(data_iter):
                     ############################
                     # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
                     ###########################
 
                     data = data.as_in_context(ctx).reshape((-1,784))
-                    cond = cond.as_in_context(ctx)
-                    cond_one_hot = nd.one_hot(cond, 10)
-
-                    data_cond = nd.concat(data,cond_one_hot,dim=1)
+                    cond_dense = cond_dense.as_in_context(ctx)
+                    cond = nd.one_hot(cond_dense, 10)
 
                     noise = nd.random_normal(shape=(data.shape[0], 32), ctx=ctx)
-                    noise_cond = nd.concat(noise,cond_one_hot,dim=1)
 
                     with autograd.record():
-                        real_output = netD(data_cond)
+                        real_output = netD(data, cond)
                         errD_real = loss(real_output, real_label)
 
-                        fake = netG(noise_cond)
-                        fake_cond = nd.concat(fake,cond_one_hot,dim=1)
-                        fake_output = netD(fake_cond.detach())
+                        fake = netG(noise, cond)
+                        fake_output = netD(fake.detach(), cond)
                         errD_fake = loss(fake_output, fake_label)
                         errD = errD_real + errD_fake
                         errD.backward()
@@ -176,7 +172,7 @@ class CGAN(GAN):
                     # (2) Update G network: maximize log(D(G(z)))
                     ###########################
                     with autograd.record():
-                        output = netD(fake_cond)
+                        output = netD(fake, cond)
                         errG = loss(output, real_label)
                         errG.backward()
 
