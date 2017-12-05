@@ -8,16 +8,12 @@ import yaml
 from mxnet import nd
 from string import Template
 
-data_funcs = {}
-def register_data_func(func):
-    data_funcs[func.__name__] = func
-    return func
-
 class Config(dict):
 
     default_config = {
         'device':           'cpu',
         'device_id':        0,
+        'netC':             'ClassFC',
         'netG':             'GenFC',
         'netD':             'DiscrFC',
         'model':            'GAN',
@@ -27,9 +23,11 @@ class Config(dict):
         'batch_size':       32,
         'nepochs':          10,
         'start_epoch':      10,
-        'save_freq':          0,
+        'save_freq':        0,
+        'paramC'            None,
         'paramD':           None,
         'paramG':           None,
+        'saveC':            None,
         'saveD':            None,
         'saveG':            None,
         'log':              None,
@@ -52,7 +50,6 @@ class Config(dict):
     def sub(self,param,**kwargs):
         return Template(self[param]).safe_substitute(self,**kwargs)
 
-
 def plot_data(data):
     snum = int(len(data)**.5)
     if type(data) is nd.NDArray:
@@ -69,33 +66,6 @@ def plot_data(data):
     ax.set
     return fig
 
-@register_data_func
-def get_mnist(train):
-    def transform(data,label):
-        data = (data.astype(np.float32)/255.)*2. - 1.
-        label = label.astype(np.float32)
-        return data,label
-
-    return mx.gluon.data.vision.MNIST(train=train,transform=transform)
-
-@register_data_func
-def get_mnist_cond(train):
-    def transform(data,label):
-        data = (data.astype(np.float32)/255.)*2. - 1.
-        label = label.astype(np.float32)
-        return data,nd.one_hot(label,10)
-
-    return mx.gluon.data.vision.MNIST(train=train,transform=transform)
-
-@register_data_func
-def get_mnist_single(train,label):
-    def transform(tdata,tlabel):
-        if tlabel != label:
-            return None
-        return (tdata.astype(np.float32)/255.)*2. - 1.
-
-    ldata = [dat for dat in mx.gluon.data.vision.MNIST(train=train,transform=transform) if dat is not None]
-    return ldata
 
 def mkfilelogger(lname,fname,level=logging.INFO):
     logger = logging.getLogger(lname)

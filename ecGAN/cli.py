@@ -9,9 +9,10 @@ from argparse import ArgumentParser
 from imageio import imwrite
 from mxnet import nd
 
-from ecGAN.net import nets
-from ecGAN.model import models
-from ecGAN.util import data_funcs,mkfilelogger,plot_data,Config
+from .net import nets
+from .model import models
+from .data import data_funcs
+from .util import mkfilelogger,plot_data,Config
 
 commands = {}
 def register_command(func):
