@@ -151,6 +151,7 @@ class CGAN(GAN):
                     data = data.as_in_context(ctx).reshape((-1,784))
                     cond_dense = cond_dense.as_in_context(ctx)
                     cond = nd.one_hot(cond_dense, 10)
+                    cond2 = nd.one_hot(cond_dense, 10)
 
                     noise = nd.random_normal(shape=(data.shape[0], 32), ctx=ctx)
 
@@ -172,7 +173,7 @@ class CGAN(GAN):
                     # (2) Update G network: maximize log(D(G(z)))
                     ###########################
                     with autograd.record():
-                        output = netD(fake, cond)
+                        output = netD(fake, cond2)
                         errG = loss(output, real_label)
                         errG.backward()
 
