@@ -62,6 +62,9 @@ class GAN(object):
 
         epoch = start_epoch
 
+        if logger:
+            logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',config.model,config.netD,config.netG,start_epoch)
+
         try:
             for epoch in range(start_epoch, start_epoch + nepochs):
                 tic = time()
@@ -102,7 +105,7 @@ class GAN(object):
                 name, acc = metric.get()
                 metric.reset()
                 if logger:
-                    logger.info('netD training acc epoch %04d: %s=%f , time: %f',epoch, name, acc, (time() - tic))
+                    logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f',epoch, name, acc, (time() - tic))
                 if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
                     self.checkpoint(epoch+1)
         except KeyboardInterrupt:
@@ -138,6 +141,9 @@ class CGAN(GAN):
         metric = mx.metric.Accuracy()
 
         epoch = start_epoch
+
+        if logger:
+            logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',config.model,config.netD,config.netG,start_epoch)
 
         try:
             for epoch in range(start_epoch, start_epoch + nepochs):
@@ -183,7 +189,7 @@ class CGAN(GAN):
                 name, acc = metric.get()
                 metric.reset()
                 if logger:
-                    logger.info('netD training acc epoch %04d: %s=%f , time: %f',epoch, name, acc, (time() - tic))
+                    logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f',epoch, name, acc, (time() - tic))
                 if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
                     self.checkpoint(epoch+1)
         except KeyboardInterrupt:
