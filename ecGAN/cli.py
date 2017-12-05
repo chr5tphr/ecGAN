@@ -46,12 +46,12 @@ def train(args,config):
 
     netG = nets[config.netG]()
     if config.paramG:
-        netG.load_params(config.paramG,ctx=ctx)
+        netG.load_params(config.sub('paramG'),ctx=ctx)
     else:
         netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
     netD = nets[config.netD]()
     if config.paramD:
-        netD.load_params(config.paramD,ctx=ctx)
+        netD.load_params(config.sub('paramD'),ctx=ctx)
     else:
         netD.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
 
