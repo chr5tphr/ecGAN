@@ -79,8 +79,10 @@ def generate(args,config):
 
     noise = nd.random_normal(shape=(30, 32), ctx=ctx)
     gdat = None
+    cond = None
     if config.model == 'CGAN':
-        gdat = netG(noise, nd.one_hot(nd.repeat(nd.arange(10),3),10))
+        cond = nd.one_hot(nd.repeat(nd.arange(10,ctx=ctx),3),10)
+        gdat = netG(noise, cond)
     else:
         gdat = netG(noise)
 

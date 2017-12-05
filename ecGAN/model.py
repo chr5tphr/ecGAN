@@ -152,15 +152,16 @@ class CGAN(GAN):
                     cond_dense = cond_dense.as_in_context(ctx)
                     cond = nd.one_hot(cond_dense, 10)
                     cond2 = nd.one_hot(cond_dense, 10)
+                    cond3 = nd.one_hot(cond_dense, 10)
 
                     noise = nd.random_normal(shape=(data.shape[0], 32), ctx=ctx)
 
                     with autograd.record():
-                        real_output = netD(data, cond)
+                        real_output = netD(data, cond.detach())
                         errD_real = loss(real_output, real_label)
 
                         fake = netG(noise, cond)
-                        fake_output = netD(fake.detach(), cond)
+                        fake_output = netD(fake.detach(), cond2.detach())
                         errD_fake = loss(fake_output, fake_label)
                         errD = errD_real + errD_fake
                         errD.backward()
@@ -173,7 +174,7 @@ class CGAN(GAN):
                     # (2) Update G network: maximize log(D(G(z)))
                     ###########################
                     with autograd.record():
-                        output = netD(fake, cond2)
+                        output = netD(fake, cond3.detach())
                         errG = loss(output, real_label)
                         errG.backward()
 
