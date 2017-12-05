@@ -8,47 +8,99 @@ import yaml
 from mxnet import nd
 from string import Template
 
-class Config(dict):
+class ConfigNode(dict):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        for key,val in self.items():
+            self[key] = self.parse(val)
+
+    def flattened(self):
+        self.flat = {}
+        self._flatten(self.flat)
+
+    def _flatten(self,root,prefix=''):
+        for key,val in self.items():
+            cap = '%s%s%s'%(prefix, '.' if prefix else '', key)
+            if type(val) is type(self):
+                val._flatten(root,cap)
+            else:
+                root[cap] = val
+
+    def update(self,new):
+        for key, val in new.items():
+            if isinstance(val,dict) and isinstance(self.get(key),dict):
+                self[key].update(val)
+            else:
+                self[key] = self.parse(val)
+
+    @classmethod
+    def parse(clss,X):
+        if type(X) is dict:
+            return clss(X)
+        else:
+            return X
+
+    def __getattr__(self,name):
+        errA = None
+        try:
+            return self.__getitem__(name)
+        except KeyError as err:
+            # return None
+            errA = err
+        raise AttributeError(err)
+
+    def sub(self,param,**kwargs):
+        if not hasattr(self,'flat'):
+            self.flattened()
+        return Template(self.flat[param]).safe_substitute(self.flat,**kwargs)
+
+class Config(ConfigNode):
 
     default_config = {
         'device':           'cpu',
         'device_id':        0,
-        'netC':             'ClassFC',
-        'netG':             'GenFC',
-        'netD':             'DiscrFC',
         'model':            'GAN',
-        'data_func':        'get_mnist_single',
-        'data_args':        [],
-        'data_kwargs':      {},
+        'nets': {
+            # 'generator': {
+            #     'type':     'GenFC',
+            #     'param':    None,
+            #     'save':     None,
+            # },
+            # 'discriminator': {
+            #     'type':     'DiscrFC',
+            #     'param':    None,
+            #     'save':     None,
+            # },
+            # 'classifier': {
+            #     'type':     'ClassFC',
+            #     'param':    None,
+            #     'save':     None,
+            # },
+        },
+        'data': {
+            'func':         'get_mnist_single',
+            'args':         [],
+            'kwargs':       {},
+        },
         'batch_size':       32,
         'nepochs':          10,
         'start_epoch':      10,
         'save_freq':        0,
-        'paramC'            None,
-        'paramD':           None,
-        'paramG':           None,
-        'saveC':            None,
-        'saveD':            None,
-        'saveG':            None,
         'log':              None,
         'genout':           None,
     }
 
     def __init__(self,fname=None,*args,**kwargs):
         super().__init__(*args,**kwargs)
-        self.update(__class__.default_config)
+
+        defcfg = ConfigNode(__class__.default_config)
+        defcfg.update(self)
+        self.update(defcfg)
+
         if fname:
             with open(fname,'r') as fp:
                 self.update(yaml.safe_load(fp))
 
-    def __getattr__(self,name):
-        try:
-            return self.__getitem__(name)
-        except KeyError as err:
-            raise AttributeError(err)
-
-    def sub(self,param,**kwargs):
-        return Template(self[param]).safe_substitute(self,**kwargs)
 
 def plot_data(data):
     snum = int(len(data)**.5)

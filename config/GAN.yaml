@@ -1,0 +1,32 @@
+root_dir: '/home/chrstphr/projects/ecGAN/result'
+
+device: 'cpu'
+device_id: 0
+
+batch_size: 32
+nepochs: 10
+start_epoch: 0
+save_freq: 5
+
+data:
+  func: 'get_mnist_single'
+  args: []
+  kwargs: {'train':True,'label':5}
+
+model: 'GAN'
+nets:
+  generator:
+    type: 'GenFC'
+    param: '${root_dir}/params/${model}.${nets.generator.type}.${start_epoch}.params'
+    save: '${root_dir}/params/${model}.${nets.generator.type}.${epoch}.params'
+  discriminator:
+    type: 'DiscrFC'
+    param: '${root_dir}/params/${model}.${nets.discriminator.type}.${start_epoch}.params'
+    save: '${root_dir}/params/${model}.${nets.discriminator.type}.${epoch}.params'
+  # classifier:
+  #   type: 'ClassFC'
+  #   param: '${root_dir}/params/${model}.${nets.classifier.type}.${start_epoch}.params'
+  #   save: '${root_dir}/params/${model}.${nets.classifier.type}.${epoch}.params'
+
+log: '${root_dir}/log/${model}.log'
+genout: '${root_dir}/gen/${model}.${nets.discriminator.type}.${start_epoch}.png'

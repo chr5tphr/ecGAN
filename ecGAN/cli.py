@@ -40,27 +40,14 @@ def train(args,config):
 
     batch_size = config.batch_size
     nepochs = config.nepochs
-    start_epoch = config.start_epoch
-    save_freq = config.save_freq
 
-    data = data_funcs[config.data_func](*(config.data_args),**(config.data_kwargs))
-
-    netG = nets[config.netG]()
-    if config.paramG:
-        netG.load_params(config.sub('paramG'),ctx=ctx)
-    else:
-        netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
-    netD = nets[config.netD]()
-    if config.paramD:
-        netD.load_params(config.sub('paramD'),ctx=ctx)
-    else:
-        netD.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
+    data = data_funcs[config.data.func](*(config.data.args),**(config.data.kwargs))
 
     logger = None
     if config.log:
         logger = mkfilelogger('training',config.sub('log'))
 
-    model = models[config.model](netG=netG,netD=netD,ctx=ctx,logger=logger,config=config)
+    model = models[config.model](ctx=ctx,logger=logger,config=config)
     model.train(data,batch_size,nepochs)
 
 
@@ -68,9 +55,9 @@ def train(args,config):
 def generate(args,config):
     ctx = mx.context.Context(config.device, config.device_id)
 
-    netG = nets[config.netG]()
-    if config.paramG:
-        netG.load_params(config.sub('paramG'),ctx=ctx)
+    netG = nets[config.nets.generator.type]()
+    if config.nets.generator.param:
+        netG.load_params(config.sub('nets.generator.param'),ctx=ctx)
     else:
         netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
 
@@ -94,10 +81,22 @@ def generate(args,config):
         # imwrite(fpath, gdat[:snum**2].reshape(snum,snum,28,28).transpose(0,2,1,3).reshape(snum*28,snum*28))
         imwrite(fpath, gdat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
         if logger:
-            logger.info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',config.netG,config.sub('paramG'),config.sub('genout'))
+            logger.info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',
+                        config.nets.generator.type,config.sub('nets.generator.param'),config.sub('genout'))
     else:
         fig = plot_data(gdat)
         fig.show()
+
+@register_command
+def test(args, config):
+    ctx = mx.context.Context(config.device, config.device_id)
+
+    logger = None
+    if config.log:
+        logger = mkfilelogger('testing',config.sub('log'))
+
+    model = models[config.model](ctx=ctx,logger=logger,config=config)
+    model.test()
 
 if __name__ == '__main__':
     main()

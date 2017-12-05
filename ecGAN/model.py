@@ -9,46 +9,71 @@ def register_model(obj):
     models[obj.__name__] = obj
     return obj
 
-@register_model
-class Classifier(object):
-    def __init__(self,netC,ctx,**kwargs):
+class Model(object):
+    def __init__(self,**kwargs):
         self.logger = kwargs.get('logger')
-        self.config = kwargs.get('config',{})
+        self.config = kwargs.get('config',Config())
+        self.ctx = kwargs.get(ctx)
 
         self.save_freq = self.config.save_freq
         self.start_epoch = self.config.get('start_epoch',0)
 
-        self.netC = netC
+        self.nets = {}
+        for key, desc in self.config.nets.items():
+            self.nets[key] = nets[desc.type]
+            try:
+                if desc.param:
+                    fpath = self.config.sub('nets.%s.param'%(key))
+                    self.nets[key].load_params(fpath,ctx=ctx)
+                    if self.logger:
+                        self.logger.debug('Loading parameters for %s \'%s\' from %s.',key,desc.type,fpath)
+                else:
+                    raise AttributeError
+            except AttributeError:
+                self.nets[key].initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
+                if self.logger:
+                    self.logger.debug('Initializing %s \'%s\'.',key,desc.type)
 
-        self.ctx = ctx
+    def checkpoint(self, epoch):
+        for key,tnet in self.nets.items():
+            try:
+                if self.config.nets[key].save:
+                    fpath = self.config.sub('nets.%s.save'%(key),epoch=epoch)
+                    tnet.save_params(fpath)
+                    if self.logger:
+                        self.logger.info('Saved %s \'%s\' checkpoint epoch %s in file \'%s\'.',key,self.config.nets[key].type,epoch,fpath)
+                else:
+                    raise AttributeError
+            except AttributeError:
+                if self.logger:
+                    self.logger.debug('Not saving %s \'%s\' epoch %s.',key,self.config.nets[key].type,epoch,fpath)
 
-    def checkpoint(self,epoch):
-        if self.config.saveC:
-            fpath = self.config.sub('saveC',epoch=epoch)
-            self.netC.save_params(fpath)
-            if self.logger:
-                self.logger.info('Saved classifier \'%s\' checkpoint epoch %s in file \'%s\'.',self.config.netC,epoch,fpath)
+
+@register_model
+class Classifier(Model):
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        self.netC = self.nets['classifier']
 
     def train(self,data,batch_size,nepochs):
-        logger = self.logger
         config = self.config
-        save_freq = self.save_freq
-        start_epoch = self.start_epoch
-        net = self.net
+
+        netC = self.netC
         ctx = self.ctx
 
         data_iter = gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
         loss = gluon.loss.SoftmaxCrossEntropyLoss()
-        trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': 0.01})
-        epoch = start_epoch
+        trainer = gluon.Trainer(netC.collect_params(), 'adam', {'learning_rate': 0.01})
+        epoch = self.start_epoch
 
         metric = mx.metric.Accuracy()
 
-        if logger:
-            logger.info('Starting training of model %s, classifier %s at epoch %d',config.model,config.netC,start_epoch)
+        if self.logger:
+            self.logger.info('Starting training of model %s, classifier %s at epoch %d',
+                            config.model,config.nets.classifier.type,epoch)
 
         try:
-            for epoch in range(start_epoch, start_epoch + nepochs):
+            for epoch in range(self.start_epoch, self.start_epoch + nepochs):
                 tic = time()
                 for i, (data, label) in enumerate(data_iter):
 
@@ -56,7 +81,7 @@ class Classifier(object):
                     label = label.as_in_context(ctx)
 
                     with autograd.record():
-                        output = net(data)
+                        output = netC(data)
                         err = loss(output, label)
 
                         err.backward()
@@ -66,47 +91,40 @@ class Classifier(object):
 
                 name, acc = metric.get()
                 metric.reset()
-                if logger:
-                    logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f',epoch, name, acc, (time() - tic))
-                if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
+                if self.logger:
+                    self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f',epoch, name, acc, (time() - tic))
+                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)) :
                     self.checkpoint(epoch+1)
         except KeyboardInterrupt:
-            logger.info('Training interrupted by user.')
+            self.logger.info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
 
+    def test(self,data,batch_size):
+        data_iter = gluon.data.DataLoader(data,batch_size,last_batch='discard')
+
+        metric = mx.metric.Accuracy()
+        for i, (data, label) in enumerate(data_iter):
+            data = data.as_in_context(self.ctx).reshape((-1,784))
+            label = label.as_in_context(self.ctx)
+
+            output = self.netC(data)
+            metric.update([label,], [output,])
+
+        name, acc = metric.get()
+
+        if self.logger:
+            self.logger.info('%s test acc: %s=%.4f , time: %.2f',self.config.nets.classifier.type, name, acc)
+
 @register_model
-class GAN(object):
-    def __init__(self,netG,netD,ctx,**kwargs):
-        self.logger = kwargs.get('logger')
-        self.config = kwargs.get('config',{})
-
-        self.save_freq = self.config.save_freq
-        self.start_epoch = self.config.get('start_epoch',0)
-
-        self.netG = netG
-        self.netD = netD
-
-        self.ctx = ctx
-
-    def checkpoint(self,epoch):
-        if self.config.saveG:
-            fpath = self.config.sub('saveG',epoch=epoch)
-            self.netG.save_params(fpath)
-            if self.logger:
-                self.logger.info('Saved generator \'%s\' checkpoint epoch %s in file \'%s\'.',self.config.netG,epoch,fpath)
-        if self.config.saveD:
-            fpath = self.config.sub('saveD',epoch=epoch)
-            self.netD.save_params(fpath)
-            if self.logger:
-                self.logger.info('Saved discriminator \'%s\' checkpoint epoch %s in file \'%s\'.',self.config.netD,epoch,fpath)
+class GAN(Model):
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        self.netG = self.nets['generator']
+        self.netD = self.nets['discriminator']
 
     def train(self,data,batch_size,nepochs):
 
-        logger = self.logger
         config = self.config
-
-        save_freq = self.save_freq
-        start_epoch = self.start_epoch
 
         netG = self.netG
         netD = self.netD
@@ -130,13 +148,14 @@ class GAN(object):
 
         metric = mx.metric.Accuracy()
 
-        epoch = start_epoch
+        epoch = self.start_epoch
 
         if logger:
-            logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',config.model,config.netD,config.netG,start_epoch)
+            logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
+                        config.model,config.nets.discriminator.type,config.nets.generator.type,epoch)
 
         try:
-            for epoch in range(start_epoch, start_epoch + nepochs):
+            for epoch in range(self.start_epoch, self.start_epoch + nepochs):
                 tic = time()
                 # train_data.reset()
                 for i, data in enumerate(data_iter):
@@ -174,27 +193,21 @@ class GAN(object):
 
                 name, acc = metric.get()
                 metric.reset()
-                if logger:
-                    logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f',epoch, name, acc, (time() - tic))
-                if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
+                if self.logger:
+                    self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f',epoch, name, acc, (time() - tic))
+                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)) :
                     self.checkpoint(epoch+1)
         except KeyboardInterrupt:
-            logger.info('Training interrupted by user.')
+            self.logger.info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
 
 @register_model
 class CGAN(GAN):
     def train(self,data,batch_size,nepochs):
 
-        logger = self.logger
         config = self.config
-
-        save_freq = self.save_freq
-        start_epoch = self.start_epoch
-
         netG = self.netG
         netD = self.netD
-
         ctx = self.ctx
 
         data_iter = gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
@@ -213,13 +226,14 @@ class CGAN(GAN):
         fake_label_oh = fuzzy_one_hot(fake_label, 2)
         metric = mx.metric.Accuracy()
 
-        epoch = start_epoch
+        epoch = self.start_epoch
 
         if logger:
-            logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',config.model,config.netD,config.netG,start_epoch)
+            logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
+                        config.model,config.nets.discriminator.type,config.nets.generator.type,epoch)
 
         try:
-            for epoch in range(start_epoch, start_epoch + nepochs):
+            for epoch in range(self.start_epoch, self.start_epoch + nepochs):
                 tic = time()
                 # train_data.reset()
                 for i, (data,cond_dense) in enumerate(data_iter):
@@ -261,10 +275,10 @@ class CGAN(GAN):
 
                 name, acc = metric.get()
                 metric.reset()
-                if logger:
-                    logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f',epoch, name, acc, (time() - tic))
-                if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
+                if self.logger:
+                    self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f',epoch, name, acc, (time() - tic))
+                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)) :
                     self.checkpoint(epoch+1)
         except KeyboardInterrupt:
-            logger.info('Training interrupted by user.')
+            self.logger.info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
