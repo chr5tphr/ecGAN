@@ -32,6 +32,22 @@ class DiscrFC(nn.Sequential):
             self.add(nn.Dropout(.5))
             self.add(nn.Dense(2))
 
+@register_net
+class ClassFC(nn.Sequential):
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self.add(nn.Dense(256))
+            # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
+            self.add(nn.LeakyReLU(0.01))
+            self.add(nn.Dropout(.5))
+            self.add(nn.Dense(256))
+            # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
+            self.add(nn.LeakyReLU(0.01))
+            self.add(nn.Dropout(.5))
+            self.add(nn.Dense(10))
+
+
 class YSequential(nn.Block):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)

@@ -3,6 +3,8 @@ from time import time
 from mxnet import gluon, autograd, nd
 
 from .func import fuzzy_one_hot
+from .util import Config
+from .net import nets
 
 models = {}
 def register_model(obj):
@@ -13,38 +15,34 @@ class Model(object):
     def __init__(self,**kwargs):
         self.logger = kwargs.get('logger')
         self.config = kwargs.get('config',Config())
-        self.ctx = kwargs.get(ctx)
+        self.ctx = kwargs.get('ctx')
+        if not self.ctx:
+            self.ctx = mx.context.Context(config.device, config.device_id)
 
         self.save_freq = self.config.save_freq
         self.start_epoch = self.config.get('start_epoch',0)
 
         self.nets = {}
         for key, desc in self.config.nets.items():
-            self.nets[key] = nets[desc.type]
-            try:
-                if desc.param:
-                    fpath = self.config.sub('nets.%s.param'%(key))
-                    self.nets[key].load_params(fpath,ctx=ctx)
-                    if self.logger:
-                        self.logger.debug('Loading parameters for %s \'%s\' from %s.',key,desc.type,fpath)
-                else:
-                    raise AttributeError
-            except AttributeError:
-                self.nets[key].initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
+            self.nets[key] = nets[desc.type]()
+            if desc.get('param'):
+                fpath = self.config.sub('nets.%s.param'%(key))
+                self.nets[key].load_params(fpath,ctx=self.ctx)
+                if self.logger:
+                    self.logger.debug('Loading parameters for %s \'%s\' from %s.',key,desc.type,fpath)
+            else:
+                self.nets[key].initialize(mx.init.Xavier(magnitude=2.24),ctx=self.ctx)
                 if self.logger:
                     self.logger.debug('Initializing %s \'%s\'.',key,desc.type)
 
     def checkpoint(self, epoch):
         for key,tnet in self.nets.items():
-            try:
-                if self.config.nets[key].save:
-                    fpath = self.config.sub('nets.%s.save'%(key),epoch=epoch)
-                    tnet.save_params(fpath)
-                    if self.logger:
-                        self.logger.info('Saved %s \'%s\' checkpoint epoch %s in file \'%s\'.',key,self.config.nets[key].type,epoch,fpath)
-                else:
-                    raise AttributeError
-            except AttributeError:
+            if self.config.nets[key].get('save'):
+                fpath = self.config.sub('nets.%s.save'%(key),epoch=epoch)
+                tnet.save_params(fpath)
+                if self.logger:
+                    self.logger.info('Saved %s \'%s\' checkpoint epoch %s in file \'%s\'.',key,self.config.nets[key].type,epoch,fpath)
+            else:
                 if self.logger:
                     self.logger.debug('Not saving %s \'%s\' epoch %s.',key,self.config.nets[key].type,epoch,fpath)
 
@@ -134,7 +132,7 @@ class GAN(Model):
         data_iter = gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
 
         # loss
-        loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_labels=False)
+        loss = gluon.loss.SoftmaxCrossEntropyLoss()#sparse_label=False)
 
         # trainer for the generator and the discriminator
         trainerG = gluon.Trainer(netG.collect_params(), 'adam', {'learning_rate': 0.01})
@@ -150,8 +148,8 @@ class GAN(Model):
 
         epoch = self.start_epoch
 
-        if logger:
-            logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
+        if self.logger:
+            self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
                         config.model,config.nets.discriminator.type,config.nets.generator.type,epoch)
 
         try:
@@ -169,11 +167,11 @@ class GAN(Model):
 
                     with autograd.record():
                         real_output = netD(data)
-                        errD_real = loss(real_output, real_label_oh)
+                        errD_real = loss(real_output, real_label)
 
                         fake = netG(noise)
                         fake_output = netD(fake.detach())
-                        errD_fake = loss(fake_output, fake_label_oh)
+                        errD_fake = loss(fake_output, fake_label)
                         errD = errD_real + errD_fake
                         errD.backward()
 
@@ -213,7 +211,7 @@ class CGAN(GAN):
         data_iter = gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
 
         # loss
-        loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_labels=False)
+        loss = gluon.loss.SoftmaxCrossEntropyLoss()#sparse_label=False)
 
         # trainer for the generator and the discriminator
         trainerG = gluon.Trainer(netG.collect_params(), 'adam', {'learning_rate': 0.01})
@@ -222,14 +220,14 @@ class CGAN(GAN):
         real_label = nd.ones(batch_size, ctx=ctx)
         fake_label = nd.zeros(batch_size, ctx=ctx)
 
-        real_label_oh = fuzzy_one_hot(real_label, 2)
-        fake_label_oh = fuzzy_one_hot(fake_label, 2)
+        # real_label_oh = fuzzy_one_hot(real_label, 2)
+        # fake_label_oh = fuzzy_one_hot(fake_label, 2)
         metric = mx.metric.Accuracy()
 
         epoch = self.start_epoch
 
-        if logger:
-            logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
+        if self.logger:
+            self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
                         config.model,config.nets.discriminator.type,config.nets.generator.type,epoch)
 
         try:
@@ -251,11 +249,11 @@ class CGAN(GAN):
 
                     with autograd.record():
                         real_output = netD(data, cond.detach())
-                        errD_real = loss(real_output, real_label_oh)
+                        errD_real = loss(real_output, real_label)
 
                         fake = netG(noise, cond)
                         fake_output = netD(fake.detach(), cond2.detach())
-                        errD_fake = loss(fake_output, fake_label_oh)
+                        errD_fake = loss(fake_output, fake_label)
                         errD = errD_real + errD_fake
                         errD.backward()
 

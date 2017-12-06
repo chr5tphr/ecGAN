@@ -6,7 +6,10 @@ import logging
 import yaml
 
 from mxnet import nd
-from string import Template
+from string import Template as STemplate
+
+class Template(STemplate):
+    idpattern = r'[_a-z][_\.a-z0-9]*'
 
 class ConfigNode(dict):
     def __init__(self,*args,**kwargs):
@@ -14,14 +17,18 @@ class ConfigNode(dict):
         for key,val in self.items():
             self[key] = self.parse(val)
 
-    def flattened(self):
-        self.flat = {}
-        self._flatten(self.flat)
+        self._flat = None
+
+    def flat(self):
+        if not self._flat:
+            self._flat = {}
+            self._flatten(self._flat)
+        return self._flat
 
     def _flatten(self,root,prefix=''):
         for key,val in self.items():
             cap = '%s%s%s'%(prefix, '.' if prefix else '', key)
-            if type(val) is type(self):
+            if isinstance(val,__class__):
                 val._flatten(root,cap)
             else:
                 root[cap] = val
@@ -47,12 +54,10 @@ class ConfigNode(dict):
         except KeyError as err:
             # return None
             errA = err
-        raise AttributeError(err)
+        raise AttributeError(errA)
 
     def sub(self,param,**kwargs):
-        if not hasattr(self,'flat'):
-            self.flattened()
-        return Template(self.flat[param]).safe_substitute(self.flat,**kwargs)
+        return Template(self.flat()[param]).safe_substitute(self.flat(),**kwargs)
 
 class Config(ConfigNode):
 
@@ -100,7 +105,6 @@ class Config(ConfigNode):
         if fname:
             with open(fname,'r') as fp:
                 self.update(yaml.safe_load(fp))
-
 
 def plot_data(data):
     snum = int(len(data)**.5)
