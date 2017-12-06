@@ -132,7 +132,7 @@ class GAN(Model):
         data_iter = gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
 
         # loss
-        loss = gluon.loss.SoftmaxCrossEntropyLoss()#sparse_label=False)
+        loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
 
         # trainer for the generator and the discriminator
         trainerG = gluon.Trainer(netG.collect_params(), 'adam', {'learning_rate': 0.01})
@@ -167,11 +167,11 @@ class GAN(Model):
 
                     with autograd.record():
                         real_output = netD(data)
-                        errD_real = loss(real_output, real_label)
+                        errD_real = loss(real_output, real_label_oh)
 
                         fake = netG(noise)
                         fake_output = netD(fake.detach())
-                        errD_fake = loss(fake_output, fake_label)
+                        errD_fake = loss(fake_output, fake_label_oh)
                         errD = errD_real + errD_fake
                         errD.backward()
 
@@ -184,7 +184,7 @@ class GAN(Model):
                     ###########################
                     with autograd.record():
                         output = netD(fake)
-                        errG = loss(output, real_label)
+                        errG = loss(output, real_label_oh)
                         errG.backward()
 
                     trainerG.step(batch_size)
@@ -211,7 +211,7 @@ class CGAN(GAN):
         data_iter = gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
 
         # loss
-        loss = gluon.loss.SoftmaxCrossEntropyLoss()#sparse_label=False)
+        loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
 
         # trainer for the generator and the discriminator
         trainerG = gluon.Trainer(netG.collect_params(), 'adam', {'learning_rate': 0.01})
@@ -220,8 +220,8 @@ class CGAN(GAN):
         real_label = nd.ones(batch_size, ctx=ctx)
         fake_label = nd.zeros(batch_size, ctx=ctx)
 
-        # real_label_oh = fuzzy_one_hot(real_label, 2)
-        # fake_label_oh = fuzzy_one_hot(fake_label, 2)
+        real_label_oh = fuzzy_one_hot(real_label, 2)
+        fake_label_oh = fuzzy_one_hot(fake_label, 2)
         metric = mx.metric.Accuracy()
 
         epoch = self.start_epoch
@@ -249,11 +249,11 @@ class CGAN(GAN):
 
                     with autograd.record():
                         real_output = netD(data, cond.detach())
-                        errD_real = loss(real_output, real_label)
+                        errD_real = loss(real_output, real_label_oh)
 
                         fake = netG(noise, cond)
                         fake_output = netD(fake.detach(), cond2.detach())
-                        errD_fake = loss(fake_output, fake_label)
+                        errD_fake = loss(fake_output, fake_label_oh)
                         errD = errD_real + errD_fake
                         errD.backward()
 
@@ -266,7 +266,7 @@ class CGAN(GAN):
                     ###########################
                     with autograd.record():
                         output = netD(fake, cond3.detach())
-                        errG = loss(output, real_label)
+                        errG = loss(output, real_label_oh)
                         errG.backward()
 
                     trainerG.step(batch_size)
