@@ -3,7 +3,7 @@ from time import time
 from mxnet import gluon, autograd, nd
 
 from .func import fuzzy_one_hot
-from .util import Config
+from .util import Config, config_ctx
 from .net import nets
 
 models = {}
@@ -17,7 +17,7 @@ class Model(object):
         self.config = kwargs.get('config',Config())
         self.ctx = kwargs.get('ctx')
         if not self.ctx:
-            self.ctx = mx.context.Context(config.device, config.device_id)
+            self.ctx = config_ctx(self.config)
 
         self.save_freq = self.config.save_freq
         self.start_epoch = self.config.get('start_epoch',0)

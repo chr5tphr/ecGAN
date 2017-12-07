@@ -4,9 +4,12 @@ import numpy as np
 import mxnet as mx
 import logging
 import yaml
+import random
 
 from mxnet import nd
 from string import Template as STemplate
+
+from .gpuman import nvidia_idle
 
 class Template(STemplate):
     idpattern = r'[_a-z][_\.a-z0-9]*'
@@ -63,7 +66,7 @@ class Config(ConfigNode):
 
     default_config = {
         'device':           'cpu',
-        'device_id':        0,
+        'device_id':        'auto',
         'model':            'GAN',
         'nets': {
             # 'generator': {
@@ -105,6 +108,16 @@ class Config(ConfigNode):
         if fname:
             with open(fname,'r') as fp:
                 self.update(yaml.safe_load(fp))
+
+def config_ctx(config):
+    if config.device == 'cpu':
+        return mx.context.cpu()
+    elif config.device == 'gpu':
+        if isinstance(config.device_id,int):
+            return mx.context.gpu(config.device_id)
+        else:
+            return mx.context.gpu(random.choice(nvidia_idle()))
+
 
 def plot_data(data):
     snum = int(len(data)**.5)

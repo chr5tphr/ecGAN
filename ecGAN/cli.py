@@ -12,7 +12,7 @@ from mxnet import nd
 from .net import nets
 from .model import models
 from .data import data_funcs
-from .util import mkfilelogger,plot_data,Config
+from .util import mkfilelogger, plot_data, Config, config_ctx
 
 commands = {}
 def register_command(func):
@@ -36,7 +36,7 @@ def main():
 
 @register_command
 def train(args,config):
-    ctx = mx.context.Context(config.device,config.device_id)
+    ctx = config_ctx(config)
 
     batch_size = config.batch_size
     nepochs = config.nepochs
@@ -53,7 +53,7 @@ def train(args,config):
 
 @register_command
 def generate(args,config):
-    ctx = mx.context.Context(config.device, config.device_id)
+    ctx = config_ctx(config)
 
     netG = nets[config.nets.generator.type]()
     if config.nets.generator.param:
@@ -89,7 +89,7 @@ def generate(args,config):
 
 @register_command
 def test(args, config):
-    ctx = mx.context.Context(config.device, config.device_id)
+    ctx = config_ctx(config)
 
     logger = None
     if config.log:
