@@ -26,5 +26,14 @@ setup(
         ['PyYAML==3.12'],
         ['Pillow==4.3.0'],
         ['imageio==2.2.0']
+    ],
+    ext_modules=[
+        Extension(
+            'gpuman',
+            ['src/gpuman.c'],
+            include_dirs=['/usr/local/cuda/include'],
+            libraries=['nvidia-ml'],
+            library_dirs='/usr/lib/nvidia-384'
+        )
     ]
 )
