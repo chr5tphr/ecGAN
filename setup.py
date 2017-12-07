@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
 setup(
     name="ecGAN",
     version="0.1",
@@ -29,11 +29,12 @@ setup(
     ],
     ext_modules=[
         Extension(
-            'gpuman',
+            'ecGAN.gpuman',
             ['src/gpuman.c'],
             include_dirs=['/usr/local/cuda/include'],
             libraries=['nvidia-ml'],
-            library_dirs='/usr/lib/nvidia-384'
+            # WARNING driver branch can be other than 384!!
+            library_dirs=['/usr/lib/nvidia-384']
         )
     ]
 )

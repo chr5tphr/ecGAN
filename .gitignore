@@ -3,3 +3,5 @@ sandbox.py
 __pycache__
 *.egg-info
 .pygpu
+*.so
+build

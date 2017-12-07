@@ -1,8 +1,9 @@
+#include <nvml.h>
 #include "Python.h"
 
 static PyObject *NVMLError;
 
-static PyObject * gpuman_idle(PyObject *self, PyObject *args) {
+static PyObject * gpuman_nvidia_idle(PyObject *self, PyObject *args) {
   PyObject *retlist = NULL;
 
   // parse arguments
@@ -58,7 +59,7 @@ static PyObject * gpuman_idle(PyObject *self, PyObject *args) {
 }
 
 static PyMethodDef methods[] = {
-  {"idle", gpuman_idle, METH_VARARGS, "Get ids of idleing (unoccupied) gpu devices." },
+  {"nvidia_idle", gpuman_nvidia_idle, METH_VARARGS, "Get ids of idleing (unoccupied) nvidia gpu devices." },
   {NULL, NULL, 0, NULL}
 };
 
