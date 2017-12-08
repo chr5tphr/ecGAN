@@ -1,6 +1,7 @@
 import mxnet as mx
 from time import time
 from mxnet import gluon, autograd, nd
+from imageio import imwrite
 
 from .func import fuzzy_one_hot
 from .util import Config, config_ctx
@@ -111,7 +112,7 @@ class Classifier(Model):
         name, acc = metric.get()
 
         if self.logger:
-            self.logger.info('%s test acc: %s=%.4f , time: %.2f',self.config.nets.classifier.type, name, acc)
+            self.logger.info('%s test acc: %s=%.4f',self.config.nets.classifier.type, name, acc)
 
 @register_model
 class GAN(Model):
@@ -163,7 +164,7 @@ class GAN(Model):
 
                     data = data.as_in_context(ctx).reshape((-1,784))
 
-                    noise = nd.random_normal(shape=(data.shape[0], 32), ctx=ctx)
+                    noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
 
                     with autograd.record():
                         real_output = netD(data)
@@ -193,11 +194,25 @@ class GAN(Model):
                 metric.reset()
                 if self.logger:
                     self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f',epoch, name, acc, (time() - tic))
-                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)) :
+                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.checkpoint(epoch+1)
+                if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
+                    self.generate_sample(epoch+1)
         except KeyboardInterrupt:
             self.logger.info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
+            self.generate_sample('I%d'%epoch)
+
+    def generate_sample(self,epoch):
+        if self.config.genout:
+            noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
+            gdat = self.netG(noise)
+            fpath = self.config.sub('genout')
+            gdat = ((gdat + 1) * 255/2).asnumpy().astype(np.uint8)
+            imwrite(fpath, gdat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
+            if logger:
+                logger.info('Saved generated data by generator \'%s\' epoch \'%s\' in \'%s\'.',
+                            self.config.nets.generator.type,epoch,self.config.sub('genout'))
 
 @register_model
 class CGAN(GAN):
@@ -245,7 +260,7 @@ class CGAN(GAN):
                     cond2 = nd.one_hot(cond_dense, 10)
                     cond3 = nd.one_hot(cond_dense, 10)
 
-                    noise = nd.random_normal(shape=(data.shape[0], 32), ctx=ctx)
+                    noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
 
                     with autograd.record():
                         real_output = netD(data, cond.detach())

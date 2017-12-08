@@ -29,4 +29,5 @@ nets:
   #   save: '${root_dir}/params/${model}.${nets.classifier.type}.${epoch}.params'
 
 log: '${root_dir}/log/${model}.log'
-genout: '${root_dir}/gen/${model}.${nets.generator.type}.${start_epoch}.png'
+gen_freq: 10
+genout: '${root_dir}/gen/${model}.${nets.generator.type}.${epoch}.png'

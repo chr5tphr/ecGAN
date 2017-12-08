@@ -96,6 +96,7 @@ class Config(ConfigNode):
         'save_freq':        0,
         'log':              None,
         'genout':           None,
+        'gen_freq':         0,
     }
 
     def __init__(self,fname=None,*args,**kwargs):

@@ -65,7 +65,7 @@ def generate(args,config):
     if config.log:
         logger = mkfilelogger('generation',config.sub('log'))
 
-    noise = nd.random_normal(shape=(30, 32), ctx=ctx)
+    noise = nd.random_normal(shape=(30, 100), ctx=ctx)
     gdat = None
     cond = None
     if config.model == 'CGAN':
@@ -75,14 +75,14 @@ def generate(args,config):
         gdat = netG(noise)
 
     if config.genout:
-        fpath = config.sub('genout')
+        fpath = config.sub('genout',epoch=config.start_epoch)
         gdat = ((gdat + 1) * 255/2).asnumpy().astype(np.uint8)
         # snum = int(len(gdat)**.5)
         # imwrite(fpath, gdat[:snum**2].reshape(snum,snum,28,28).transpose(0,2,1,3).reshape(snum*28,snum*28))
         imwrite(fpath, gdat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
         if logger:
             logger.info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',
-                        config.nets.generator.type,config.sub('nets.generator.param'),config.sub('genout'))
+                        config.nets.generator.type,config.sub('nets.generator.param'),fpath)
     else:
         fig = plot_data(gdat)
         fig.show()
@@ -95,8 +95,11 @@ def test(args, config):
     if config.log:
         logger = mkfilelogger('testing',config.sub('log'))
 
+    batch_size = config.batch_size
+    data = data_funcs[config.data.func](*(config.data.args),**(config.data.kwargs))
+
     model = models[config.model](ctx=ctx,logger=logger,config=config)
-    model.test()
+    model.test(data=data,batch_size=batch_size)
 
 if __name__ == '__main__':
     main()
