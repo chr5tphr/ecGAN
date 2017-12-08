@@ -11,15 +11,15 @@ class GenFC(nn.Sequential):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         with self.name_scope():
-            # self.add(nn.Dense(1024))
-            # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-            # self.add(nn.LeakyReLU(0.01))
-            # self.add(nn.Dropout(.5))
-            self.add(nn.Dense(64))
+            self.add(nn.Dense(2))
             self.add(nn.BatchNorm(axis=1,center=True,scale=True))
             self.add(nn.LeakyReLU(0.01))
             self.add(nn.Dropout(.5))
-            self.add(nn.Dense(784,activation='tanh'))
+            self.add(nn.Dense(2))
+            self.add(nn.BatchNorm(axis=1,center=True,scale=True))
+            self.add(nn.LeakyReLU(0.01))
+            # self.add(nn.Dropout(.5))
+            self.add(nn.Dense(784, activation='tanh'))
 
 @register_net
 class DiscrFC(nn.Sequential):
@@ -27,13 +27,13 @@ class DiscrFC(nn.Sequential):
         super().__init__(**kwargs)
         with self.name_scope():
             self.add(nn.Dense(64))
-            self.add(nn.BatchNorm(axis=1,center=True,scale=True))
+            # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
             self.add(nn.LeakyReLU(0.01))
             # self.add(nn.Dropout(.5))
             self.add(nn.Dense(64))
-            self.add(nn.BatchNorm(axis=1,center=True,scale=True))
+            # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
             self.add(nn.LeakyReLU(0.01))
-            self.add(nn.Dropout(.5))
+            # self.add(nn.Dropout(.5))
             self.add(nn.Dense(2))
 
 @register_net

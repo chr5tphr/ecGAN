@@ -1,7 +1,7 @@
 root_dir: '/home/chrstphr/projects/ecGAN/result'
 
 device: 'cpu'
-device_id: 0
+device_id: 'auto'
 
 batch_size: 32
 nepochs: 10
@@ -29,4 +29,3 @@ nets:
     save: '${root_dir}/params/${model}.${nets.classifier.type}.${epoch}.params'
 
 log: '${root_dir}/log/${model}.log'
-genout: '${root_dir}/gen/${model}.${nets.generator.type}.${start_epoch}.png'
