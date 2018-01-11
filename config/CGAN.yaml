@@ -2,6 +2,7 @@ root_dir: '/home/chrstphr/projects/ecGAN/result'
 
 device: 'cpu'
 device_id: 'auto'
+debug: False
 
 batch_size: 32
 nepochs: 40

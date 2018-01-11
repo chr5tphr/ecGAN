@@ -9,36 +9,71 @@ def register_net(obj):
 @register_net
 class GenFC(nn.Sequential):
     def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',784)
+        self._outact = kwargs.pop('outact','tanh')
         super().__init__(**kwargs)
         with self.name_scope():
-            self.add(nn.Dense(2))
+            self.add(nn.Dense(256))
             self.add(nn.BatchNorm(axis=1,center=True,scale=True))
             self.add(nn.LeakyReLU(0.01))
             self.add(nn.Dropout(.5))
-            self.add(nn.Dense(2))
+            self.add(nn.Dense(256))
             self.add(nn.BatchNorm(axis=1,center=True,scale=True))
             self.add(nn.LeakyReLU(0.01))
-            # self.add(nn.Dropout(.5))
-            self.add(nn.Dense(784, activation='tanh'))
+            self.add(nn.Dropout(.5))
+            self.add(nn.Dense(self._outnum, activation=self._outact))
+
 
 @register_net
 class DiscrFC(nn.Sequential):
     def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',1)
+        self._outact = kwargs.pop('outact',None)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self.add(nn.Dense(64, activation='relu'))
+            self.add(nn.BatchNorm(axis=1,center=True,scale=True))
+            self.add(nn.LeakyReLU(0.01))
+            self.add(nn.Dropout(.5))
+            self.add(nn.Dense(64))
+            self.add(nn.BatchNorm(axis=1,center=True,scale=True))
+            self.add(nn.LeakyReLU(0.01))
+            self.add(nn.Dropout(.5))
+            self.add(nn.Dense(self._outnum, activation=self._outact))
+
+@register_net
+class GSFC(nn.Sequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',784)
+        self._outact = kwargs.pop('outact','tanh')
         super().__init__(**kwargs)
         with self.name_scope():
             self.add(nn.Dense(64))
-            # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
             self.add(nn.LeakyReLU(0.01))
-            # self.add(nn.Dropout(.5))
             self.add(nn.Dense(64))
-            # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
             self.add(nn.LeakyReLU(0.01))
-            # self.add(nn.Dropout(.5))
-            self.add(nn.Dense(2))
+            self.add(nn.Dense(self._outnum, activation=self._outact))
+
+@register_net
+class DSFC(nn.Sequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',1)
+        self._outact = kwargs.pop('outact',None)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self.add(nn.Dense(64))
+            self.add(nn.LeakyReLU(0.01))
+            self.add(nn.Dense(64))
+            self.add(nn.LeakyReLU(0.01))
+            self.add(nn.Dense(64))
+            self.add(nn.LeakyReLU(0.01))
+            self.add(nn.Dense(self._outnum, activation=self._outact))
 
 @register_net
 class ClassFC(nn.Sequential):
     def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',10)
+        self._outact = kwargs.pop('outact',None)
         super().__init__(**kwargs)
         with self.name_scope():
             self.add(nn.Dense(64))
@@ -49,7 +84,7 @@ class ClassFC(nn.Sequential):
             self.add(nn.BatchNorm(axis=1,center=True,scale=True))
             self.add(nn.LeakyReLU(0.01))
             self.add(nn.Dropout(.5))
-            self.add(nn.Dense(10))
+            self.add(nn.Dense(self._outnum, activation=self._outact))
 
 # @register_net
 # class ClassMO(nn.Sequential):

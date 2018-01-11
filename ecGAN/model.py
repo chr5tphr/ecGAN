@@ -27,7 +27,7 @@ class Model(object):
 
         self.nets = {}
         for key, desc in self.config.nets.items():
-            self.nets[key] = nets[desc.type]()
+            self.nets[key] = nets[desc.type](**(desc.get('kwargs',{})))
             if desc.get('param'):
                 fpath = self.config.sub('nets.%s.param'%(key))
                 self.nets[key].load_params(fpath,ctx=self.ctx)
@@ -232,12 +232,9 @@ class WGAN(GAN):
 
         data_iter = gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
 
-        # loss
-        loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
-
         # trainer for the generator and the discriminator
         trainerG = gluon.Trainer(netG.collect_params(), 'rmsprop', {'learning_rate': 0.00005})
-        trainerD = gluon.Trainer(netD.collect_params(), 'rmsprop', {'learning_rate': 0.00005, 'clip_weigths': 0.01})
+        trainerD = gluon.Trainer(netD.collect_params(), 'rmsprop', {'learning_rate': 0.00005, 'clip_weights': 1e-2})
 
         real_label = nd.ones(1, ctx=ctx)
         fake_label = -real_label
@@ -249,6 +246,9 @@ class WGAN(GAN):
         if self.logger:
             self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
                         config.model,config.nets.discriminator.type,config.nets.generator.type,epoch)
+
+        iter_g = 0
+        # paramsD = netD.collect_params()
 
         try:
             for epoch in range(self.start_epoch, self.start_epoch + nepochs):
@@ -266,30 +266,38 @@ class WGAN(GAN):
                     with autograd.record():
                         real_output = netD(data)
                         errD_real = real_output.mean(axis=0)
-                        errD_real.backward(real_label)
+                        # errD_real.backward(out_grad=real_label)
 
-                        fake = netG(noise)
+                    fake = netG(noise)
+
+                    with autograd.record():
                         fake_output = netD(fake.detach())
                         errD_fake = fake_output.mean(axis=0)
-                        errD_fake.backward(fake_label)
+                        # errD_fake.backward(out_grad=fake_label)
 
-                        errD = errD_real - errD_fake
+                        errD = - (errD_real - errD_fake)
+                        errD.backward()
 
                     trainerD.step(batch_size)
-                    metric.update([errD,])
+                    # for key,param in paramsD.items():
+                        # param.set_data(param.data(ctx=ctx).clip(-0.01,0.01))
+                    metric.update(None, [errD,])
 
                     ################
                     # (2) Update G
                     ################
-                    if not (i % self.ncritic):
+                    diter = 100 if ((iter_g < 25) or not (iter_g % 500)) else self.ncritic
+                    if not (i % diter):
                         noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
                         with autograd.record():
                             fake = netG(noise)
                             output = netD(fake)
-                            errG = output.mean(axis=0)
-                            errG.backward(real_label)
+                            errG = -output.mean(axis=0)
+                            # errG.backward(out_grad=real_label)
+                            errG.backward()
 
                         trainerG.step(batch_size)
+                        iter_g += 1
 
                 name, est = metric.get()
                 metric.reset()
@@ -300,7 +308,8 @@ class WGAN(GAN):
                 if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.generate_sample(epoch+1)
         except KeyboardInterrupt:
-            self.logger.info('Training interrupted by user.')
+            if self.logger:
+                self.logger.info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
             self.generate_sample('I%d'%epoch)
 

@@ -9,11 +9,11 @@ def register_data_func(func):
     return func
 
 @register_data_func
-def get_mnist(train):
+def get_mnist(train,ret_label=True):
     def transform(data,label):
         data = (data.astype(np.float32)/255.)*2. - 1.
         label = label.astype(np.float32)
-        return data,label
+        return (data,label) if ret_label else data
 
     return mx.gluon.data.vision.MNIST(train=train,transform=transform)
 

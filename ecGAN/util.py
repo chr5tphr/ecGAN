@@ -71,16 +71,19 @@ class Config(ConfigNode):
         'nets': {
             # 'generator': {
             #     'type':     'GenFC',
+            #     'kwargs':   {},
             #     'param':    None,
             #     'save':     None,
             # },
             # 'discriminator': {
             #     'type':     'DiscrFC',
+            #     'kwargs':   {},
             #     'param':    None,
             #     'save':     None,
             # },
             # 'classifier': {
             #     'type':     'ClassFC',
+            #     'kwargs':   {},
             #     'param':    None,
             #     'save':     None,
             # },

@@ -4,6 +4,7 @@ import yaml
 import mxnet as mx
 import numpy as np
 import sys
+import logging
 
 from argparse import ArgumentParser
 from imageio import imwrite
@@ -45,7 +46,7 @@ def train(args,config):
 
     logger = None
     if config.log:
-        logger = mkfilelogger('training',config.sub('log'))
+        logger = mkfilelogger('training',config.sub('log'),logging.DEBUG if config.get('debug') else logging.INFO )
 
     model = models[config.model](ctx=ctx,logger=logger,config=config)
     model.train(data,batch_size,nepochs)
