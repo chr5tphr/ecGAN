@@ -28,7 +28,7 @@ class Model(object):
         self.nets = {}
         for key, desc in self.config.nets.items():
             self.nets[key] = nets[desc.type](**(desc.get('kwargs',{})))
-            if desc.get('param'):
+            if not self.config.init and desc.get('param'):
                 fpath = self.config.sub('nets.%s.param'%(key))
                 self.nets[key].load_params(fpath,ctx=self.ctx)
                 if self.logger:

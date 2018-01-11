@@ -68,6 +68,7 @@ class Config(ConfigNode):
         'device':           'cpu',
         'device_id':        'auto',
         'model':            'GAN',
+        'init':             False,
         'nets': {
             # 'generator': {
             #     'type':     'GenFC',

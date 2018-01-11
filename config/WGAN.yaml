@@ -1,4 +1,5 @@
 root_dir: '/home/chrstphr/projects/ecGAN/result'
+exp_dir: 'mnist_full'
 
 device: 'cpu'
 device_id: 'auto'
@@ -9,29 +10,31 @@ nepochs: 10
 start_epoch: 0
 save_freq: 5
 
-data:
-  func: 'get_mnist_single'
-  args: []
-  kwargs: {'train':True,'label':5}
+init: False
 
-model: 'GAN'
+data:
+  func: 'get_mnist'
+  args: []
+  kwargs: {'train':True,'ret_label':False}
+
+model: 'WGAN'
 nets:
   generator:
     type: 'GSFC'
     kwargs: {}
-    param: '${root_dir}/params/${model}.${nets.generator.type}.${start_epoch}.params'
-    save: '${root_dir}/params/${model}.${nets.generator.type}.${epoch}.params'
+    param: '${root_dir}/${exp_dir}/params/${model}.${nets.generator.type}.${start_epoch}.params'
+    save: '${root_dir}/${exp_dir}/params/${model}.${nets.generator.type}.${epoch}.params'
   discriminator:
     type: 'DSFC'
     kwargs: {'outnum': 1}
-    param: '${root_dir}/params/${model}.${nets.discriminator.type}.${start_epoch}.params'
-    save: '${root_dir}/params/${model}.${nets.discriminator.type}.${epoch}.params'
+    param: '${root_dir}/${exp_dir}/params/${model}.${nets.discriminator.type}.${start_epoch}.params'
+    save: '${root_dir}/${exp_dir}/params/${model}.${nets.discriminator.type}.${epoch}.params'
   # classifier:
   #   type: 'ClassFC'
   #   param: '${root_dir}/params/${model}.${nets.classifier.type}.${start_epoch}.params'
   #   save: '${root_dir}/params/${model}.${nets.classifier.type}.${epoch}.params'
 
-log: '${root_dir}/log/${model}.log'
+log: '${root_dir}/${exp_dir}/log/${model}.log'
 gen_freq: 5
-genout: '${root_dir}/gen/${model}.${nets.generator.type}.${epoch}.png'
+genout: '${root_dir}/${exp_dir}/gen/${model}.${nets.generator.type}.${epoch}.png'
 ncritic: 5

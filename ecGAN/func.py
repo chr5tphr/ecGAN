@@ -1,7 +1,7 @@
 import mxnet as mx
 
 from mxnet import nd, gluon
-from mxnet.gluon.nn import Block
+from mxnet.gluon import nn
 
 
 def fuzzy_one_hot(x,size):
@@ -10,5 +10,8 @@ def fuzzy_one_hot(x,size):
                     nd.uniform(low=0.0,high=0.3,shape=(x.shape[0],size),ctx=x.context))
 
 
-def MaxOut(Block):
+class Interpretable(nn.Block):
+    pass
+
+class MaxOut(nn.Block):
     pass
