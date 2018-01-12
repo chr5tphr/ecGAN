@@ -5,7 +5,7 @@ device: 'cpu'
 device_id: 'auto'
 debug: False
 
-batch_size: 32
+batch_size: 64
 nepochs: 10
 start_epoch: 0
 save_freq: 5
