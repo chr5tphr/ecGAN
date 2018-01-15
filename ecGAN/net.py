@@ -70,6 +70,30 @@ class DSFC(nn.Sequential):
             self.add(nn.Dense(self._outnum, activation=self._outact))
 
 @register_net
+class GPFC(nn.Sequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',784)
+        self._outact = kwargs.pop('outact','relu')
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self.add(nn.Dense(64, activation='relu'))
+            self.add(nn.Dense(64, activation='relu'))
+            self.add(nn.Dense(64, activation='relu'))
+            self.add(nn.Dense(self._outnum, activation=self._outact))
+
+@register_net
+class DPFC(nn.Sequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',1)
+        self._outact = kwargs.pop('outact',None)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self.add(nn.Dense(64, activation='relu'))
+            self.add(nn.Dense(64, activation='relu'))
+            self.add(nn.Dense(64, activation='relu'))
+            self.add(nn.Dense(self._outnum, activation=self._outact))
+
+@register_net
 class ClassFC(nn.Sequential):
     def __init__(self,**kwargs):
         self._outnum = kwargs.pop('outnum',10)

@@ -140,6 +140,11 @@ def plot_data(data):
     ax.set
     return fig
 
+def draw_heatmap(data):
+    ndat = data **2
+    ndat = (ndat / ndat.max() * 255).astype(np.uint8)
+    ndat = np.stack([ndat] + [np.zeros(ndat.shape)]*2,axis=-1)
+    return ndat
 
 def mkfilelogger(lname,fname,level=logging.INFO):
     logger = logging.getLogger(lname)
