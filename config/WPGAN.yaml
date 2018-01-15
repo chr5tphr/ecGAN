@@ -15,7 +15,8 @@ init: False
 data:
   func: 'get_mnist'
   args: []
-  kwargs: {'train':True,'ret_label':False,'tanh':False}
+  kwargs: {'train':True,'ret_label':False,'bbox':[0,1]}
+  bbox: [0,1]
 
 model: 'WGAN'
 nets:

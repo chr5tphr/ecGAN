@@ -9,11 +9,9 @@ def register_data_func(func):
     return func
 
 @register_data_func
-def get_mnist(train,ret_label=True,tanh=True):
+def get_mnist(train,ret_label=True,bbox=(-1,1)):
     def transform(data,label):
-        data = (data.astype(np.float32)/255.)
-        if tanh:
-            data = data*2. - 1.
+        data = (data.astype(np.float32)/255.) * (bbox[1]-bbox[0]) + bbox[0]
         label = label.astype(np.float32)
         return (data,label) if ret_label else data
 

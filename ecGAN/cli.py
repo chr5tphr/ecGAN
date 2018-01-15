@@ -26,6 +26,7 @@ def main():
     parser.add_argument('command',choices=commands.keys())
     parser.add_argument('-f','--config')
     parser.add_argument('-u','--update')
+    parser.add_argument('--generate_range',nargs=3,type=int)
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -57,36 +58,39 @@ def generate(args,config):
     ctx = config_ctx(config)
 
     netG = nets[config.nets.generator.type]()
-    if config.nets.generator.param:
-        netG.load_params(config.sub('nets.generator.param'),ctx=ctx)
-    else:
-        netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
+
 
     logger = None
     if config.log:
         logger = mkfilelogger('generation',config.sub('log'))
 
-    noise = nd.random_normal(shape=(30, 100), ctx=ctx)
-    gdat = None
-    cond = None
-    if config.model == 'CGAN':
-        cond = nd.one_hot(nd.repeat(nd.arange(10,ctx=ctx),3),10)
-        gdat = netG(noise, cond)
-    else:
-        gdat = netG(noise)
+    for epoch in (range(*args.generate_range) if args.generate_range else [config.start_epoch]):
+        if config.nets.generator.param:
+            netG.load_params(config.sub('nets.generator.param',start_epoch=epoch),ctx=ctx)
+        else:
+            netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
+        noise = nd.random_normal(shape=(30, 100), ctx=ctx)
+        gdat = None
+        cond = None
+        if config.model == 'CGAN':
+            cond = nd.one_hot(nd.repeat(nd.arange(10,ctx=ctx),3),10)
+            gdat = netG(noise, cond)
+        else:
+            gdat = netG(noise)
 
-    if config.genout:
-        fpath = config.sub('genout',epoch=config.start_epoch)
-        gdat = ((gdat + 1) * 255/2).asnumpy().astype(np.uint8)
-        # snum = int(len(gdat)**.5)
-        # imwrite(fpath, gdat[:snum**2].reshape(snum,snum,28,28).transpose(0,2,1,3).reshape(snum*28,snum*28))
-        imwrite(fpath, gdat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
-        if logger:
-            logger.info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',
-                        config.nets.generator.type,config.sub('nets.generator.param'),fpath)
-    else:
-        fig = plot_data(gdat)
-        fig.show()
+        if config.genout:
+            bbox = config.data.bbox
+            fpath = config.sub('genout',epoch=epoch)
+            gdat = ((gdat - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().astype(np.uint8)
+            # snum = int(len(gdat)**.5)
+            # imwrite(fpath, gdat[:snum**2].reshape(snum,snum,28,28).transpose(0,2,1,3).reshape(snum*28,snum*28))
+            imwrite(fpath, gdat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
+            if logger:
+                logger.info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',
+                            config.nets.generator.type,config.sub('nets.generator.param',start_epoch=epoch),fpath)
+        else:
+            fig = plot_data(gdat)
+            fig.show()
 
 @register_command
 def test(args, config):

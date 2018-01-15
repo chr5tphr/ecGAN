@@ -93,6 +93,7 @@ class Config(ConfigNode):
             'func':         'get_mnist_single',
             'args':         [],
             'kwargs':       {},
+            'bbox':         [-1,1]
         },
         'batch_size':       32,
         'nepochs':          10,

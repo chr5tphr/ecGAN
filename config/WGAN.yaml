@@ -16,6 +16,7 @@ data:
   func: 'get_mnist'
   args: []
   kwargs: {'train':True,'ret_label':False}
+  bbox: [-1,1]
 
 model: 'WGAN'
 nets:
