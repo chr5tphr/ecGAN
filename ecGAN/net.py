@@ -1,5 +1,6 @@
 from mxnet import nd
 from mxnet.gluon import nn
+from func import Dense,Sequential
 
 nets = {}
 def register_net(obj):
@@ -70,28 +71,28 @@ class DSFC(nn.Sequential):
             self.add(nn.Dense(self._outnum, activation=self._outact))
 
 @register_net
-class GPFC(nn.Sequential):
+class GPFC(Sequential):
     def __init__(self,**kwargs):
         self._outnum = kwargs.pop('outnum',784)
         self._outact = kwargs.pop('outact','relu')
         super().__init__(**kwargs)
         with self.name_scope():
-            self.add(nn.Dense(64, activation='relu'))
-            self.add(nn.Dense(64, activation='relu'))
-            self.add(nn.Dense(64, activation='relu'))
-            self.add(nn.Dense(self._outnum, activation=self._outact))
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(self._outnum, activation=self._outact))
 
 @register_net
-class DPFC(nn.Sequential):
+class DPFC(Sequential):
     def __init__(self,**kwargs):
         self._outnum = kwargs.pop('outnum',1)
         self._outact = kwargs.pop('outact',None)
         super().__init__(**kwargs)
         with self.name_scope():
-            self.add(nn.Dense(64, activation='relu'))
-            self.add(nn.Dense(64, activation='relu'))
-            self.add(nn.Dense(64, activation='relu'))
-            self.add(nn.Dense(self._outnum, activation=self._outact))
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(self._outnum, activation=self._outact))
 
 @register_net
 class ClassFC(nn.Sequential):
@@ -109,6 +110,18 @@ class ClassFC(nn.Sequential):
             self.add(nn.LeakyReLU(0.01))
             self.add(nn.Dropout(.5))
             self.add(nn.Dense(self._outnum, activation=self._outact))
+
+@register_net
+class CPFC(nn.Sequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',10)
+        self._outact = kwargs.pop('outact',None)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(self._outnum, activation=self._outact))
 
 # @register_net
 # class ClassMO(nn.Sequential):

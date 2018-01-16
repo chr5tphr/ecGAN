@@ -13,7 +13,7 @@ save_freq: 10
 init: False
 
 data:
-  func: 'get_mnist'
+  func: 'mnist'
   args: []
   kwargs: {'train':True,'ret_label':False,'bbox':[0,1]}
   bbox: [0,1]

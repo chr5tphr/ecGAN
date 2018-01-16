@@ -9,7 +9,7 @@ def register_data_func(func):
     return func
 
 @register_data_func
-def get_mnist(train,ret_label=True,bbox=(-1,1)):
+def mnist(train,ret_label=True,bbox=(-1,1)):
     def transform(data,label):
         data = (data.astype(np.float32)/255.) * (bbox[1]-bbox[0]) + bbox[0]
         label = label.astype(np.float32)
@@ -18,7 +18,7 @@ def get_mnist(train,ret_label=True,bbox=(-1,1)):
     return mx.gluon.data.vision.MNIST(train=train,transform=transform)
 
 @register_data_func
-def get_mnist_cond(train):
+def mnist_cond(train):
     def transform(data,label):
         data = (data.astype(np.float32)/255.)*2. - 1.
         label = label.astype(np.float32)
@@ -27,7 +27,7 @@ def get_mnist_cond(train):
     return mx.gluon.data.vision.MNIST(train=train,transform=transform)
 
 @register_data_func
-def get_mnist_single(train,label):
+def mnist_single(train,label):
     def transform(tdata,tlabel):
         if tlabel != label:
             return None

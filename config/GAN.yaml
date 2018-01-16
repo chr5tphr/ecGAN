@@ -10,7 +10,7 @@ start_epoch: 0
 save_freq: 5
 
 data:
-  func: 'get_mnist_single'
+  func: 'mnist_single'
   args: []
   kwargs: {'train':True,'label':5}
 

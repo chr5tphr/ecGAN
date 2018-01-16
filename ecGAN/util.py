@@ -102,6 +102,7 @@ class Config(ConfigNode):
         'log':              None,
         'genout':           None,
         'gen_freq':         0,
+        'explanation':      'sensitivity',
     }
 
     def __init__(self,fname=None,*args,**kwargs):

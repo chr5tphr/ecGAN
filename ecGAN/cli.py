@@ -5,6 +5,7 @@ import mxnet as mx
 import numpy as np
 import sys
 import logging
+import h5py
 
 from argparse import ArgumentParser
 from imageio import imwrite
@@ -14,6 +15,7 @@ from .net import nets
 from .model import models
 from .data import data_funcs
 from .util import mkfilelogger, plot_data, Config, config_ctx
+from .func import Interpretable
 
 commands = {}
 def register_command(func):
@@ -81,7 +83,7 @@ def generate(args,config):
         if config.genout:
             bbox = config.data.bbox
             fpath = config.sub('genout',epoch=epoch)
-            gdat = ((gdat - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().astype(np.uint8)
+            gdat = ((gdat - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0,255).astype(np.uint8)
             # snum = int(len(gdat)**.5)
             # imwrite(fpath, gdat[:snum**2].reshape(snum,snum,28,28).transpose(0,2,1,3).reshape(snum*28,snum*28))
             imwrite(fpath, gdat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
@@ -105,6 +107,40 @@ def test(args, config):
 
     model = models[config.model](ctx=ctx,logger=logger,config=config)
     model.test(data=data,batch_size=batch_size)
+
+@register_command
+def explain(args,config):
+    if config.model != 'Classifier':
+        raise NotImplementedError('Only Classifier models are currently supported.')
+
+    data_fp = data_funcs[config.data.func](*(config.data.args),**(config.data.kwargs))
+
+    netC = nets[config.nets.classifier.type]()
+    if not isinstance(netC,Interpretable):
+        raise NotImplementedError('\'%s\' is not yet Interpretable!'%config.nets.classifier.type)
+
+    loss = gluon.loss.SoftmaxCrossEntropyLoss()
+
+    if config.nets.generator.param:
+        netG.load_params(config.sub('nets.classifier.param'),ctx=ctx)
+    else:
+        netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
+
+    data_iter = gluon.data.DataLoader(data_fp,config.batch_size,shuffle=False,last_batch='discard')
+    for i,(data,label) in data_iter:
+        if i >= 1:
+            break
+        data = data.as_in_context(ctx).reshape((-1,784))
+        label = label.as_in_context(ctx)
+
+        output = netC(data)
+        err = loss(output, label)
+        dEdy = autograd.grad(err,output)
+
+        relevance = netC.relevance(data,dEdy,method='sensitivity')
+        with h5py.File(config.sub(relout,iter=i),'w') as fp:
+            fp['heatmap'] = relevance.asnumpy()
+
 
 if __name__ == '__main__':
     main()
