@@ -90,7 +90,7 @@ class Config(ConfigNode):
             # },
         },
         'data': {
-            'func':         'get_mnist_single',
+            'func':         'mnist_single',
             'args':         [],
             'kwargs':       {},
             'bbox':         [-1,1]
@@ -102,7 +102,11 @@ class Config(ConfigNode):
         'log':              None,
         'genout':           None,
         'gen_freq':         0,
-        'explanation':      'sensitivity',
+        'explanation': {
+            'method':       'sensitivity',
+            'output':       None,
+            'image':        None,
+        },
     }
 
     def __init__(self,fname=None,*args,**kwargs):

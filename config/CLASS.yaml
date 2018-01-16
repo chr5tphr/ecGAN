@@ -1,10 +1,11 @@
 root_dir: '/home/chrstphr/projects/ecGAN/result'
+exp_dir: 'classify'
 
 device: 'cpu'
 device_id: 'auto'
 debug: False
 
-batch_size: 32
+batch_size: 64
 nepochs: 10
 start_epoch: 0
 save_freq: 5
@@ -25,8 +26,14 @@ nets:
   #   param: '${root_dir}/params/${model}.${nets.discriminator.type}.${start_epoch}.params'
   #   save: '${root_dir}/params/${model}.${nets.discriminator.type}.${epoch}.params'
   classifier:
-    type: 'ClassFC'
-    param: '${root_dir}/params/${model}.${nets.classifier.type}.${start_epoch}.params'
-    save: '${root_dir}/params/${model}.${nets.classifier.type}.${epoch}.params'
+    type: 'CPFC'
+    param: '${root_dir}/${exp_dir}/params/${model}.${nets.classifier.type}.${start_epoch}.params'
+    save: '${root_dir}/${exp_dir}/params/${model}.${nets.classifier.type}.${epoch}.params'
 
-log: '${root_dir}/log/${model}.log'
+log: '${root_dir}/${exp_dir}/log/${model}.log'
+
+explanation:
+  method: 'sensitivity'
+  # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation}.${iter}.h5'
+  output: NULL
+  image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation.method}.${iter}.png'

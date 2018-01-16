@@ -25,7 +25,8 @@ setup(
         ['urllib3==1.22'],
         ['PyYAML==3.12'],
         ['Pillow==4.3.0'],
-        ['imageio==2.2.0']
+        ['imageio==2.2.0'],
+        ['h5py==2.7.1'],
     ],
     ext_modules=[
         Extension(

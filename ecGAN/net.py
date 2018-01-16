@@ -1,6 +1,6 @@
 from mxnet import nd
 from mxnet.gluon import nn
-from func import Dense,Sequential
+from .func import Dense,Sequential
 
 nets = {}
 def register_net(obj):
@@ -112,7 +112,7 @@ class ClassFC(nn.Sequential):
             self.add(nn.Dense(self._outnum, activation=self._outact))
 
 @register_net
-class CPFC(nn.Sequential):
+class CPFC(Sequential):
     def __init__(self,**kwargs):
         self._outnum = kwargs.pop('outnum',10)
         self._outact = kwargs.pop('outact',None)

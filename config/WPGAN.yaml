@@ -22,7 +22,7 @@ model: 'WGAN'
 nets:
   generator:
     type: 'GPFC'
-    kwargs: {}
+    kwargs: {'outact':'relu'}
     param: '${root_dir}/${exp_dir}/params/${model}.${nets.generator.type}.${start_epoch}.params'
     save: '${root_dir}/${exp_dir}/params/${model}.${nets.generator.type}.${epoch}.params'
   discriminator:

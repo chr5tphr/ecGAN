@@ -9,7 +9,7 @@ import h5py
 
 from argparse import ArgumentParser
 from imageio import imwrite
-from mxnet import nd
+from mxnet import nd, gluon, autograd
 
 from .net import nets
 from .model import models
@@ -28,7 +28,8 @@ def main():
     parser.add_argument('command',choices=commands.keys())
     parser.add_argument('-f','--config')
     parser.add_argument('-u','--update')
-    parser.add_argument('--generate_range',nargs=3,type=int)
+    parser.add_argument('--epoch_range',nargs=3,type=int)
+    parser.add_argument('--iter',type=int,default=1)
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -66,7 +67,7 @@ def generate(args,config):
     if config.log:
         logger = mkfilelogger('generation',config.sub('log'))
 
-    for epoch in (range(*args.generate_range) if args.generate_range else [config.start_epoch]):
+    for epoch in (range(*args.epoch_range) if args.epoch_range else [config.start_epoch]):
         if config.nets.generator.param:
             netG.load_params(config.sub('nets.generator.param',start_epoch=epoch),ctx=ctx)
         else:
@@ -113,6 +114,10 @@ def explain(args,config):
     if config.model != 'Classifier':
         raise NotImplementedError('Only Classifier models are currently supported.')
 
+    logger = None
+    if config.log:
+        logger = mkfilelogger('testing',config.sub('log'))
+
     data_fp = data_funcs[config.data.func](*(config.data.args),**(config.data.kwargs))
 
     netC = nets[config.nets.classifier.type]()
@@ -120,26 +125,47 @@ def explain(args,config):
         raise NotImplementedError('\'%s\' is not yet Interpretable!'%config.nets.classifier.type)
 
     loss = gluon.loss.SoftmaxCrossEntropyLoss()
+    ctx = config_ctx(config)
 
-    if config.nets.generator.param:
-        netG.load_params(config.sub('nets.classifier.param'),ctx=ctx)
+    if config.nets.classifier.param:
+        netC.load_params(config.sub('nets.classifier.param'),ctx=ctx)
     else:
-        netG.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
+        netC.initialize(mx.init.Xavier(magnitude=2.24),ctx=ctx)
 
-    data_iter = gluon.data.DataLoader(data_fp,config.batch_size,shuffle=False,last_batch='discard')
-    for i,(data,label) in data_iter:
-        if i >= 1:
+    data_iter = gluon.data.DataLoader(data_fp,30,shuffle=False,last_batch='discard')
+    for i,(data,label) in enumerate(data_iter):
+        if i >= args.iter:
             break
         data = data.as_in_context(ctx).reshape((-1,784))
         label = label.as_in_context(ctx)
 
-        output = netC(data)
-        err = loss(output, label)
-        dEdy = autograd.grad(err,output)
+        if config.explanation.method == 'sensitivity':
+            output = netC(data)
+            output.attach_grad()
+            with autograd.record():
+                err = loss(output, label)
+            dEdy = autograd.grad(err,output)
+        else:
+            dEdy = None
 
-        relevance = netC.relevance(data,dEdy,method='sensitivity')
-        with h5py.File(config.sub(relout,iter=i),'w') as fp:
-            fp['heatmap'] = relevance.asnumpy()
+        relevance = netC.relevance(data,dEdy,method=config.explanation.method)
+
+
+        if config.explanation.output:
+            with h5py.File(config.sub('explanation.output',iter=i,epoch=config.start_epoch),'w') as fp:
+                fp['heatmap'] = relevance.asnumpy()
+        if config.explanation.image:
+            rdat = relevance
+            if config.explanation.method == 'sensitivity':
+                rdat = relevance**2
+            lo,hi = relevance.min(),relevance.max()
+            fpath = config.sub('explanation.image',iter=i,epoch=config.start_epoch)
+            rdat = ((relevance - lo) * 255/(hi-lo)).asnumpy().astype(np.uint8)
+            # rdat = np.stack([rdat] + [np.zeros(rdat.shape)]*2,axis=-1)
+            imwrite(fpath, rdat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
+            if logger:
+                logger.info('Saved explanation of \'%s\' checkpoint \'%s\' in \'%s\'.',
+                            config.nets.classifier.type,config.sub('nets.classifier.param'),fpath)
 
 
 if __name__ == '__main__':
