@@ -356,7 +356,7 @@ class WGAN(GAN):
                     trainerD.step(batch_size)
                     # for key,param in paramsD.items():
                         # param.set_data(param.data(ctx=ctx).clip(-0.01,0.01))
-                    metric.update(None, [errD,])
+                    metric.update(None, [-errD,])
 
                     ################
                     # (2) Update G
