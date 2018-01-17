@@ -154,6 +154,9 @@ def explain(args,config):
         if config.explanation.output:
             with h5py.File(config.sub('explanation.output',iter=i,epoch=config.start_epoch),'w') as fp:
                 fp['heatmap'] = relevance.asnumpy()
+            if logger:
+                logger.info('Saved explanation of \'%s\' checkpoint \'%s\' in \'%s\'.',
+                            config.nets.classifier.type,config.sub('nets.classifier.param'),fpath)
         if config.explanation.image:
             rdat = relevance
             if config.explanation.method == 'sensitivity':
@@ -164,8 +167,16 @@ def explain(args,config):
             # rdat = np.stack([rdat] + [np.zeros(rdat.shape)]*2,axis=-1)
             imwrite(fpath, rdat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
             if logger:
-                logger.info('Saved explanation of \'%s\' checkpoint \'%s\' in \'%s\'.',
+                logger.info('Saved explanation image of \'%s\' checkpoint \'%s\' in \'%s\'.',
                             config.nets.classifier.type,config.sub('nets.classifier.param'),fpath)
+        if config.explanation.input:
+            bbox = config.data.bbox
+            fpath = config.sub('explanation.input',iter=i)
+            indat = ((data - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0,255).astype(np.uint8)
+            imwrite(fpath, indat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
+            if logger:
+                logger.info('Saved input data \'%s\' iter %d in \'%s\'.',
+                            config.data.func,i,fpath)
 
 
 if __name__ == '__main__':

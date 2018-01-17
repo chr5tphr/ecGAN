@@ -106,6 +106,7 @@ class Config(ConfigNode):
             'method':       'sensitivity',
             'output':       None,
             'image':        None,
+            'input':        None,
         },
     }
 

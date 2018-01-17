@@ -37,3 +37,4 @@ explanation:
   # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation}.${iter}.h5'
   output: NULL
   image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation.method}.${iter}.png'
+  input:  '${root_dir}/${exp_dir}/rel/${model}.${data.func}.input.${iter}.png'
