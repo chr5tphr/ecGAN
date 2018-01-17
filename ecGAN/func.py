@@ -36,12 +36,14 @@ class Dense(nn.Dense,Interpretable):
         wplus = nd.maximum(0.,self.weight.data())
         a.attach_grad()
         with autograd.record():
-            z = nd.FullyConnected(a,wplus,None,no_bias=True)
+            z = nd.FullyConnected(a,wplus,None,no_bias=True,num_hidden=self._units,flatten=self._flatten)
+            if self.act is not None:
+                z = self.act(z)
         c = autograd.grad(z,a,head_grads=R/z)
         return a*c
 
 class Sequential(nn.Sequential,Interpretable):
-    def relevance(self,x,y=None,method='dtd'):
+    def relevance(self,x,y=None,method='dtd',ret_all=False):
         A = [x]
         for child in self._children:
             A.append(child.forward(A[-1]))
@@ -49,7 +51,7 @@ class Sequential(nn.Sequential,Interpretable):
         R = [z if y is None else y]
         for child,a in zip(self._children[::-1],A[::-1]):
             R.append(child.relevance(a,R[-1],method=method))
-        return R[-1]
+        return R if ret_all else R[-1]
 
 class MaxOut(nn.Block):
     pass

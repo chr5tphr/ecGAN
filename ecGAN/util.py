@@ -8,6 +8,7 @@ import random
 
 from mxnet import nd
 from string import Template as STemplate
+from imageio import imwrite
 
 from .gpuman import nvidia_idle
 
@@ -147,11 +148,41 @@ def plot_data(data):
     ax.set
     return fig
 
-def draw_heatmap(data):
-    ndat = data **2
-    ndat = (ndat / ndat.max() * 255).astype(np.uint8)
-    ndat = np.stack([ndat] + [np.zeros(ndat.shape)]*2,axis=-1)
+def draw_heatmap(data,lo,hi):
+    ndat = ((data - lo)/(hi-lo)).asnumpy()
+    # ndat = np.stack([ndat]+([ndat**2]*2),axis=-1)
+    ndat = np.stack([ndat*3,ndat*3-1,ndat*3-2],axis=-1).clip(0.,1.)
     return ndat
+
+def save_explanation(relevance,data,config,net='classifier',logger=None,i=0):
+    if config.explanation.output:
+        with h5py.File(config.sub('explanation.output',iter=i,epoch=config.start_epoch),'w') as fp:
+            fp['heatmap'] = relevance.asnumpy()
+        if logger:
+            logger.info('Saved explanation of \'%s\' checkpoint \'%s\' in \'%s\'.',
+                        config.nets[net].type,config.sub('nets.classifier.param'),fpath)
+    if config.explanation.image:
+        rdat = relevance
+        if config.explanation.method == 'sensitivity':
+            rdat = relevance.abs()
+        lo,hi = rdat.min(),rdat.max()
+        if logger:
+            logger.debug('Explanation min %f, max %f',lo.asscalar(),hi.asscalar())
+        fpath = config.sub('explanation.image',iter=i,epoch=config.start_epoch,net=net)
+        rdat = (draw_heatmap(rdat,lo,hi)*255).astype(np.uint8)
+        # rdat = np.stack([rdat] + [np.zeros(rdat.shape)]*2,axis=-1)
+        imwrite(fpath, rdat.reshape(5,6,28,28,3).transpose(0,2,1,3,4).reshape(5*28,6*28,3))
+        if logger:
+            logger.info('Saved explanation image of \'%s\' checkpoint \'%s\' in \'%s\'.',
+                        config.nets[net].type,config.sub('nets.%s.param'%net),fpath)
+    if config.explanation.input:
+        bbox = config.data.bbox
+        fpath = config.sub('explanation.input',iter=i)
+        indat = ((data - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0,255).astype(np.uint8)
+        imwrite(fpath, indat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
+        if logger:
+            logger.info('Saved input data \'%s\' iter %d in \'%s\'.',
+                        config.data.func,i,fpath)
 
 def mkfilelogger(lname,fname,level=logging.INFO):
     logger = logging.getLogger(lname)

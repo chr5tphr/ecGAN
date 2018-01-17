@@ -13,7 +13,8 @@ save_freq: 5
 data:
   func: 'mnist'
   args: []
-  kwargs: {'train':True}
+  kwargs: {'train':True,'bbox':[0,1]}
+  bbox: [0,1]
 
 model: 'Classifier'
 nets:
@@ -36,5 +37,5 @@ explanation:
   method: 'sensitivity'
   # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation}.${iter}.h5'
   output: NULL
-  image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation.method}.${iter}.png'
-  input:  '${root_dir}/${exp_dir}/rel/${model}.${data.func}.input.${iter}.png'
+  image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation.method}.${data.func}.${iter}.png'
+  input:  '${root_dir}/${exp_dir}/rel/${model}.input.${data.func}.${iter}.png'

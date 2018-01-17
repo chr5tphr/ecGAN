@@ -4,7 +4,7 @@ from time import time
 from mxnet import gluon, autograd, nd
 from imageio import imwrite
 
-from .func import fuzzy_one_hot
+from .func import fuzzy_one_hot, Interpretable
 from .util import Config, config_ctx, draw_heatmap
 from .net import nets
 
@@ -50,6 +50,14 @@ class Model(object):
                 if self.logger:
                     self.logger.debug('Not saving %s \'%s\' epoch %s.',key,self.config.nets[key].type,epoch,fpath)
 
+    def generate_sample(self,epoch):
+        raise NotImplementedError('Not supported for class %s'%self.__class__)
+
+    def explain(self,data,method):
+        raise NotImplementedError('Not supported for class %s'%self.__class__)
+
+    def test(self,data,batch_size):
+        raise NotImplementedError('Not supported for class %s'%self.__class__)
 
 @register_model
 class Classifier(Model):
@@ -116,6 +124,31 @@ class Classifier(Model):
 
         if self.logger:
             self.logger.info('%s test acc: %s=%.4f',self.config.nets.classifier.type, name, acc)
+
+    def explain(self,data,method,label=None):
+        if not isinstance(self.netC,Interpretable):
+            raise NotImplementedError('\'%s\' is not yet Interpretable!'%config.nets.classifier.type)
+
+        if method == 'sensitivity':
+            loss = gluon.loss.SoftmaxCrossEntropyLoss()
+            output = self.netC(data)
+            output.attach_grad()
+            with autograd.record():
+                err = loss(output, label)
+            dEdy = autograd.grad(err,output)
+        else:
+            dEdy = None
+
+        R = self.netC.relevance(data,dEdy,method=method,ret_all=True)
+
+        if self.config.debug:
+            Rsums = []
+            for rel in R:
+                Rsums.append(rel.sum().asscalar())
+            if logger:
+                logger.debug('Explanation sums: %s',', '.join([str(fl) for fl in Rsums]))
+
+        return R[-1]
 
 @register_model
 class GAN(Model):
@@ -232,6 +265,31 @@ class GAN(Model):
             if self.logger:
                 self.logger.info('Saved generated sensitivity by \'%s\' epoch %s in \'%s\'.',
                                  self.config.nets.generator.type,epoch,fpath)
+
+        def explain(self,data,method,netC=None,label=None):
+            if not isinstance(self.netD,Interpretable):
+                raise NotImplementedError('\'%s\' is not yet Interpretable!'%config.nets.classifier.type)
+
+            if method == 'sensitivity':
+                loss = gluon.loss.SoftmaxCrossEntropyLoss()
+                output = self.netD(data)
+                output.attach_grad()
+                with autograd.record():
+                    err = loss(output, label)
+                dEdy = autograd.grad(err,output)
+            else:
+                dEdy = None
+
+            R = self.netD.relevance(data,dEdy,method=method,ret_all=True)
+
+            if self.config.debug:
+                Rsums = []
+                for rel in R:
+                    Rsums.append(rel.sum().asscalar())
+                if logger:
+                    logger.debug('Explanation sums: %s',', '.join([str(fl) for fl in Rsums]))
+
+            return R[-1]
 
 @register_model
 class WGAN(GAN):
