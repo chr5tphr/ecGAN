@@ -146,8 +146,8 @@ class Classifier(Model):
             Rsums = []
             for rel in R:
                 Rsums.append(rel.sum().asscalar())
-            if logger:
-                logger.debug('Explanation sums: %s',', '.join([str(fl) for fl in Rsums]))
+            if self.logger:
+                self.logger.debug('Explanation sums: %s',', '.join([str(fl) for fl in Rsums]))
 
         return R[-1]
 
@@ -267,41 +267,43 @@ class GAN(Model):
     #             self.logger.info('Saved generated sensitivity by \'%s\' epoch %s in \'%s\'.',
     #                              self.config.nets.generator.type,epoch,fpath)
 
-        def explain(self,data=None,label=None):
-            netTop = self.nets.get(self.config.explanation.top_net,'discriminator')
-            method = self.config.explanation.method
+    def explain(self,data=None,label=None):
+        netTop = self.nets.get(self.config.explanation.top_net,'discriminator')
+        method = self.config.explanation.method
 
-            if not isinstance(netTop,Interpretable):
-                raise NotImplementedError('\'%s\' is not yet Interpretable!'%
-                    (config.nets.get('classifier' if topC else 'discriminator',config.nets.discriminator).type))
+        if not isinstance(netTop,Interpretable):
+            raise NotImplementedError('\'%s\' is not yet Interpretable!'%
+                (config.nets.get('classifier' if topC else 'discriminator',config.nets.discriminator).type))
 
-            if data is None:
-                noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
-                data = self.netG(noise)
+        if data is None:
+            noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
+            gdata = self.netG(noise)
+        else:
+            gdata = data
 
-            if method == 'sensitivity':
-                loss = gluon.loss.SoftmaxCrossEntropyLoss()
-                output = netTop(data)
-                output.attach_grad()
-                with autograd.record():
-                    err = loss(output, label)
-                dEdy = autograd.grad(err,output)
-            else:
-                dEdy = None
+        if method == 'sensitivity':
+            loss = gluon.loss.SoftmaxCrossEntropyLoss()
+            output = netTop(gdata)
+            output.attach_grad()
+            with autograd.record():
+                err = loss(output, label)
+            dEdy = autograd.grad(err,output)
+        else:
+            dEdy = None
 
-            R = netTop.relevance(data,dEdy,method=method,ret_all=True)
-            Rt = R[-1]
-            if data is None:
-                R += self.netG.relevance(noise,R[-1],method=method,ret_all=True)
+        R = netTop.relevance(gdata,dEdy,method=method,ret_all=True)
+        Rt = R[-1]
+        if data is None:
+            R += self.netG.relevance(noise,R[-1],method=method,ret_all=True)
 
-            if self.config.debug:
-                Rsums = []
-                for rel in R:
-                    Rsums.append(rel.sum().asscalar())
-                if logger:
-                    logger.debug('Explanation sums: %s',', '.join([str(fl) for fl in Rsums]))
+        if self.config.debug:
+            Rsums = []
+            for rel in R:
+                Rsums.append(rel.sum().asscalar())
+            if self.logger:
+                self.logger.debug('Explanation sums: %s',', '.join([str(fl) for fl in Rsums]))
 
-            return R[-1] if data is not None else (Rt,R[-1],noise,data)
+        return R[-1] if data is not None else (Rt,R[-1],noise,gdata)
 
 @register_model
 class WGAN(GAN):

@@ -144,7 +144,7 @@ def explain_gan(args,config):
     model = models[config.model](ctx=ctx,logger=logger,config=config)
 
     for i in range(args.iter):
-        relD,relG,noise,gen = model.explain(method=config.explanation.method)
+        relD,relG,noise,gen = model.explain()
 
         save_explanation(relD,gen,data_desc='gen',net=config.explanation.top_net,config=config,logger=logger,i=i)
         save_explanation(relG,noise,data_desc='noise',net='generator',config=config,logger=logger,i=i)

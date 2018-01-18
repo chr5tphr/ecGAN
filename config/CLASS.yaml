@@ -34,7 +34,7 @@ nets:
 log: '${root_dir}/${exp_dir}/log/${model}.log'
 
 explanation:
-  method: 'sensitivity'
+  method: 'dtd'
   top_net: 'classifier'
   # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation}.${iter}.h5'
   output: NULL

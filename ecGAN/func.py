@@ -32,6 +32,21 @@ class Dense(nn.Dense,Interpretable):
             z = self(a)
         return autograd.grad(z,a,head_grads=R)
 
+    def relevance_zb(self,a,R,lo=-1.,hi=1.):
+        wplus = nd.maximum(0.,self.weight.data())
+        wminus = nd.minimum(0.,self.weight.data())
+        upper = nd.ones_like(a)*hi
+        lower = nd.ones_like(a)*lo
+        a.attach_grad()
+        upper.attach_grad()
+        lower.attach_grad()
+        with autograd.record():
+            zlh = (  self(a)
+                   - nd.FullyConnected(lower,wplus,None,no_bias=True,num_hidden=self._units,flatten=self._flatten)
+                   - nd.FullyConnected(upper,wminus,None,no_bias=True,num_hidden=self._units,flatten=self._flatten) )
+        zlh.backward(out_grad=R/zlh)
+        return a*a.grad + upper*upper.grad + lower*lower.grad
+
     def relevance_dtd(self,a,R):
         wplus = nd.maximum(0.,self.weight.data())
         a.attach_grad()
