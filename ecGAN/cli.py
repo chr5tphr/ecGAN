@@ -131,8 +131,23 @@ def explain(args,config):
 
         relevance = model.explain(data,method=config.explanation.method,label=label)
 
-        save_explanation(relevance,data,net='classifier',config=config,logger=logger,i=i)
+        save_explanation(relevance,data=data,data_desc=config.data.func,net='classifier',config=config,logger=logger,i=i)
 
+@register_command
+def explain_gan(args,config):
+    ctx = config_ctx(config)
+
+    logger = None
+    if config.log:
+        logger = mkfilelogger('explaining',config.sub('log'),logging.DEBUG if config.get('debug') else logging.INFO)
+
+    model = models[config.model](ctx=ctx,logger=logger,config=config)
+
+    for i in range(args.iter):
+        relD,relG,noise,data = model.explain(method=config.explanation.method)
+
+        save_explanation(relD,data,data_desc='gen',net='discriminator',config=config,logger=logger,i=i)
+        save_explanation(relG,noise,data_desc='noise',net='generator',config=config,logger=logger,i=i)
 
 if __name__ == '__main__':
     main()

@@ -37,5 +37,5 @@ explanation:
   method: 'sensitivity'
   # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation}.${iter}.h5'
   output: NULL
-  image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation.method}.${data.func}.${iter}.png'
-  input:  '${root_dir}/${exp_dir}/rel/${model}.input.${data.func}.${iter}.png'
+  image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation.method}.${data_desc}.${iter}.png'
+  input:  '${root_dir}/${exp_dir}/rel/${model}.input.${data_desc}.${iter}.png'

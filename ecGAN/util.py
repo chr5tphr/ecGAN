@@ -154,13 +154,17 @@ def draw_heatmap(data,lo,hi):
     ndat = np.stack([ndat*3,ndat*3-1,ndat*3-2],axis=-1).clip(0.,1.)
     return ndat
 
-def save_explanation(relevance,data,config,net='classifier',logger=None,i=0):
+def align_images(im,H,W,h,w,C=1):
+    return im.reshape(H,W,h,w,C).transpose(0,2,1,3,4).reshape(H*h,W*w,C)
+
+def save_explanation(relevance,data,config,data_desc='some',net='classifier',logger=None,i=0):
     if config.explanation.output:
-        with h5py.File(config.sub('explanation.output',iter=i,epoch=config.start_epoch),'w') as fp:
+        fpath = config.sub('explanation.output',iter=i,epoch=config.start_epoch,data_desc=data_desc)
+        with h5py.File(fpath,'w') as fp:
             fp['heatmap'] = relevance.asnumpy()
         if logger:
             logger.info('Saved explanation of \'%s\' checkpoint \'%s\' in \'%s\'.',
-                        config.nets[net].type,config.sub('nets.classifier.param'),fpath)
+                        config.nets[net].type,config.sub('nets.%s.param'%net),fpath)
     if config.explanation.image:
         rdat = relevance
         if config.explanation.method == 'sensitivity':
@@ -168,21 +172,29 @@ def save_explanation(relevance,data,config,net='classifier',logger=None,i=0):
         lo,hi = rdat.min(),rdat.max()
         if logger:
             logger.debug('Explanation min %f, max %f',lo.asscalar(),hi.asscalar())
-        fpath = config.sub('explanation.image',iter=i,epoch=config.start_epoch,net=net)
+        fpath = config.sub('explanation.image',iter=i,epoch=config.start_epoch,net=net,data_desc=data_desc)
         rdat = (draw_heatmap(rdat,lo,hi)*255).astype(np.uint8)
-        # rdat = np.stack([rdat] + [np.zeros(rdat.shape)]*2,axis=-1)
-        imwrite(fpath, rdat.reshape(5,6,28,28,3).transpose(0,2,1,3,4).reshape(5*28,6*28,3))
+        if net in ['classifier','discriminator']:
+            rdat = align_images(rdat,5,6,28,28,3)
+        imwrite(fpath, rdat)
         if logger:
             logger.info('Saved explanation image of \'%s\' checkpoint \'%s\' in \'%s\'.',
                         config.nets[net].type,config.sub('nets.%s.param'%net),fpath)
-    if config.explanation.input:
+    if config.explanation.input and data is not None:
         bbox = config.data.bbox
-        fpath = config.sub('explanation.input',iter=i)
-        indat = ((data - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0,255).astype(np.uint8)
-        imwrite(fpath, indat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
+        fpath = config.sub('explanation.input',iter=i,data_desc=data_desc)
+
+        if net in ['classifier','discriminator']:
+            indat = ((data - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0,255).astype(np.uint8)
+            indat = align_images(indat,5,6,28,28)
+        else:
+            lo,hi = data.min(),data.max()
+            indat = (draw_heatmap(data,lo,hi)*255).astype(np.uint8)
+        imwrite(fpath, indat)
         if logger:
             logger.info('Saved input data \'%s\' iter %d in \'%s\'.',
-                        config.data.func,i,fpath)
+                        data_desc,i,fpath)
+
 
 def mkfilelogger(lname,fname,level=logging.INFO):
     logger = logging.getLogger(lname)
