@@ -35,6 +35,7 @@ log: '${root_dir}/${exp_dir}/log/${model}.log'
 
 explanation:
   method: 'sensitivity'
+  top_net: 'classifier'
   # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation}.${iter}.h5'
   output: NULL
   image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation.method}.${data_desc}.${iter}.png'

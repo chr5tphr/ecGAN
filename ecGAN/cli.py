@@ -129,9 +129,9 @@ def explain(args,config):
         data = data.as_in_context(ctx).reshape((-1,784))
         label = label.as_in_context(ctx)
 
-        relevance = model.explain(data,method=config.explanation.method,label=label)
+        relevance = model.explain(data,label=label)
 
-        save_explanation(relevance,data=data,data_desc=config.data.func,net='classifier',config=config,logger=logger,i=i)
+        save_explanation(relevance,data=data,data_desc=config.data.func,net=config.explanation.top_net,config=config,logger=logger,i=i)
 
 @register_command
 def explain_gan(args,config):
@@ -144,9 +144,9 @@ def explain_gan(args,config):
     model = models[config.model](ctx=ctx,logger=logger,config=config)
 
     for i in range(args.iter):
-        relD,relG,noise,data = model.explain(method=config.explanation.method)
+        relD,relG,noise,gen = model.explain(method=config.explanation.method)
 
-        save_explanation(relD,data,data_desc='gen',net='discriminator',config=config,logger=logger,i=i)
+        save_explanation(relD,gen,data_desc='gen',net=config.explanation.top_net,config=config,logger=logger,i=i)
         save_explanation(relG,noise,data_desc='noise',net='generator',config=config,logger=logger,i=i)
 
 if __name__ == '__main__':

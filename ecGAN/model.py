@@ -125,7 +125,8 @@ class Classifier(Model):
         if self.logger:
             self.logger.info('%s test acc: %s=%.4f',self.config.nets.classifier.type, name, acc)
 
-    def explain(self,data,method,label=None):
+    def explain(self,data,label=None):
+        method = self.config.explanation.method
         if not isinstance(self.netC,Interpretable):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%config.nets.classifier.type)
 
@@ -266,9 +267,9 @@ class GAN(Model):
     #             self.logger.info('Saved generated sensitivity by \'%s\' epoch %s in \'%s\'.',
     #                              self.config.nets.generator.type,epoch,fpath)
 
-        def explain(self,data=None,method,topC=False,label=None):
-
-            netTop = self.netD if topC else self.nets.get('classifier',self.netD)
+        def explain(self,data=None,label=None):
+            netTop = self.nets.get(self.config.explanation.top_net,'discriminator')
+            method = self.config.explanation.method
 
             if not isinstance(netTop,Interpretable):
                 raise NotImplementedError('\'%s\' is not yet Interpretable!'%

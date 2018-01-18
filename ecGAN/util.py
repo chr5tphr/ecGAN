@@ -108,6 +108,7 @@ class Config(ConfigNode):
             'output':       None,
             'image':        None,
             'input':        None,
+            'top_net':      'discriminator',
         },
     }
 
