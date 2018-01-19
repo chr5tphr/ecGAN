@@ -131,12 +131,13 @@ class Classifier(Model):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%config.nets.classifier.type)
 
         if method == 'sensitivity':
-            loss = gluon.loss.SoftmaxCrossEntropyLoss()
-            output = self.netC(data)
-            output.attach_grad()
-            with autograd.record():
-                err = loss(output, label)
-            dEdy = autograd.grad(err,output)
+            # loss = gluon.loss.SoftmaxCrossEntropyLoss()
+            # output = self.netC(data)
+            # output.attach_grad()
+            # with autograd.record():
+            #     err = loss(output, label)
+            # dEdy = autograd.grad(err,output)
+            dEdy = nd.ones(300,ctx=self.ctx)
         else:
             dEdy = None
 
@@ -268,7 +269,7 @@ class GAN(Model):
     #                              self.config.nets.generator.type,epoch,fpath)
 
     def explain(self,data=None,label=None):
-        netTop = self.nets.get(self.config.explanation.top_net,'discriminator')
+        netTop = self.nets.get(self.config.explanation.top_net,self.netD)
         method = self.config.explanation.method
 
         if not isinstance(netTop,Interpretable):
@@ -282,12 +283,7 @@ class GAN(Model):
             gdata = data
 
         if method == 'sensitivity':
-            loss = gluon.loss.SoftmaxCrossEntropyLoss()
-            output = netTop(gdata)
-            output.attach_grad()
-            with autograd.record():
-                err = loss(output, label)
-            dEdy = autograd.grad(err,output)
+            dEdy = nd.ones(30,ctx=self.ctx)
         else:
             dEdy = None
 
@@ -304,6 +300,19 @@ class GAN(Model):
                 self.logger.debug('Explanation sums: %s',', '.join([str(fl) for fl in Rsums]))
 
         return R[-1] if data is not None else (Rt,R[-1],noise,gdata)
+
+    def predict(self,data=None):
+        netTop = self.nets.get(self.config.explanation.top_net,self.netD)
+
+        if data is None:
+            noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
+            gdata = self.netG(noise)
+
+        output = netTop(gdata)
+        if output.shape[1] > 1:
+            output = output.softmax(axis=1)
+
+        return output
 
 @register_model
 class WGAN(GAN):

@@ -9,7 +9,7 @@ import h5py
 
 from argparse import ArgumentParser
 from imageio import imwrite
-from mxnet import nd, gluon, autograd
+from mxnet import nd, gluon, autograd, random
 
 from .net import nets
 from .model import models
@@ -30,12 +30,16 @@ def main():
     parser.add_argument('-u','--update')
     parser.add_argument('--epoch_range',nargs=3,type=int)
     parser.add_argument('--iter',type=int,default=1)
+    parser.add_argument('--seed',type=int)
 
     args = parser.parse_args(sys.argv[1:])
 
     config = Config(args.config)
     if args.update:
         config.update(yaml.safe_load(args.update))
+
+    if args.seed:
+        random.seed(args.seed)
 
     commands[args.command](args,config)
 
@@ -144,10 +148,27 @@ def explain_gan(args,config):
     model = models[config.model](ctx=ctx,logger=logger,config=config)
 
     for i in range(args.iter):
-        relD,relG,noise,gen = model.explain()
+        relTop,relG,noise,gen = model.explain()
 
-        save_explanation(relD,gen,data_desc='gen',net=config.explanation.top_net,config=config,logger=logger,i=i)
+        save_explanation(relTop,gen,data_desc='%s.%s'%(config.nets.generator.type,config.start_epoch),net=config.explanation.top_net,config=config,logger=logger,i=i)
         save_explanation(relG,noise,data_desc='noise',net='generator',config=config,logger=logger,i=i)
+
+@register_command
+def predict(args,config):
+    ctx = config_ctx(config)
+
+    logger = None
+    if config.log:
+        logger = mkfilelogger('predicting',config.sub('log'),logging.DEBUG if config.get('debug') else logging.INFO)
+
+    model = models[config.model](ctx=ctx,logger=logger,config=config)
+
+    for i in range(args.iter):
+        output = model.predict().asnumpy()
+        txt = '\n'.join([' '.join(['%.02f'%val for val in line]) for line in output])
+
+        if logger:
+            logger.info('Prediction for \'%s\':\n%s', config.nets[config.explanation.top_net].param,txt)
 
 if __name__ == '__main__':
     main()

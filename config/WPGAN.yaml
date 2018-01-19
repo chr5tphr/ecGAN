@@ -1,5 +1,6 @@
 root_dir: '/home/chrstphr/projects/ecGAN/result'
 exp_dir: 'mnist_full_pos'
+cls_dir: 'classify'
 
 device: 'cpu'
 device_id: 'auto'
@@ -37,10 +38,11 @@ nets:
     optkwargs:
       learning_rate: 0.00005
       clip_weights: 0.01
-  # classifier:
-  #   type: 'ClassFC'
-  #   param: '${root_dir}/params/${model}.${nets.classifier.type}.${start_epoch}.params'
-  #   save: '${root_dir}/params/${model}.${nets.classifier.type}.${epoch}.params'
+  classifier:
+    type: 'CPFC'
+    kwargs: {'outact':'relu'}
+    param: '${root_dir}/${cls_dir}/params/Classifier.${nets.classifier.type}.10.params'
+    # save: '${root_dir}/${cls_dir}/params/${model}.${nets.classifier.type}.${epoch}.params'
 
 log: '${root_dir}/${exp_dir}/log/${model}.log'
 gen_freq: 10
@@ -48,8 +50,8 @@ genout: '${root_dir}/${exp_dir}/gen/${model}.${nets.generator.type}.${epoch}.png
 ncritic: 5
 explanation:
   method: 'dtd'
-  top_net: 'discriminator'
+  top_net: 'classifier'
   # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.discriminator.type}.${epoch}.${explanation.method}.${iter}.h5'
   output: NULL
   image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.discriminator.type}.${epoch}.${explanation.method}.${data_desc}.${iter}.png'
-  input:  '${root_dir}/${exp_dir}/rel/${model}.input.${data_desc}.${iter}.png'
+  input:  '${root_dir}/${exp_dir}/rel/${model}.${data_desc}.${iter}.png'
