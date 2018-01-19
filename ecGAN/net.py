@@ -77,7 +77,7 @@ class GPFC(Sequential):
         self._outact = kwargs.pop('outact','relu')
         super().__init__(**kwargs)
         with self.name_scope():
-            self.add(Dense(64, activation='relu'))
+            self.add(Dense(64, activation='relu', isinput=True))
             self.add(Dense(64, activation='relu'))
             self.add(Dense(64, activation='relu'))
             self.add(Dense(self._outnum, activation=self._outact))
