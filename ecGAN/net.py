@@ -1,6 +1,6 @@
 from mxnet import nd
 from mxnet.gluon import nn
-from .func import Dense,Sequential
+from .func import Dense,Sequential,YSequential
 
 nets = {}
 def register_net(obj):
@@ -123,51 +123,35 @@ class CPFC(Sequential):
             self.add(Dense(64, activation='relu'))
             self.add(Dense(self._outnum, activation=self._outact))
 
-# @register_net
-# class ClassMO(nn.Sequential):
-#     def __init__(self,**kwargs):
-#         super().__init__(**kwargs)
-#         with self.name_scope():
-#             self.add(nn.Dense(256))
-#             # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
-#             self.add(nn.Dropout(.5))
-#             self.add(nn.Dense(256))
-#             # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
-#             self.add(nn.Dropout(.5))
-#             self.add(nn.Dense(10))
-
-class YSequential(nn.Block):
+@register_net
+class CGPFC(YSequential):
     def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',784)
+        self._outact = kwargs.pop('outact','relu')
         super().__init__(**kwargs)
         with self.name_scope():
-            self._data = nn.Sequential()
-            self.register_child(self._data)
+            self.addData(Dense(64, activation='relu', isinput=True)))
 
-            self._cond = nn.Sequential()
-            self.register_child(self._cond)
+            self.addCond(Dense(64, activation='relu')))
 
-            self._main = nn.Sequential()
-            self.register_child(self._main)
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(self._outnum, activation=self._outact))
 
-    def addData(self,*args,**kwargs):
-        with self._data.name_scope():
-            self._data.add(*args,**kwargs)
+@register_net
+class CDPFC(YSequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',1)
+        self._outact = kwargs.pop('outact',None)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self.addData(nn.Dense(64, activation='relu', isinput=True)))
 
-    def addCond(self,*args,**kwargs):
-        with self._cond.name_scope():
-            self._cond.add(*args,**kwargs)
+            self.addCond(nn.Dense(64, activation='relu')))
 
-    def add(self,*args,**kwargs):
-        with self._main.name_scope():
-            self._main.add(*args,**kwargs)
-
-    def forward(self,x,y,dim=1):
-        data = self._data(x)
-        cond = self._cond(y)
-        combo = nd.concat(data,cond,dim=dim)
-        return self._main(combo)
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(64, activation='relu'))
+            self.add(Dense(self._outnum, activation=self._outact))
 
 @register_net
 class CGenFC(YSequential):

@@ -14,29 +14,39 @@ class Interpretable(object):
     def __init__(self,*args,**kwargs):
         self._isinput = kwargs.pop('isinput',False)
         super().__init__(*args,**kwargs)
+        self._in = None
+        self._out = None
 
-    def relevance(self,*args,method='dtd',**kwargs):
+    def forward_logged(self,*args,**kwargs):
+        self._in = args
+        self._out = self.forward(*args)
+        return self._out
+
+    def relevance(self,*args,**kwargs):
+        method = kwargs.pop('method',dtd)
         func = getattr(self,'relevance_'+method)
         return func(*args,**kwargs)
 
     def relevance_sensitivity(self):
-        # result = []
-        # for param in self.collect_params().items():
-        #     result.append()
-        # return self.collect_params()
         raise NotImplementedError
 
     def relevance_dtd(self,a,R):
         raise NotImplementedError
 
 class Dense(Interpretable,nn.Dense):
-    def relevance_sensitivity(self,a,R):
+    def relevance_sensitivity(self,R):
+        if self._in is None:
+            raise RuntimeError('Block has not yet executed forward_logged!')
+        a = self._in[0]
         a.attach_grad()
         with autograd.record():
             z = self(a)
         return autograd.grad(z,a,head_grads=R)
 
-    def relevance_dtd(self,a,R,lo=-1,hi=1):
+    def relevance_dtd(self,R,lo=-1,hi=1):
+        if self._in is None:
+            raise RuntimeError('Block has not yet executed forward_logged!')
+        a = self._in[0]
         if self._isinput: #zb
             wplus = nd.maximum(0.,self.weight.data())
             wminus = nd.minimum(0.,self.weight.data())
@@ -62,15 +72,71 @@ class Dense(Interpretable,nn.Dense):
             return a*c
 
 class Sequential(Interpretable,nn.Sequential):
-    def relevance(self,x,y=None,method='dtd',ret_all=False):
-        A = [x]
-        for child in self._children:
-            A.append(child.forward(A[-1]))
-        z = A.pop()
-        R = [z if y is None else y]
-        for child,a in zip(self._children[::-1],A[::-1]):
+    # def relevance(self,x,y=None,method='dtd',ret_all=False):
+    #     if self._in is None:
+    #         raise RuntimeError('Block has not yet executed forward!')
+    #     A = [x]
+    #     for child in self._children:
+    #         A.append(child.forward(A[-1]))
+    #     z = A.pop()
+    #     R = [z if y is None else y]
+    #     for child,a in zip(self._children[::-1],A[::-1]):
+    #         R.append(child.relevance(a,R[-1],method=method))
+    #     return R if ret_all else R[-1]
+    def relevance(self,y=None,method='dtd',ret_all=False):
+        if self._in is None:
+            raise RuntimeError('Block has not yet executed forward_logged!')
+        R = [self._out if y is None else y]
+        for child in self._children[::-1]:
             R.append(child.relevance(a,R[-1],method=method))
         return R if ret_all else R[-1]
+
+class YSequential(Interpretable, nn.Block):
+    def __init__(self,**kwargs):
+        self._concat_dim = kwargs.pop('concat_dim',1)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self._data = Sequential()
+            self.register_child(self._data)
+
+            self._cond = Sequential()
+            self.register_child(self._cond)
+
+            self._main = nn.Sequential()
+            self.register_child(self._main)
+
+    def addData(self,*args,**kwargs):
+        with self._data.name_scope():
+            self._data.add(*args,**kwargs)
+
+    def addCond(self,*args,**kwargs):
+        with self._cond.name_scope():
+            self._cond.add(*args,**kwargs)
+
+    def add(self,*args,**kwargs):
+        with self._main.name_scope():
+            self._main.add(*args,**kwargs)
+
+    def forward(self,x,y):
+        data = self._data(x)
+        cond = self._cond(y)
+        combo = nd.concat(data,cond,dim=self._concat_dim)
+        return self._main(combo)
+
+    def relevance(self,y=None,method='dtd',ret_all=False):
+        if self._in is None:
+            raise RuntimeError('Block has not yet executed forward_logged!')
+        R = self._main.relevance(R,y=y,method=method,ret_all=True)
+
+        dim_d = self._data._out.shape[self._concat_dim]
+
+        Rtd = R.slice_axis(axis=self._concat_dim, begin=0, end=dim_d)
+        Rtc = R.slice_axis(axis=self._concat_dim, begin=dim_d, end=-1)
+
+        Rd = self._data.relevance(Rtd,method=method,ret_all=True)
+        Rc = self._cond.relevance(Rtc,method=method,ret_all=True)
+
+        return Rd,Rc,R if ret_all else Rd[-1],Rc[-1]
 
 class MaxOut(nn.Block):
     pass

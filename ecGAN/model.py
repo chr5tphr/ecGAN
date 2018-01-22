@@ -241,11 +241,11 @@ class GAN(Model):
             self.checkpoint('I%d'%epoch)
             self.generate_sample('I%d'%epoch)
 
-    def generate_sample(self,epoch):
+    def generate_sample(self,epoch,label=None):
         if self.config.genout:
             bbox = self.data_bbox
             noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
-            gdat = self.netG(noise)
+            gdat = self.netG(*([noise] + ([] if label is None else [label])))
             fpath = self.config.sub('genout',epoch=epoch)
             gdat = ((gdat - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0,255).astype(np.uint8)
             imwrite(fpath, gdat.reshape(5,6,28,28).transpose(0,2,1,3).reshape(5*28,6*28))
@@ -278,7 +278,7 @@ class GAN(Model):
 
         if data is None:
             noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
-            gdata = self.netG(noise)
+            gdata = self.netG(*([noise] + ([] if label is None else [label])))
         else:
             gdata = data
 
@@ -301,12 +301,12 @@ class GAN(Model):
 
         return R[-1] if data is not None else (Rt,R[-1],noise,gdata)
 
-    def predict(self,data=None):
+    def predict(self,data=None,label=None):
         netTop = self.nets.get(self.config.explanation.top_net,self.netD)
 
         if data is None:
             noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
-            gdata = self.netG(noise)
+            gdata = self.netG(*([noise] + ([] if label is None else [label])))
 
         output = netTop(gdata)
         if output.shape[1] > 1:
@@ -406,6 +406,102 @@ class WGAN(GAN):
                 self.logger.info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
             self.generate_sample('I%d'%epoch)
+
+@register_model
+class WCGAN(WGAN):
+    def train(self,data,batch_size,nepochs):
+        config = self.config
+
+        netG = self.netG
+        netD = self.netD
+
+        ctx = self.ctx
+
+        data_iter = gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
+
+        # trainer for the generator and the discriminator
+        trainerG = gluon.Trainer(netG.collect_params(),
+            config.nets.generator.get('optimizer','rmsprop'),
+            config.nets.generator.get('optkwargs',{'learning_rate': 0.00005}))
+        trainerD = gluon.Trainer(netD.collect_params(),
+            config.nets.discriminator.get('optimizer','rmsprop'),
+            config.nets.discriminator.get('optkwargs',{'learning_rate': 0.00005, 'clip_weights': 1e-2}))
+
+        metric = mx.metric.Loss()
+
+        epoch = self.start_epoch
+
+        if self.logger:
+            self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
+                        config.model,config.nets.discriminator.type,config.nets.generator.type,epoch)
+
+        iter_g = 0
+
+        try:
+            for epoch in range(self.start_epoch, self.start_epoch + nepochs):
+                tic = time()
+                for i, (data, cond_dense) in enumerate(data_iter):
+                    ################
+                    # (1) Update D
+                    ################
+
+                    prange = nd.arange(10)
+
+                    data = data.as_in_context(ctx).reshape((-1,784))
+                    cond_dense = cond_dense.as_in_context(ctx)
+                    cond_real = fuzzy_one_hot(cond_dense, 10)
+
+                    noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
+                    cond_fake = [fuzzy_one_hot(nd.random.poisson(prange,shape=(data.shape[0],)), 10)]*2
+
+                    with autograd.record():
+                        real_output = netD(data, cond_real)
+                        errD_real = real_output.mean(axis=0)
+
+                    fake = netG(noise, cond_fake[0])
+
+                    with autograd.record():
+                        fake_output = netD(fake.detach(), cond_fake[1])
+                        errD_fake = fake_output.mean(axis=0)
+
+                        errD = - (errD_real - errD_fake)
+                        errD.backward()
+
+                    trainerD.step(batch_size)
+                    # for key,param in paramsD.items():
+                        # param.set_data(param.data(ctx=ctx).clip(-0.01,0.01))
+                    metric.update(None, [-errD,])
+
+                    ################
+                    # (2) Update G
+                    ################
+                    diter = 100 if ((iter_g < 25) or not (iter_g % 500)) else self.ncritic
+                    if not (i % diter):
+                        noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
+                        cond_fake = [fuzzy_one_hot(nd.random.poisson(prange,shape=(data.shape[0],)), 10)]*2
+                        with autograd.record():
+                            fake = netG(noise, cond_fake[0])
+                            output = netD(fake, cond_fake[1])
+                            errG = -output.mean(axis=0)
+                            errG.backward()
+
+                        trainerG.step(batch_size)
+                        iter_g += 1
+
+                name, est = metric.get()
+                metric.reset()
+                if self.logger:
+                    self.logger.info('netD training est epoch %04d: %s=%.4f , time: %.2f',epoch, name, est, (time() - tic))
+                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
+                    self.checkpoint(epoch+1)
+                if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
+                    self.generate_sample(epoch+1)
+        except KeyboardInterrupt:
+            if self.logger:
+                self.logger.info('Training interrupted by user.')
+            self.checkpoint('I%d'%epoch)
+            self.generate_sample('I%d'%epoch)
+
 
 @register_model
 class CGAN(GAN):

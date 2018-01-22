@@ -1,0 +1,57 @@
+root_dir: '/home/chrstphr/projects/ecGAN/result'
+exp_dir: 'mnist_cond_pos'
+# cls_dir: 'classify'
+
+device: 'cpu'
+device_id: 'auto'
+debug: False
+
+batch_size: 64
+nepochs: 10000
+start_epoch: 0
+save_freq: 10
+
+init: False
+
+data:
+  func: 'mnist'
+  args: []
+  kwargs: {'train':True,'ret_label':True,'bbox':[0,1]}
+  bbox: [0,1]
+
+model: 'WCGAN'
+nets:
+  generator:
+    type: 'CGPFC'
+    kwargs: {'outact':'relu'}
+    param: '${root_dir}/${exp_dir}/params/${model}.${nets.generator.type}.${start_epoch}.params'
+    save: '${root_dir}/${exp_dir}/params/${model}.${nets.generator.type}.${epoch}.params'
+    optimizer: 'rmsprop'
+    optkwargs:
+      learning_rate: 0.00005
+  discriminator:
+    type: 'CDPFC'
+    kwargs: {'outnum': 1, 'outact': 'relu'}
+    param: '${root_dir}/${exp_dir}/params/${model}.${nets.discriminator.type}.${start_epoch}.params'
+    save: '${root_dir}/${exp_dir}/params/${model}.${nets.discriminator.type}.${epoch}.params'
+    optimizer: 'rmsprop'
+    optkwargs:
+      learning_rate: 0.00005
+      clip_weights: 0.01
+  # classifier:
+  #   type: 'CPFC'
+  #   kwargs: {'outact':'relu'}
+  #   param: '${root_dir}/${cls_dir}/params/Classifier.${nets.classifier.type}.10.params'
+    # save: '${root_dir}/${cls_dir}/params/${model}.${nets.classifier.type}.${epoch}.params'
+
+log: '${root_dir}/${exp_dir}/log/${model}.log'
+gen_freq: 10
+genout: '${root_dir}/${exp_dir}/gen/${model}.${nets.generator.type}.${epoch}.png'
+ncritic: 5
+explanation:
+  method: 'dtd'
+  top_net: 'classifier'
+  # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.discriminator.type}.${epoch}.${explanation.method}.${iter}.h5'
+  output: NULL
+  image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.discriminator.type}.${epoch}.${explanation.method}.${data_desc}.${iter}.png'
+  input:  '${root_dir}/${exp_dir}/rel/${model}.${data_desc}.${iter}.png'
