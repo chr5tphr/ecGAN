@@ -4,7 +4,8 @@ from mxnet import nd, gluon, autograd
 from mxnet.gluon import nn
 
 
-def fuzzy_one_hot(x,size):
+def fuzzy_one_hot(arr,size):
+    x = arr.reshape((-1,))
     return nd.where(nd.one_hot(x,size),
                     nd.uniform(low=0.7,high=1.2,shape=(x.shape[0],size),ctx=x.context),
                     nd.uniform(low=0.0,high=0.3,shape=(x.shape[0],size),ctx=x.context))
@@ -137,6 +138,12 @@ class YSequential(Interpretable, nn.Block):
         Rc = self._cond_net.relevance(Rtc,method=method,ret_all=True)
 
         return Rd,Rc,R if ret_all else Rd[-1],Rc[-1]
+
+class Clip(Interpretable,nn.Block):
+    def forward(self,x):
+        return nd.clip(x,0.,1.)
+    def relevance(self,R):
+        return R
 
 class MaxOut(nn.Block):
     pass

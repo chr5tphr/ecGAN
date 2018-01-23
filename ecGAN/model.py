@@ -35,7 +35,7 @@ class Model(object):
                 if self.logger:
                     self.logger.debug('Loading parameters for %s \'%s\' from %s.',key,desc.type,fpath)
             else:
-                self.nets[key].initialize(mx.init.Xavier(magnitude=2.24),ctx=self.ctx)
+                self.nets[key].initialize(mx.init.Xavier(rnd_type='gaussian',magnitude=2.24),ctx=self.ctx)
                 if self.logger:
                     self.logger.debug('Initializing %s \'%s\'.',key,desc.type)
 
@@ -48,6 +48,7 @@ class Model(object):
                     self.logger.info('Saved %s \'%s\' checkpoint epoch %s in file \'%s\'.',key,self.config.nets[key].type,epoch,fpath)
             else:
                 if self.logger:
+                    fpath = self.config.sub('nets.%s.save'%(key),epoch=epoch)
                     self.logger.debug('Not saving %s \'%s\' epoch %s.',key,self.config.nets[key].type,epoch,fpath)
 
     def generate_sample(self,epoch):
@@ -355,6 +356,8 @@ class WGAN(GAN):
                     ################
                     # (1) Update D
                     ################
+                    if type(data) in [tuple,list]:
+                        data = data[0]
 
                     data = data.as_in_context(ctx).reshape((-1,784))
 

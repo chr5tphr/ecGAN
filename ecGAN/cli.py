@@ -50,7 +50,7 @@ def train(args,config):
     batch_size = config.batch_size
     nepochs = config.nepochs
 
-    data = data_funcs[config.data.func](*(config.data.args),**(config.data.kwargs))
+    data = data_funcs[config.data.func](*(config.data.args),ctx=ctx,**(config.data.kwargs))
 
     logger = None
     if config.log:
