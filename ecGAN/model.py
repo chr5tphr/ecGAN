@@ -445,14 +445,12 @@ class WCGAN(WGAN):
                     # (1) Update D
                     ################
 
-                    prange = nd.arange(10)
-
                     data = data.as_in_context(ctx).reshape((-1,784))
                     cond_dense = cond_dense.as_in_context(ctx)
                     cond_real = fuzzy_one_hot(cond_dense, 10)
 
                     noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
-                    cond_fake = [fuzzy_one_hot(nd.random.poisson(prange,shape=(data.shape[0],)), 10)]*2
+                    cond_fake = [fuzzy_one_hot(nd.uniform(high=10,shape=(data.shape[0],),ctx=ctx).astype('int32'), 10)]*2
 
                     with autograd.record():
                         real_output = netD(data, cond_real)
@@ -478,7 +476,7 @@ class WCGAN(WGAN):
                     diter = 100 if ((iter_g < 25) or not (iter_g % 500)) else self.ncritic
                     if not (i % diter):
                         noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
-                        cond_fake = [fuzzy_one_hot(nd.random.poisson(prange,shape=(data.shape[0],)), 10)]*2
+                        cond_fake = [fuzzy_one_hot(nd.uniform(high=10,shape=(data.shape[0],),ctx=ctx).astype('int32'), 10)]*2
                         with autograd.record():
                             fake = netG(noise, cond_fake[0])
                             output = netD(fake, cond_fake[1])
@@ -495,12 +493,14 @@ class WCGAN(WGAN):
                 if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.checkpoint(epoch+1)
                 if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
-                    self.generate_sample(epoch+1)
+                    cond = fuzzy_one_hot(nd.arange(10,step=1./3.,ctx=ctx).astype('int32'), 10)
+                    self.generate_sample(epoch+1,cond)
         except KeyboardInterrupt:
             if self.logger:
                 self.logger.info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
-            self.generate_sample('I%d'%epoch)
+            cond = fuzzy_one_hot(nd.arange(10,step=1./3.,ctx=ctx).astype('int32'), 10)
+            self.generate_sample('I%d'%epoch,cond)
 
 
 @register_model

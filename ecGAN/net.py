@@ -130,9 +130,9 @@ class CGPFC(YSequential):
         self._outact = kwargs.pop('outact','relu')
         super().__init__(**kwargs)
         with self.name_scope():
-            self.addData(Dense(64, activation='relu', isinput=True)))
+            self.addData(Dense(64, activation='relu', isinput=True))
 
-            self.addCond(Dense(64, activation='relu')))
+            self.addCond(Dense(64, activation='relu'))
 
             self.add(Dense(64, activation='relu'))
             self.add(Dense(64, activation='relu'))
@@ -145,9 +145,9 @@ class CDPFC(YSequential):
         self._outact = kwargs.pop('outact',None)
         super().__init__(**kwargs)
         with self.name_scope():
-            self.addData(nn.Dense(64, activation='relu', isinput=True)))
+            self.addData(Dense(64, activation='relu', isinput=True))
 
-            self.addCond(nn.Dense(64, activation='relu')))
+            self.addCond(Dense(64, activation='relu'))
 
             self.add(Dense(64, activation='relu'))
             self.add(Dense(64, activation='relu'))

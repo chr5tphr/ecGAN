@@ -31,7 +31,7 @@ nets:
       learning_rate: 0.00005
   discriminator:
     type: 'CDPFC'
-    kwargs: {'outnum': 1, 'outact': 'relu'}
+    kwargs: {'outnum': 1}, 'outact': 'relu'}
     param: '${root_dir}/${exp_dir}/params/${model}.${nets.discriminator.type}.${start_epoch}.params'
     save: '${root_dir}/${exp_dir}/params/${model}.${nets.discriminator.type}.${epoch}.params'
     optimizer: 'rmsprop'

@@ -96,45 +96,45 @@ class YSequential(Interpretable, nn.Block):
         self._concat_dim = kwargs.pop('concat_dim',1)
         super().__init__(**kwargs)
         with self.name_scope():
-            self._data = Sequential()
-            self.register_child(self._data)
+            self._data_net = Sequential()
+            self.register_child(self._data_net)
 
-            self._cond = Sequential()
-            self.register_child(self._cond)
+            self._cond_net = Sequential()
+            self.register_child(self._cond_net)
 
-            self._main = nn.Sequential()
-            self.register_child(self._main)
+            self._main_net = nn.Sequential()
+            self.register_child(self._main_net)
 
     def addData(self,*args,**kwargs):
-        with self._data.name_scope():
-            self._data.add(*args,**kwargs)
+        with self._data_net.name_scope():
+            self._data_net.add(*args,**kwargs)
 
     def addCond(self,*args,**kwargs):
-        with self._cond.name_scope():
-            self._cond.add(*args,**kwargs)
+        with self._cond_net.name_scope():
+            self._cond_net.add(*args,**kwargs)
 
     def add(self,*args,**kwargs):
-        with self._main.name_scope():
-            self._main.add(*args,**kwargs)
+        with self._main_net.name_scope():
+            self._main_net.add(*args,**kwargs)
 
     def forward(self,x,y):
-        data = self._data(x)
-        cond = self._cond(y)
+        data = self._data_net(x)
+        cond = self._cond_net(y)
         combo = nd.concat(data,cond,dim=self._concat_dim)
-        return self._main(combo)
+        return self._main_net(combo)
 
     def relevance(self,y=None,method='dtd',ret_all=False):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
-        R = self._main.relevance(R,y=y,method=method,ret_all=True)
+        R = self._main_net.relevance(R,y=y,method=method,ret_all=True)
 
-        dim_d = self._data._out.shape[self._concat_dim]
+        dim_d = self._data_net._out.shape[self._concat_dim]
 
         Rtd = R.slice_axis(axis=self._concat_dim, begin=0, end=dim_d)
         Rtc = R.slice_axis(axis=self._concat_dim, begin=dim_d, end=-1)
 
-        Rd = self._data.relevance(Rtd,method=method,ret_all=True)
-        Rc = self._cond.relevance(Rtc,method=method,ret_all=True)
+        Rd = self._data_net.relevance(Rtd,method=method,ret_all=True)
+        Rc = self._cond_net.relevance(Rtc,method=method,ret_all=True)
 
         return Rd,Rc,R if ret_all else Rd[-1],Rc[-1]
 
