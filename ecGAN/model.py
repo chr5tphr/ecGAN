@@ -453,20 +453,26 @@ class WCGAN(WGAN):
                     cond_real = fuzzy_one_hot(cond_dense, 10)
 
                     noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
-                    cond_fake = [fuzzy_one_hot(nd.uniform(high=10,shape=(data.shape[0],),ctx=ctx).astype('int32'), 10)]*2
+                    cond_fake = fuzzy_one_hot(nd.uniform(high=10,shape=(data.shape[0],),ctx=ctx).astype('int32'), 10)
+
+                    cond_wrong_dense = (cond_dense.reshape((-1,)) + nd.uniform(low=1,high=10,shape=(data.shape[0],),ctx=ctx).astype('int32')) % 10
+                    cond_wrong = fuzzy_one_hot(cond_wrong_dense, 10)
 
                     with autograd.record():
                         real_output = netD(data, cond_real)
                         errD_real = real_output.mean(axis=0)
 
-                    fake = netG(noise, cond_fake[0])
+                        wrong_output = netD(data, cond_wrong)
+                        errD_wrong = wrong_output.mean(axis=0)
+
+                    fake = netG(noise, cond_fake)
 
                     with autograd.record():
-                        fake_output = netD(fake.detach(), cond_fake[1])
+                        fake_output = netD(fake.detach(), cond_fake)
                         errD_fake = fake_output.mean(axis=0)
 
-                        errD = - (errD_real - errD_fake)
-                        errD.backward()
+                        errD = - (errD_real - 0.5*(errD_fake + errD_wrong))
+                    errD.backward()
 
                     trainerD.step(batch_size)
                     # for key,param in paramsD.items():
@@ -479,10 +485,10 @@ class WCGAN(WGAN):
                     diter = 100 if ((iter_g < 25) or not (iter_g % 500)) else self.ncritic
                     if not (i % diter):
                         noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
-                        cond_fake = [fuzzy_one_hot(nd.uniform(high=10,shape=(data.shape[0],),ctx=ctx).astype('int32'), 10)]*2
+                        cond_fake = fuzzy_one_hot(nd.uniform(high=10,shape=(data.shape[0],),ctx=ctx).astype('int32'), 10)
                         with autograd.record():
-                            fake = netG(noise, cond_fake[0])
-                            output = netD(fake, cond_fake[1])
+                            fake = netG(noise, cond_fake)
+                            output = netD(fake, cond_fake)
                             errG = -output.mean(axis=0)
                             errG.backward()
 
