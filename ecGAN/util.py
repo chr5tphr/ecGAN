@@ -70,6 +70,7 @@ class Config(ConfigNode):
         'device_id':        'auto',
         'model':            'GAN',
         'init':             False,
+        'fuzzy_labels':     False,
         'nets': {
             # 'generator': {
             #     'type':     'GenFC',
@@ -91,7 +92,7 @@ class Config(ConfigNode):
             # },
         },
         'data': {
-            'func':         'mnist_single',
+            'func':         'mnist',
             'args':         [],
             'kwargs':       {},
             'bbox':         [-1,1]

@@ -19,7 +19,9 @@ data:
   kwargs:
     train: True
     bbox: [0,1]
+    # labels: [0,1]
   bbox: [0,1]
+fuzzy_labels: False
 
 model: 'WCGAN'
 nets:

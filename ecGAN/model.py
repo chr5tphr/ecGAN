@@ -4,7 +4,7 @@ from time import time
 from mxnet import gluon, autograd, nd
 from imageio import imwrite
 
-from .func import fuzzy_one_hot, Interpretable
+from .func import fuzzy_one_hot, Interpretable, linspace, randint
 from .util import Config, config_ctx, draw_heatmap
 from .net import nets
 
@@ -420,6 +420,8 @@ class WCGAN(WGAN):
 
         ctx = self.ctx
 
+        K = len(data.classes)
+
         data_iter = gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
 
         # trainer for the generator and the discriminator
@@ -431,6 +433,8 @@ class WCGAN(WGAN):
             config.nets.discriminator.get('optkwargs',{'learning_rate': 0.00005, 'clip_weights': 1e-2}))
 
         metric = mx.metric.Loss()
+
+        one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
 
         epoch = self.start_epoch
 
@@ -444,16 +448,19 @@ class WCGAN(WGAN):
             for epoch in range(self.start_epoch, self.start_epoch + nepochs):
                 tic = time()
                 for i, (data, cond_dense) in enumerate(data_iter):
+                    num = data.shape[0
                     ################
                     # (1) Update D
                     ################
 
-                    data = data.as_in_context(ctx).reshape((-1,784))
+                    data = data.as_in_context(ctx)
                     cond_dense = cond_dense.as_in_context(ctx)
-                    cond_real = fuzzy_one_hot(cond_dense, 10)
+                    # cond_real = fuzzy_one_hot(cond_dense, K)
+                    cond_real = one_hot(cond_dense, K)
 
-                    noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
-                    cond_fake = fuzzy_one_hot(nd.uniform(high=10,shape=(data.shape[0],),ctx=ctx).astype('int32'), 10)
+                    noise = nd.random_normal(shape=(num, 100), ctx=ctx)
+                    # cond_fake = fuzzy_one_hot(nd.uniform(high=K,shape=(data.shape[0],),ctx=ctx).astype('int32'), K)
+                    cond_fake = one_hot(randint(high=K,shape=(num,),ctx=ctx), K)
 
                     # cond_wrong_dense = (cond_dense.reshape((-1,)) + nd.uniform(low=1,high=10,shape=(data.shape[0],),ctx=ctx).astype('int32')) % 10
                     # cond_wrong = fuzzy_one_hot(cond_wrong_dense, 10)
@@ -462,8 +469,8 @@ class WCGAN(WGAN):
                         real_output = netD(data, cond_real)
                         errD_real = real_output.mean(axis=0)
 
-                        wrong_output = netD(data, cond_wrong)
-                        errD_wrong = wrong_output.mean(axis=0)
+                        # wrong_output = netD(data, cond_wrong)
+                        # errD_wrong = wrong_output.mean(axis=0)
 
                     fake = netG(noise, cond_fake)
 
@@ -475,7 +482,7 @@ class WCGAN(WGAN):
                         errD = - (errD_real - errD_fake)
                     errD.backward()
 
-                    trainerD.step(batch_size)
+                    trainerD.step(num)
                     # for key,param in paramsD.items():
                         # param.set_data(param.data(ctx=ctx).clip(-0.01,0.01))
                     metric.update(None, [-errD,])
@@ -485,15 +492,16 @@ class WCGAN(WGAN):
                     ################
                     diter = 100 if ((iter_g < 25) or not (iter_g % 500)) else self.ncritic
                     if not (i % diter):
-                        noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
-                        cond_fake = fuzzy_one_hot(nd.uniform(high=10,shape=(data.shape[0],),ctx=ctx).astype('int32'), 10)
+                        noise = nd.random_normal(shape=(num, 100), ctx=ctx)
+                        # cond_fake = fuzzy_one_hot(nd.uniform(high=K,shape=(data.shape[0],),ctx=ctx).astype('int32'), K)
+                        cond_fake = one_hot(randint(high=K,shape=(num,),ctx=ctx), K)
                         with autograd.record():
                             fake = netG(noise, cond_fake)
                             output = netD(fake, cond_fake)
                             errG = -output.mean(axis=0)
                             errG.backward()
 
-                        trainerG.step(batch_size)
+                        trainerG.step(num)
                         iter_g += 1
 
                 name, est = metric.get()
@@ -503,13 +511,13 @@ class WCGAN(WGAN):
                 if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.checkpoint(epoch+1)
                 if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
-                    cond = fuzzy_one_hot(nd.arange(10,step=1./3.,ctx=ctx).astype('int32'), 10)
+                    cond = one_hot(linspace(0,K,30,ctx=ctx,dtype='int32'), K)
                     self.generate_sample(epoch+1,cond)
         except KeyboardInterrupt:
             if self.logger:
                 self.logger.info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
-            cond = fuzzy_one_hot(nd.arange(10,step=1./3.,ctx=ctx).astype('int32'), 10)
+            cond = one_hot(linspace(0,K,30,ctx=ctx,dtype='int32'), K)
             self.generate_sample('I%d'%epoch,cond)
 
 

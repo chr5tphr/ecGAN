@@ -35,12 +35,17 @@ class PreloadedDataset(Dataset):
         self._data = nd.zeros([self._length] + list(dataset._data.shape)[1:],dtype='float32',ctx=ctx)
         self._label = nd.zeros([self._length] + list(dataset._label.shape)[1:],dtype='int32',ctx=ctx)
 
+        uniques = set()
         i = 0
-        for dat,lab in dataset:
-            if labels is None or (np.any([(lab == cond).any() for cond in labels])):
-                self._data[i] = dat.astype('float32')
-                self._label[i] = lab.astype('int32')
+        for dat,dlab in dataset:
+            lab = dlab.item()
+            if labels is None or ([lab == cond for cond in labels]):
+                self._data[i] = dat
+                self._label[i] = lab
                 i += 1
+                uniques.add(lab)
+        self.classes = list(uniques)
+
 
     def __getitem__(self,idx):
         return (self._data[idx],self._label[idx])
