@@ -39,7 +39,7 @@ class PreloadedDataset(Dataset):
         i = 0
         for dat,dlab in dataset:
             lab = dlab.item()
-            if labels is None or ([lab == cond for cond in labels]):
+            if labels is None or np.any([lab == cond for cond in labels]):
                 self._data[i] = dat
                 self._label[i] = lab
                 i += 1

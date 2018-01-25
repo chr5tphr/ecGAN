@@ -11,10 +11,14 @@ def fuzzy_one_hot(arr,size):
                     nd.uniform(low=0.0,high=0.3,shape=(x.shape[0],size),ctx=x.context))
 
 def linspace(start=0.,stop=1.,num=1,ctx=None,dtype=None):
-    return nd.arange(start,stop,(stop-start)/num,ctx=ctx,dtype=dtype)
+    return nd.arange(start,stop,(stop-start)/num,ctx=ctx,dtype='float32').astype(dtype)
 
 def randint(low=0.,high=1.,shape=(1,),ctx=None,dtype='int32'):
     return nd.uniform(low=low,high=high,shape=shape,ctx=ctx).astype(dtype)
+
+class Intermediate(object):
+    def forward(self,*args,depth=-1):
+        return self.forward(self,*args)
 
 class Interpretable(object):
     def __init__(self,*args,**kwargs):
@@ -77,7 +81,7 @@ class Dense(Interpretable,nn.Dense):
             c = autograd.grad(z,a,head_grads=R/z)
             return a*c
 
-class Sequential(Interpretable,nn.Sequential):
+class Sequential(Interpretable, Intermediate, nn.Sequential):
     # def relevance(self,x,y=None,method='dtd',ret_all=False):
     #     if self._in is None:
     #         raise RuntimeError('Block has not yet executed forward!')
@@ -97,7 +101,15 @@ class Sequential(Interpretable,nn.Sequential):
             R.append(child.relevance(a,R[-1],method=method))
         return R if ret_all else R[-1]
 
-class YSequential(Interpretable, nn.Block):
+    def forward(self, x, depth=-1):
+        rdep = depth if depth > 0 else (len(self._children) + depth)
+        for i,block in enumerate(self._children):
+            x = block(x)
+            if i == depth:
+                break
+        return x
+
+class YSequential(Interpretable, Intermediate, nn.Block):
     def __init__(self,**kwargs):
         self._concat_dim = kwargs.pop('concat_dim',1)
         super().__init__(**kwargs)
@@ -123,11 +135,11 @@ class YSequential(Interpretable, nn.Block):
         with self._main_net.name_scope():
             self._main_net.add(*args,**kwargs)
 
-    def forward(self,x,y):
+    def forward(self,x,y,depth=-1):
         data = self._data_net(x)
         cond = self._cond_net(y)
         combo = nd.concat(data,cond,dim=self._concat_dim)
-        return self._main_net(combo)
+        return self._main_net(combo,depth=depth)
 
     def relevance(self,y=None,method='dtd',ret_all=False):
         if self._in is None:
