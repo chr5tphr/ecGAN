@@ -120,7 +120,7 @@ class YSequential(Interpretable, Intermediate, nn.Block):
             self._cond_net = Sequential()
             self.register_child(self._cond_net)
 
-            self._main_net = nn.Sequential()
+            self._main_net = Sequential()
             self.register_child(self._main_net)
 
     def addData(self,*args,**kwargs):
@@ -139,7 +139,7 @@ class YSequential(Interpretable, Intermediate, nn.Block):
         data = self._data_net(x)
         cond = self._cond_net(y)
         combo = nd.concat(data,cond,dim=self._concat_dim)
-        return self._main_net(combo,depth=depth)
+        return self._main_net.forward(combo,depth=depth)
 
     def relevance(self,y=None,method='dtd',ret_all=False):
         if self._in is None:

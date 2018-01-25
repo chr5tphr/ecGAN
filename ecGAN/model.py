@@ -4,7 +4,7 @@ from time import time
 from mxnet import gluon, autograd, nd
 from imageio import imwrite
 
-from .func import fuzzy_one_hot, Interpretable, linspace, randint
+from .func import fuzzy_one_hot, Interpretable, Intermediate, linspace, randint
 from .util import Config, config_ctx, draw_heatmap
 from .net import nets
 
@@ -542,6 +542,8 @@ class CCGAN(GAN):
         # loss
         loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
 
+        one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
+
         # trainer for the generator and the discriminator
         trainerG = gluon.Trainer(netG.collect_params(),
             config.nets.generator.get('optimizer','adam'),
@@ -553,8 +555,8 @@ class CCGAN(GAN):
         real_label = nd.ones(batch_size, ctx=ctx)
         fake_label = nd.zeros(batch_size, ctx=ctx)
 
-        real_label_oh = fuzzy_one_hot(real_label, 2)
-        fake_label_oh = fuzzy_one_hot(fake_label, 2)
+        real_label_oh = one_hot(real_label, 2)
+        fake_label_oh = one_hot(fake_label, 2)
         metric = mx.metric.Accuracy()
 
         epoch = self.start_epoch
@@ -571,7 +573,7 @@ class CCGAN(GAN):
 
                     data = data.as_in_context(ctx)
                     cond_dense = cond_dense.as_in_context(ctx)
-                    cond = nd.one_hot(cond_dense, 10)
+                    cond = one_hot(cond_dense, K)
 
                     noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
 
@@ -588,7 +590,7 @@ class CCGAN(GAN):
                         fake_output = netD(fake, cond)
                         errD_fake = loss(fake_output, fake_label_oh)
                         errD = errD_real + errD_fake
-                        errD.backward()
+                    errD.backward()
 
                     trainerD.step(batch_size)
                     metric.update([real_label,], [real_output,])
@@ -597,10 +599,10 @@ class CCGAN(GAN):
                     ############################
                     # (2) Update G
                     ###########################
-                    real_intermed = netD(data, cond, depth=-2)
+                    real_intermed = netD.forward(data, cond, depth=-2)
                     with autograd.record():
                         fake = netG(noise, cond)
-                        fake_intermed = netD(fake, cond, depth=-2)
+                        fake_intermed = netD.forward(fake, cond, depth=-2)
                         errG = ((real_intermed - fake_intermed)**2).sum()
                         errG.backward()
 
@@ -610,11 +612,17 @@ class CCGAN(GAN):
                 metric.reset()
                 if self.logger:
                     self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f',epoch, name, acc, (time() - tic))
-                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)) :
+                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.checkpoint(epoch+1)
+                if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
+                    cond = one_hot(linspace(0,K,30,ctx=ctx,dtype='int32'), K)
+                    self.generate_sample(epoch+1,cond)
         except KeyboardInterrupt:
-            self.logger.info('Training interrupted by user.')
+            if self.logger:
+                self.logger.info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
+            cond = one_hot(linspace(0,K,30,ctx=ctx,dtype='int32'), K)
+            self.generate_sample('I%d'%epoch,cond)
 
 
 @register_model
