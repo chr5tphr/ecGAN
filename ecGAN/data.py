@@ -10,31 +10,37 @@ def register_data_func(func):
     return func
 
 @register_data_func
-def mnist(train,ret_label=True,bbox=(-1,1),preload=False,ctx=None):
+def mnist(train,ctx,bbox=(-1,1),labels=None):
     def transform(data,label):
-        data = (data.astype(np.float32)/255.) * (bbox[1]-bbox[0]) + bbox[0]
-        label = label.astype(np.float32)
-        return (data,label) if ret_label else data
+        data = (data.astype('float32')/255.) * (bbox[1]-bbox[0]) + bbox[0]
+        label = label.astype('int32')
+        return (data,label)
 
     dataset = mx.gluon.data.vision.MNIST(train=train,transform=transform)
-    if (not preload) or (ctx is None):
-        return dataset
-
-    return PreloadedDataset(dataset,ctx)
+    return PreloadedDataset(dataset,ctx,labels=labels)
 
 
 class PreloadedDataset(Dataset):
-    def __init__(self,dataset,ctx,*args,**kwargs):
+    def __init__(self,dataset,ctx,labels=None,*args,**kwargs):
         super().__init__(*args,**kwargs)
-        self._length = len(dataset)
 
-        self._data = nd.zeros(dataset._data.shape,dtype='float32',ctx=ctx)
-        self._label = nd.zeros(dataset._label.shape,dtype='int32',ctx=ctx)
+        if labels is not None:
+            llen = 0
+            for cond in labels:
+                llen += (dataset._label == cond).sum()
+            self._length = llen
+        else:
+            self._length = len(dataset)
 
-        for i in range(self._length):
-            dat,lab = dataset[i]
-            self._data[i] = dat.astype('float32')
-            self._label[i] = lab.astype('int32')
+        self._data = nd.zeros([self._length] + list(dataset._data.shape)[1:],dtype='float32',ctx=ctx)
+        self._label = nd.zeros([self._length] + list(dataset._label.shape)[1:],dtype='int32',ctx=ctx)
+
+        i = 0
+        for dat,lab in dataset:
+            if labels is None or (np.any([(lab == cond).any() for cond in labels])):
+                self._data[i] = dat.astype('float32')
+                self._label[i] = lab.astype('int32')
+                i += 1
 
     def __getitem__(self,idx):
         return (self._data[idx],self._label[idx])
@@ -42,21 +48,21 @@ class PreloadedDataset(Dataset):
     def __len__(self):
         return self._length
 
-@register_data_func
-def mnist_cond(train):
-    def transform(data,label):
-        data = (data.astype(np.float32)/255.)*2. - 1.
-        label = label.astype(np.float32)
-        return data,label
-
-    return mx.gluon.data.vision.MNIST(train=train,transform=transform)
-
-@register_data_func
-def mnist_single(train,label):
-    def transform(tdata,tlabel):
-        if tlabel != label:
-            return None
-        return (tdata.astype(np.float32)/255.)*2. - 1.
-
-    ldata = [dat for dat in mx.gluon.data.vision.MNIST(train=train,transform=transform) if dat is not None]
-    return ldata
+# @register_data_func
+# def mnist_cond(train):
+#     def transform(data,label):
+#         data = (data.astype(np.float32)/255.)*2. - 1.
+#         label = label.astype(np.float32)
+#         return data,label
+#
+#     return mx.gluon.data.vision.MNIST(train=train,transform=transform)
+#
+# @register_data_func
+# def mnist_single(train,label):
+#     def transform(tdata,tlabel):
+#         if tlabel != label:
+#             return None
+#         return (tdata.astype(np.float32)/255.)*2. - 1.
+#
+#     ldata = [dat for dat in mx.gluon.data.vision.MNIST(train=train,transform=transform) if dat is not None]
+#     return ldata
