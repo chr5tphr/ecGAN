@@ -552,11 +552,12 @@ class CCGAN(GAN):
             config.nets.discriminator.get('optimizer','adam'),
             config.nets.discriminator.get('optkwargs',{'learning_rate': 0.05}))
 
-        real_label = nd.ones(batch_size, ctx=ctx)
-        fake_label = nd.zeros(batch_size, ctx=ctx)
+        # real_label = nd.ones(batch_size, ctx=ctx)
+        # class K (0toK) is fake
+        fake_label_dense = nd.ones(batch_size, ctx=ctx)*K
 
-        real_label_oh = one_hot(real_label, 2)
-        fake_label_oh = one_hot(fake_label, 2)
+        # real_label_oh = one_hot(real_label, 2)
+        fake_label = one_hot(fake_label_dense, K+1)
         metric = mx.metric.Accuracy()
 
         epoch = self.start_epoch
@@ -570,41 +571,47 @@ class CCGAN(GAN):
                 tic = time()
                 for i, (data,cond_dense) in enumerate(data_iter):
 
+                    num = data.shape[0]
 
                     data = data.as_in_context(ctx)
                     cond_dense = cond_dense.as_in_context(ctx)
                     cond = one_hot(cond_dense, K)
+                    real_label = one_hot(cond_dense, K+1)
 
-                    noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
+                    noise = nd.random_normal(shape=(num, 100), ctx=ctx)
 
                     ############################
                     # (1) Update D
                     ###########################
                     with autograd.record():
                         real_output = netD(data, cond)
-                        errD_real = loss(real_output, real_label_oh)
+                        errD_real = loss(real_output, real_label)
 
-                    fake = netG(noise, cond)
-
-                    with autograd.record():
-                        fake_output = netD(fake, cond)
-                        errD_fake = loss(fake_output, fake_label_oh)
+                        fake = netG(noise, cond)
+                        fake_output = netD(fake.detach(), cond)
+                        errD_fake = loss(fake_output, fake_label)
                         errD = errD_real + errD_fake
                     errD.backward()
 
                     trainerD.step(batch_size)
-                    metric.update([real_label,], [real_output,])
-                    metric.update([fake_label,], [fake_output,])
+                    metric.update([cond_dense,], [real_output,])
+                    metric.update([fake_label_dense,], [fake_output,])
 
                     ############################
                     # (2) Update G
                     ###########################
-                    real_intermed = netD.forward(data, cond, depth=-2)
+                    # real_intermed = netD.forward(data, cond, depth=-2)
                     with autograd.record():
                         fake = netG(noise, cond)
-                        fake_intermed = netD.forward(fake, cond, depth=-2)
-                        errG = ((real_intermed - fake_intermed)**2).sum()
-                        errG.backward()
+                        if config.feature_matching:
+                            # feature matching
+                            real_intermed = netD.forward(data, cond, depth=-2)
+                            fake_intermed = netD.forward(fake, cond, depth=-2)
+                            errG = ((real_intermed - fake_intermed)**2).sum()
+                        else:
+                            output = netD(fake, cond)
+                            errG = loss(output,real_label)
+                    errG.backward()
 
                     trainerG.step(batch_size)
 

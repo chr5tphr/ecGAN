@@ -71,6 +71,7 @@ class Config(ConfigNode):
         'model':            'GAN',
         'init':             False,
         'fuzzy_labels':     False,
+        'feature_matching': False,
         'nets': {
             # 'generator': {
             #     'type':     'GenFC',

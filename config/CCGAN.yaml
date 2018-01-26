@@ -1,5 +1,5 @@
 root_dir: '/home/chrstphr/projects/ecGAN/result'
-exp_dir: 'mnist_cond_fm01'
+exp_dir: 'mnist_cond_fm'
 # cls_dir: 'classify'
 
 device: 'gpu'
@@ -7,11 +7,12 @@ device_id: 'auto'
 debug: False
 
 batch_size: 64
-nepochs: 100
+nepochs: 1000
 start_epoch: 0
-save_freq: 10
+save_freq: 5
 
 init: False
+feature_matching: True
 
 data:
   func: 'mnist'
@@ -19,7 +20,7 @@ data:
   kwargs:
     train: True
     bbox: [0,1]
-    labels: [0,1]
+    labels: NULL
   bbox: [0,1]
 
 model: 'CCGAN'
@@ -28,26 +29,26 @@ nets:
     type: 'YSFC'
     name: 'Gen'
     kwargs:
-      numhid: 256
+      numhid: 512
       outact: 'relu'
       outnum: 784
     param: '${root_dir}/${exp_dir}/params/${model}.${nets.generator.type}.${nets.generator.name}.${start_epoch}.params'
     save: '${root_dir}/${exp_dir}/params/${model}.${nets.generator.type}.${nets.generator.name}.${epoch}.params'
     optimizer: 'adam'
     optkwargs:
-      learning_rate: 0.01
+      learning_rate: 0.0001
   discriminator:
     type: 'YSFC'
     name: 'Dis'
     kwargs:
-      numhid: 256
+      numhid: 512
       outact: NULL
-      outnum: 1
+      outnum: 11
     param: '${root_dir}/${exp_dir}/params/${model}.${nets.discriminator.type}.${nets.discriminator.name}.${start_epoch}.params'
     save: '${root_dir}/${exp_dir}/params/${model}.${nets.discriminator.type}.${nets.discriminator.name}.${epoch}.params'
     optimizer: 'adam'
     optkwargs:
-      learning_rate: 0.05
+      learning_rate: 0.0001
   # classifier:
   #   type: 'CPFC'
   #   kwargs: {'outact':'relu'}
@@ -55,7 +56,7 @@ nets:
     # save: '${root_dir}/${cls_dir}/params/${model}.${nets.classifier.type}.${epoch}.params'
 
 log: '${root_dir}/${exp_dir}/log/${model}.log'
-gen_freq: 10
+gen_freq: 5
 genout: '${root_dir}/${exp_dir}/gen/${model}.${nets.generator.type}.${epoch}.png'
 explanation:
   method: 'dtd'
