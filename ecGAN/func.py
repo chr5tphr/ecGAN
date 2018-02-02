@@ -154,7 +154,9 @@ class YSequential(Interpretable, Intermediate, nn.Block):
         Rd = self._data_net.relevance(Rtd,method=method,ret_all=True)
         Rc = self._cond_net.relevance(Rtc,method=method,ret_all=True)
 
-        return Rd,Rc,R if ret_all else Rd[-1],Rc[-1]
+        R += Rd
+
+        return (R,Rc) if ret_all else (R[-1],Rc[-1])
 
 class Clip(Interpretable,nn.Block):
     def forward(self,x):

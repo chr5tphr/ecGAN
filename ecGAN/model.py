@@ -281,19 +281,34 @@ class GAN(Model):
 
         if data is None:
             noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
-            gdata = self.netG(*([noise] + ([] if label is None else [label])))
+            gdata = self.netG.forward_logged(*([noise] + ([] if label is None else [label])))
         else:
             gdata = data
+
+        netTop.forward_logged(gdata)
 
         if method == 'sensitivity':
             dEdy = nd.ones(30,ctx=self.ctx)
         else:
             dEdy = None
 
-        R = netTop.relevance(gdata,dEdy,method=method,ret_all=True)
+        Rtc = None
+        Rc = None
+
+        Rret = netTop.relevance(dEdy,method=method,ret_all=True)
+        if isinstance(Rret,tuple):
+            R,Rtc = Rret
+        else:
+            R = Rret
         Rt = R[-1]
+
         if data is None:
-            R += self.netG.relevance(noise,R[-1],method=method,ret_all=True)
+            Rret = self.netG.relevance(R[-1],method=method,ret_all=True)
+            if isinstance(R,tuple):
+                Rg,Rc = Rret
+            else:
+                Rg = Rret
+            R += Rg
 
         if self.config.debug:
             Rsums = []
@@ -302,7 +317,10 @@ class GAN(Model):
             if self.logger:
                 self.logger.debug('Explanation sums: %s',', '.join([str(fl) for fl in Rsums]))
 
-        return R[-1] if data is not None else (Rt,R[-1],noise,gdata)
+        if data is None:
+            return (Rt,Rtc[-1],R[-1],Rc[-1],noise,gdata)
+        else:
+            return (R[-1],Rc[-1])
 
     def predict(self,data=None,label=None):
         netTop = self.nets.get(self.config.explanation.top_net,self.netD)
