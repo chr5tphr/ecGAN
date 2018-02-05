@@ -33,7 +33,7 @@ class Interpretable(object):
         return self._out
 
     def relevance(self,*args,**kwargs):
-        method = kwargs.pop('method',dtd)
+        method = kwargs.pop('method','dtd')
         func = getattr(self,'relevance_'+method)
         return func(*args,**kwargs)
 
@@ -98,8 +98,18 @@ class Sequential(Interpretable, Intermediate, nn.Sequential):
             raise RuntimeError('Block has not yet executed forward_logged!')
         R = [self._out if y is None else y]
         for child in self._children[::-1]:
-            R.append(child.relevance(a,R[-1],method=method))
+            R.append(child.relevance(R[-1],method=method))
         return R if ret_all else R[-1]
+
+    def forward_logged(self, x, depth=-1):
+        self._in = [x]
+        rdep = depth if depth > 0 else (len(self._children) + depth)
+        for i,block in enumerate(self._children):
+            x = block.forward_logged(x)
+            if i == depth:
+                break
+        self._out = x
+        return self._out
 
     def forward(self, x, depth=-1):
         rdep = depth if depth > 0 else (len(self._children) + depth)
@@ -135,6 +145,14 @@ class YSequential(Interpretable, Intermediate, nn.Block):
         with self._main_net.name_scope():
             self._main_net.add(*args,**kwargs)
 
+    def forward_logged(self,x,y,depth=-1):
+        self._in = [x,y]
+        data = self._data_net.forward_logged(x)
+        cond = self._cond_net.forward_logged(y)
+        combo = nd.concat(data,cond,dim=self._concat_dim)
+        self._out = self._main_net.forward_logged(combo,depth=depth)
+        return self._out
+
     def forward(self,x,y,depth=-1):
         data = self._data_net(x)
         cond = self._cond_net(y)
@@ -144,12 +162,13 @@ class YSequential(Interpretable, Intermediate, nn.Block):
     def relevance(self,y=None,method='dtd',ret_all=False):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
-        R = self._main_net.relevance(R,y=y,method=method,ret_all=True)
+        Rout = self._out if y is None else y
+        R = self._main_net.relevance(Rout,method=method,ret_all=True)
 
         dim_d = self._data_net._out.shape[self._concat_dim]
 
-        Rtd = R.slice_axis(axis=self._concat_dim, begin=0, end=dim_d)
-        Rtc = R.slice_axis(axis=self._concat_dim, begin=dim_d, end=-1)
+        Rtd = R[-1].slice_axis(axis=self._concat_dim, begin=0, end=dim_d)
+        Rtc = R[-1].slice_axis(axis=self._concat_dim, begin=dim_d, end=None)
 
         Rd = self._data_net.relevance(Rtd,method=method,ret_all=True)
         Rc = self._cond_net.relevance(Rtc,method=method,ret_all=True)

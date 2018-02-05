@@ -31,7 +31,7 @@ def main():
     parser.add_argument('--epoch_range',nargs=3,type=int)
     parser.add_argument('--iter',type=int,default=1)
     parser.add_argument('--seed',type=int)
-    parser.add_argument('--classnum',type=int,default=2)
+    parser.add_argument('--classnum',type=int,default=10)
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -154,7 +154,7 @@ def explain_gan(args,config):
         label = nd.one_hot(linspace(0,K,30,ctx=ctx,dtype='int32'), K)
 
     for i in range(args.iter):
-        relTop,_,relG,Rc,noise,gen = model.explain()
+        relTop,Rtc,relG,Rc,noise,gen = model.explain(label=label)
 
         save_explanation(relTop,gen,data_desc='%s.%s'%(config.nets.generator.type,config.start_epoch),net=config.explanation.top_net,config=config,logger=logger,i=i)
         save_explanation(relG,noise,data_desc='noise',net='generator',config=config,logger=logger,i=i)

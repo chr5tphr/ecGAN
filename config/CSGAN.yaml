@@ -23,7 +23,7 @@ data:
     labels: NULL
   bbox: [0,1]
 
-model: 'CCGAN'
+model: 'CSGAN'
 nets:
   generator:
     type: 'YSFC'
@@ -38,13 +38,13 @@ nets:
     optkwargs:
       learning_rate: 0.0001
   discriminator:
-    type: 'SFC'
+    type: 'YSFC'
     name: 'Dis'
     kwargs:
       numhid: 512
-      # outact: NULL
-      outact: 'relu'
-      outnum: 20
+      outact: NULL
+      # outact: 'relu'
+      outnum: 11
     param: '${root_dir}/${exp_dir}/params/${model}.${nets.discriminator.type}.${nets.discriminator.name}.${start_epoch}.params'
     save: '${root_dir}/${exp_dir}/params/${model}.${nets.discriminator.type}.${nets.discriminator.name}.${epoch}.params'
     optimizer: 'adam'
