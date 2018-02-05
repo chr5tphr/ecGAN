@@ -81,6 +81,12 @@ class Dense(Interpretable,nn.Dense):
             c = autograd.grad(z,a,head_grads=R/z)
             return a*c
 
+class Conv2D(Interpretable, nn.Conv2D):
+    pass
+
+class Conv2DTranspose(Interpretable, nn.Conv2DTranspose):
+    pass
+
 class Sequential(Interpretable, Intermediate, nn.Sequential):
     # def relevance(self,x,y=None,method='dtd',ret_all=False):
     #     if self._in is None:

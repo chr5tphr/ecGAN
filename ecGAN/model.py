@@ -4,7 +4,7 @@ from time import time
 from mxnet import gluon, autograd, nd
 from imageio import imwrite
 
-from .func import fuzzy_one_hot, Interpretable, Intermediate, linspace, randint
+from .func import fuzzy_one_hot, Interpretable, Intermediate, YSequential, linspace, randint
 from .util import Config, config_ctx, draw_heatmap
 from .net import nets
 
@@ -281,11 +281,17 @@ class GAN(Model):
 
         if data is None:
             noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
-            gdata = self.netG.forward_logged(*([noise] + ([] if label is None else [label])))
+            targs = [noise]
+            if (isinstance(self.netG,YSequential)) and (label is not None):
+                targs += [label]
+            gdata = self.netG.forward_logged(*targs)
         else:
             gdata = data
 
-        netTop.forward_logged(*([gdata] + ([] if label is None else [label])))
+        targs = [gdata]
+        if (isinstance(netTop,YSequential)) and (label is not None):
+            targs += [label]
+        netTop.forward_logged(*targs)
 
         if method == 'sensitivity':
             dEdy = nd.ones((30,netTop._outnum),ctx=self.ctx)

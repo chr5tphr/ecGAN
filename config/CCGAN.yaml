@@ -1,5 +1,5 @@
 root_dir: '/home/chrstphr/projects/ecGAN/result'
-exp_dir: 'mnist_cond_fm'
+exp_dir: 'mnist_cond_fm_2K'
 # cls_dir: 'classify'
 
 device: 'gpu'

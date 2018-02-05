@@ -1,6 +1,6 @@
 from mxnet import nd
 from mxnet.gluon import nn
-from .func import Dense,Sequential,YSequential
+from .func import Dense,Conv2D,Conv2DTranspose,Sequential,YSequential
 
 nets = {}
 def register_net(obj):
@@ -35,6 +35,87 @@ class YSFC(YSequential):
             self.add(Dense(self._numhid, activation='relu'))
             self.add(Dense(self._numhid, activation='relu'))
             self.add(Dense(self._outnum, activation=self._outact))
+
+@register_net
+class STCN28(Sequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',1)
+        self._numhid = kwargs.pop('numhid',64)
+        self._outact = kwargs.pop('outact',None)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self.add(Conv2DTranspose(self._numhid * 8, 4, strides=1, padding=0, use_bias=False, activation='relu', isinput=True))
+            # self.add(Activation('relu'))
+            # _numhid x 4 x 4
+
+            self.add(Conv2DTranspose(self._numhid * 4, 4, strides=1, padding=0, use_bias=False, activation='relu'))
+            # self.add(Activation('relu'))
+            # _numhid x 7 x 7
+
+            self.add(Conv2DTranspose(self._numhid * 2, 4, strides=2, padding=1, use_bias=False, activation='relu'))
+            # self.add(Activation('relu'))
+            # _numhid x 14 x 14
+
+            self.add(Conv2DTranspose(self._outnum, 4, strides=2, padding=1, use_bias=False, activation=self._outact))
+            # self.add(Activation(self._outact))
+            # _numhid x 28 x 28
+
+@register_net
+class SCN28(Sequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',1)
+        self._numhid = kwargs.pop('numhid',64)
+        self._outact = kwargs.pop('outact',None)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            # _numhid x 28 x 28
+            self.add(Conv2D(self._numhid, 4, strides=2, padding=1, use_bias=False, activation='relu'))
+            # self.add(Activation('relu'))
+            # _numhid x 14 x 14
+
+            self.add(Conv2D(self._numhid * 2, 4, strides=2, padding=1, use_bias=False, activation='relu'))
+            # self.add(Activation('relu'))
+            # _numhid x 7 x 7
+
+            self.add(Conv2D(self._numhid * 4, 4, strides=1, padding=0, use_bias=False, activation='relu'))
+            # self.add(Activation('relu'))
+            # _numhid x 4 x 4
+
+            self.add(Conv2D(self._numhid * 8, 4, strides=1, padding=0, use_bias=False, activation='relu'))
+            # self.add(Activation('relu'))
+            # filters x 1 x 1
+
+            self.add(Dense(self._outnum, activation=self._outact))
+
+
+@register_net
+class STCN(Sequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',1)
+        self._numhid = kwargs.pop('numhid',64)
+        self._outact = kwargs.pop('outact',None)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self.addData(Conv2DTranspose(self._numhid * 8, 4, strides=1, padding=0, use_bias=False, isinput=True))
+            self.addData(Activation('relu'))
+            # _numhid x 4 x 4
+
+            self.addData(Conv2DTranspose(self._numhid * 4, 4, strides=2, padding=1, use_bias=False))
+            self.addData(Activation('relu'))
+            # _numhid x 8 x 8
+
+            self.addData(Conv2DTranspose(self._numhid * 2, 4, strides=2, padding=1, use_bias=False))
+            self.addData(Activation('relu'))
+            # _numhid x 16 x 16
+
+            self.addData(Conv2DTranspose(self._numhid, 4, strides=2, padding=1, use_bias=False))
+            self.addData(Activation('relu'))
+            # _numhid x 32 x 32
+
+            self.addData(Conv2DTranspose(self._outnum, 4, strides=2, padding=1, use_bias=False))
+            self.addData(Activation(self._outact))
+            # _outnum x 64 x 64
+
 
 # @register_net
 # class GenFC(nn.Sequential):
