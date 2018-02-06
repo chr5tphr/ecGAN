@@ -4,6 +4,7 @@ import yaml
 import mxnet as mx
 import numpy as np
 import sys
+import os
 import logging
 import h5py
 
@@ -43,6 +44,43 @@ def main():
         random.seed(args.seed)
 
     commands[args.command](args,config)
+
+@register_command
+def setup(args,config):
+    # ctx = config_ctx(config)
+
+    setup_engine(config.db_engine)
+    with session_scope() as session:
+        setup = Setup(
+            time_created = datetime.now(),
+            time_modified = datetime.now(),
+        )
+        session.flush()
+        config['setup_id'] = setup.id
+        setup.storage_path = config.sub('setup_path')
+        setup.config = config
+
+    explore = [
+        'log',
+        'genout',
+        'explanation.input',
+        'explanation.outout',
+        'explanation.image',
+        'nets.discriminator.params',
+        'nets.discriminator.save',
+        'nets.generator.params',
+        'nets.generator.save',
+        'nets.classifier.params',
+        'nets.classifier.save',
+        ]
+    for key in explore:
+        try:
+            os.makedirs(os.path.dirname(config.sub(key)),exist_ok=True)
+        except KeyError:
+            pass
+
+    with open(os.path.join([config.sub('setup_path'),'config.yaml']),'w') as fp:
+        yaml.safe_dump(fp,config)
 
 @register_command
 def train(args,config):
