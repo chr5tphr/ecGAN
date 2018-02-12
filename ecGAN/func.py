@@ -81,6 +81,12 @@ class Dense(Interpretable,nn.Dense):
             c = autograd.grad(z,a,head_grads=R/z)
             return a*c
 
+class Identity(Interpretable, nn.Block):
+    def relevance(self,*args,**kwargs):
+        return args[0]
+    def forward(self,*args,**kwargs):
+        return args[0]
+
 class Conv2D(Interpretable, nn.Conv2D):
     pass
 

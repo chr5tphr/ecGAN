@@ -245,7 +245,7 @@ class GAN(Model):
     def generate_sample(self,epoch,label=None):
         if self.config.genout:
             bbox = self.data_bbox
-            noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
+            noise = nd.random_normal(shape=(30, 100, 1, 1), ctx=self.ctx)
             gdat = self.netG(*([noise] + ([] if label is None else [label])))
             fpath = self.config.sub('genout',epoch=epoch)
             gdat = ((gdat - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0,255).astype(np.uint8)
@@ -280,7 +280,7 @@ class GAN(Model):
                 (config.nets.get('classifier' if topC else 'discriminator',config.nets.discriminator).type))
 
         if data is None:
-            noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
+            noise = nd.random_normal(shape=(30, 100, 1, 1), ctx=self.ctx)
             targs = [noise]
             if (isinstance(self.netG,YSequential)) and (label is not None):
                 targs += [label]
@@ -592,15 +592,15 @@ class CCGAN(GAN):
                     num = data.shape[0]
 
                     data = data.as_in_context(ctx)
-                    cond_dense = cond_dense.as_in_context(ctx)
-                    cond = one_hot(cond_dense, K)
-                    real_label = one_hot(cond_dense, 2*K)
+                    cond_dense = cond_dense.as_in_context(ctx).reshape((-1,))
+                    cond = one_hot(cond_dense, K).reshape((num,-1,1,1))
+                    real_label = one_hot(cond_dense, 2*K).reshape((num,-1,1,1))
 
                     # classes K to 2K are fake
                     fake_dense = cond_dense + K
-                    fake_label = one_hot(fake_dense, 2*K)
+                    fake_label = one_hot(fake_dense, 2*K).reshape((num,-1,1,1))
 
-                    noise = nd.random_normal(shape=(num, 100), ctx=ctx)
+                    noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
 
                     ############################
                     # (1) Update D
@@ -644,13 +644,13 @@ class CCGAN(GAN):
                 if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.checkpoint(epoch+1)
                 if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
-                    cond = one_hot(linspace(0,K,30,ctx=ctx,dtype='int32'), K)
+                    cond = one_hot(linspace(0,K,30,ctx=ctx,dtype='int32'), K).reshape((30,K,1,1))
                     self.generate_sample(epoch+1,cond)
         except KeyboardInterrupt:
             if self.logger:
                 self.logger.info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
-            cond = one_hot(linspace(0,K,30,ctx=ctx,dtype='int32'), K)
+            cond = one_hot(linspace(0,K,30,ctx=ctx,dtype='int32'), K).reshape((30,K,1,1))
             self.generate_sample('I%d'%epoch,cond)
 
 

@@ -12,16 +12,16 @@ def register_data_func(func):
 @register_data_func
 def mnist(train,ctx,bbox=(-1,1),labels=None):
     def transform(data,label):
-        data = (data.astype('float32')/255.) * (bbox[1]-bbox[0]) + bbox[0]
+        data = ((data.astype('float32')/255.) * (bbox[1]-bbox[0]) + bbox[0]).reshape((1,28,28))
         label = label.astype('int32')
         return (data,label)
 
     dataset = mx.gluon.data.vision.MNIST(train=train,transform=transform)
-    return PreloadedDataset(dataset,ctx,labels=labels)
+    return PreloadedDataset(dataset,ctx,labels=labels,shape=(1,28,28),label_shape=[])
 
 
 class PreloadedDataset(Dataset):
-    def __init__(self,dataset,ctx,labels=None,*args,**kwargs):
+    def __init__(self,dataset,ctx,labels=None,shape=None,label_shape=None,*args,**kwargs):
         super().__init__(*args,**kwargs)
 
         if labels is not None:
@@ -32,8 +32,13 @@ class PreloadedDataset(Dataset):
         else:
             self._length = len(dataset)
 
-        self._data = nd.zeros([self._length] + list(dataset._data.shape)[1:],dtype='float32',ctx=ctx)
-        self._label = nd.zeros([self._length] + list(dataset._label.shape)[1:],dtype='int32',ctx=ctx)
+        if shape is None:
+            shape = dataset._data.shape[1:]
+        if label_shape is None:
+            label_shape = dataset._label.shape[1:]
+
+        self._data = nd.zeros([self._length] + list(shape),dtype='float32',ctx=ctx)
+        self._label = nd.zeros([self._length] + list(label_shape),dtype='int32',ctx=ctx)
 
         uniques = set()
         i = 0
