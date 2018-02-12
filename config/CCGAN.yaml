@@ -13,6 +13,7 @@ save_freq: 5
 
 init: False
 feature_matching: True
+semi_supervised: True
 
 data:
   func: 'mnist'

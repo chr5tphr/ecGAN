@@ -72,6 +72,7 @@ class Config(ConfigNode):
         'init':             False,
         'fuzzy_labels':     False,
         'feature_matching': False,
+        'semi_supervised':  False,
         'nets': {
             # 'generator': {
             #     'type':     'GenFC',

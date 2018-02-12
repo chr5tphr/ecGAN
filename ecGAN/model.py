@@ -169,24 +169,39 @@ class GAN(Model):
 
         ctx = self.ctx
 
+        one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
+
         data_iter = gluon.data.DataLoader(data,batch_size,shuffle=True,last_batch='discard')
 
         # loss
-        loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
+        if config.semi_supervised:
+            loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
+        else:
+            loss = gluon.loss.SigmoidBinaryCrossEntropyLoss()
 
         # trainer for the generator and the discriminator
-        trainerG = gluon.Trainer(netG.collect_params(), 'adam', {'learning_rate': 0.01})
-        trainerD = gluon.Trainer(netD.collect_params(), 'adam', {'learning_rate': 0.05})
+        trainerG = gluon.Trainer(netG.collect_params(),
+            config.nets.generator.get('optimizer','adam'),
+            config.nets.generator.get('optkwargs',{'learning_rate': 0.01}))
+        trainerD = gluon.Trainer(netD.collect_params(),
+            config.nets.discriminator.get('optimizer','adam'),
+            config.nets.discriminator.get('optkwargs',{'learning_rate': 0.05}))
 
-        real_label = nd.ones(batch_size, ctx=ctx)
-        fake_label = nd.zeros(batch_size, ctx=ctx)
 
-        real_label_oh = fuzzy_one_hot(real_label, 2)
-        fake_label_oh = fuzzy_one_hot(fake_label, 2)
+        if not config.semi_supervised:
+            real_dense = nd.ones(batch_size, ctx=ctx)
+            fake_dense = nd.zeros(batch_size, ctx=ctx)
+
+            real_label = real_dense
+            fake_label = fake_dense
+
+            # real_label = one_hot(real_dense, 2).reshape((batch_size,-1,1,1))
+            # fake_label = one_hot(fake_dense, 2).reshape((batch_size,-1,1,1))
 
         metric = mx.metric.Accuracy()
 
         epoch = self.start_epoch
+        K = len(data.classes)
 
         if self.logger:
             self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
@@ -195,37 +210,51 @@ class GAN(Model):
         try:
             for epoch in range(self.start_epoch, self.start_epoch + nepochs):
                 tic = time()
-                # train_data.reset()
-                for i, data in enumerate(data_iter):
+                for i, (data,real_dense) in enumerate(data_iter):
                     ############################
-                    # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+                    # (1) Update D
                     ###########################
 
-                    data = data.as_in_context(ctx).reshape((-1,784))
+                    num = data.shape[0]
 
-                    noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
+                    data = data.as_in_context(ctx)
+                    if config.semi_supervised:
+                        real_dense = real_dense.as_in_context(ctx).reshape((-1,))
+                        real_label = one_hot(real_dense, 2*K).reshape((num,-1,1,1))
+
+                        # classes K to 2K are fake
+                        fake_dense = real_dense + K
+                        fake_label = one_hot(fake_dense, 2*K).reshape((num,-1,1,1))
+
+                    noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
 
                     with autograd.record():
                         real_output = netD(data)
-                        errD_real = loss(real_output, real_label_oh)
+                        errD_real = loss(real_output, real_label)
 
                         fake = netG(noise)
                         fake_output = netD(fake.detach())
-                        errD_fake = loss(fake_output, fake_label_oh)
+                        errD_fake = loss(fake_output, fake_label)
                         errD = errD_real + errD_fake
-                        errD.backward()
+                    errD.backward()
 
                     trainerD.step(batch_size)
-                    metric.update([real_label,], [real_output,])
-                    metric.update([fake_label,], [fake_output,])
+                    metric.update([real_dense,], [real_output,])
+                    metric.update([fake_dense,], [fake_output,])
 
                     ############################
-                    # (2) Update G network: maximize log(D(G(z)))
+                    # (2) Update G
                     ###########################
                     with autograd.record():
-                        output = netD(fake)
-                        errG = loss(output, real_label_oh)
-                        errG.backward()
+                        if config.feature_matching:
+                            # feature matching
+                            real_intermed = netD.forward(data, depth=-2)
+                            fake_intermed = netD.forward(fake, depth=-2)
+                            errG = ((real_intermed - fake_intermed)**2).sum()
+                        else:
+                            output = netD(fake)
+                            errG = loss(output,real_label)
+                    errG.backward()
 
                     trainerG.step(batch_size)
 
@@ -578,6 +607,13 @@ class CCGAN(GAN):
 
         metric = mx.metric.Accuracy()
 
+        if not config.semi_supervised:
+            real_dense = nd.ones(batch_size, ctx=ctx)
+            fake_dense = nd.zeros(batch_size, ctx=ctx)
+
+            real_label = one_hot(real_dense, 2).reshape((batch_size,-1,1,1))
+            fake_label = one_hot(fake_dense, 2).reshape((batch_size,-1,1,1))
+
         epoch = self.start_epoch
 
         if self.logger:
@@ -594,11 +630,14 @@ class CCGAN(GAN):
                     data = data.as_in_context(ctx)
                     cond_dense = cond_dense.as_in_context(ctx).reshape((-1,))
                     cond = one_hot(cond_dense, K).reshape((num,-1,1,1))
-                    real_label = one_hot(cond_dense, 2*K).reshape((num,-1,1,1))
 
-                    # classes K to 2K are fake
-                    fake_dense = cond_dense + K
-                    fake_label = one_hot(fake_dense, 2*K).reshape((num,-1,1,1))
+                    if config.semi_supervised:
+                        real_dense = cond_dense
+                        real_label = one_hot(cond_dense, 2*K).reshape((num,-1,1,1))
+
+                        # classes K to 2K are fake
+                        fake_dense = cond_dense + K
+                        fake_label = one_hot(fake_dense, 2*K).reshape((num,-1,1,1))
 
                     noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
 
@@ -616,7 +655,7 @@ class CCGAN(GAN):
                     errD.backward()
 
                     trainerD.step(batch_size)
-                    metric.update([cond_dense,], [real_output,])
+                    metric.update([real_dense,], [real_output,])
                     metric.update([fake_dense,], [fake_output,])
 
                     ############################
