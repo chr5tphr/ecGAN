@@ -115,6 +115,7 @@ class SCN28(Sequential):
 
             self.add(Dense(self._outnum, activation=self._outact))
 
+# Sequential Transposed Convolutional-only 28x28
 @register_net
 class STCO28(Sequential):
     def __init__(self,**kwargs):
@@ -142,7 +143,109 @@ class STCO28(Sequential):
             # self.add(Activation(self._outact))
             # _numhid x 28 x 28
 
+# Y-shaped Sequential Transposed Convolutional-only 28x28
+@register_net
+class YTCO28(YSequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',1)
+        self._numhid = kwargs.pop('numhid',64)
+        self._outact = kwargs.pop('outact',None)
+        super().__init__(**kwargs)
+        with self.name_scope():
 
+            self.addData(Identity())
+            self.addCond(Identity())
+
+            self.add(Conv2DTranspose(self._numhid * 4, 4, strides=1, padding=0, use_bias=False, isinput=True))
+            self.add(nn.BatchNorm())
+            self.add(nn.Activation('relu'))
+            # _numhid x 4 x 4
+
+            self.add(Conv2DTranspose(self._numhid * 2, 4, strides=1, padding=0, use_bias=False))
+            self.add(nn.BatchNorm())
+            self.add(nn.Activation('relu'))
+            # _numhid x 7 x 7
+
+            self.add(Conv2DTranspose(self._numhid, 4, strides=2, padding=1, use_bias=False))
+            self.add(nn.BatchNorm())
+            self.add(nn.Activation('relu'))
+            # _numhid x 14 x 14
+
+            self.add(Conv2DTranspose(self._outnum, 4, strides=2, padding=1, use_bias=False, activation=self._outact))
+            # self.add(Activation(self._outact))
+            # _numhid x 28 x 28
+
+# Y-shaped Sequential Convolutional/Fully-Connected 28x28
+@register_net
+class YCNFC28(YSequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',1)
+        self._numhid = kwargs.pop('numhid',64)
+        self._outact = kwargs.pop('outact',None)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            # _numhid x 28 x 28
+            self.addData(Conv2D(self._numhid, 4, strides=2, padding=1, use_bias=False))
+            self.addData(nn.BatchNorm())
+            self.addData(nn.LeakyReLU(0.2))
+            # self.add(Activation('relu'))
+            # _numhid x 14 x 14
+
+            self.addData(Conv2D(self._numhid * 2, 4, strides=2, padding=1, use_bias=False))
+            self.addData(nn.BatchNorm())
+            self.addData(nn.LeakyReLU(0.2))
+            # self.add(Activation('relu'))
+            # _numhid x 7 x 7
+
+            self.addData(Conv2D(self._numhid * 4, 4, strides=1, padding=0, use_bias=False))
+            self.addData(nn.BatchNorm())
+            self.addData(nn.LeakyReLU(0.2))
+            # self.add(Activation('relu'))
+            # _numhid x 4 x 4
+
+            self.addData(Conv2D(self._numhid * 8, 4, strides=1, padding=0, use_bias=False))
+            # _outnum x 1 x 1
+
+            self.addCond(Identity())
+
+            self.add(Dense(self._numhid, activation='relu'))
+            self.add(Dense(self._outnum, activation=self._outact))
+
+# Sequential Convolutional/Fully-Connected 28x28
+@register_net
+class SCNFC28(Sequential):
+    def __init__(self,**kwargs):
+        self._outnum = kwargs.pop('outnum',1)
+        self._numhid = kwargs.pop('numhid',64)
+        self._outact = kwargs.pop('outact',None)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            # _numhid x 28 x 28
+            self.add(Conv2D(self._numhid, 4, strides=2, padding=1, use_bias=False))
+            self.add(nn.BatchNorm())
+            self.add(nn.LeakyReLU(0.2))
+            # self.add(Activation('relu'))
+            # _numhid x 14 x 14
+
+            self.add(Conv2D(self._numhid * 2, 4, strides=2, padding=1, use_bias=False))
+            self.add(nn.BatchNorm())
+            self.add(nn.LeakyReLU(0.2))
+            # self.add(Activation('relu'))
+            # _numhid x 7 x 7
+
+            self.add(Conv2D(self._numhid * 4, 4, strides=1, padding=0, use_bias=False))
+            self.add(nn.BatchNorm())
+            self.add(nn.LeakyReLU(0.2))
+            # self.add(Activation('relu'))
+            # _numhid x 4 x 4
+
+            self.add(Conv2D(self._numhid * 8, 4, strides=1, padding=0, use_bias=False))
+            # _outnum x 1 x 1
+
+            self.add(Dense(self._numhid, activation='relu'))
+            self.add(Dense(self._outnum, activation=self._outact))
+
+# Sequential Convolutional-only 28x28
 @register_net
 class SCO28(Sequential):
     def __init__(self,**kwargs):
