@@ -1,6 +1,7 @@
 from mxnet import nd
 from mxnet.gluon import nn
-from .func import Dense,Conv2D,Conv2DTranspose,Sequential,YSequential,Identity
+from .func import Sequential,YSequential,
+from .layer import Dense,Conv2D,Conv2DTranspose,Identity,BatchNorm,LeakyReLU,Activation
 
 nets = {}
 def register_net(obj):
@@ -125,18 +126,18 @@ class STCO28(Sequential):
         super().__init__(**kwargs)
         with self.name_scope():
             self.add(Conv2DTranspose(self._numhid * 4, 4, strides=1, padding=0, use_bias=False, isinput=True))
-            self.add(nn.BatchNorm())
-            self.add(nn.Activation('relu'))
+            self.add(BatchNorm())
+            self.add(Activation('relu'))
             # _numhid x 4 x 4
 
             self.add(Conv2DTranspose(self._numhid * 2, 4, strides=1, padding=0, use_bias=False))
-            self.add(nn.BatchNorm())
-            self.add(nn.Activation('relu'))
+            self.add(BatchNorm())
+            self.add(Activation('relu'))
             # _numhid x 7 x 7
 
             self.add(Conv2DTranspose(self._numhid, 4, strides=2, padding=1, use_bias=False))
-            self.add(nn.BatchNorm())
-            self.add(nn.Activation('relu'))
+            self.add(BatchNorm())
+            self.add(Activation('relu'))
             # _numhid x 14 x 14
 
             self.add(Conv2DTranspose(self._outnum, 4, strides=2, padding=1, use_bias=False, activation=self._outact))
@@ -157,18 +158,18 @@ class YTCO28(YSequential):
             self.addCond(Identity())
 
             self.add(Conv2DTranspose(self._numhid * 4, 4, strides=1, padding=0, use_bias=False, isinput=True))
-            self.add(nn.BatchNorm())
-            self.add(nn.Activation('relu'))
+            self.add(BatchNorm())
+            self.add(Activation('relu'))
             # _numhid x 4 x 4
 
             self.add(Conv2DTranspose(self._numhid * 2, 4, strides=1, padding=0, use_bias=False))
-            self.add(nn.BatchNorm())
-            self.add(nn.Activation('relu'))
+            self.add(BatchNorm())
+            self.add(Activation('relu'))
             # _numhid x 7 x 7
 
             self.add(Conv2DTranspose(self._numhid, 4, strides=2, padding=1, use_bias=False))
-            self.add(nn.BatchNorm())
-            self.add(nn.Activation('relu'))
+            self.add(BatchNorm())
+            self.add(Activation('relu'))
             # _numhid x 14 x 14
 
             self.add(Conv2DTranspose(self._outnum, 4, strides=2, padding=1, use_bias=False, activation=self._outact))
@@ -186,20 +187,20 @@ class YCNFC28(YSequential):
         with self.name_scope():
             # _numhid x 28 x 28
             self.addData(Conv2D(self._numhid, 4, strides=2, padding=1, use_bias=False))
-            self.addData(nn.BatchNorm())
-            self.addData(nn.LeakyReLU(0.2))
+            self.addData(BatchNorm())
+            self.addData(LeakyReLU(0.2))
             # self.add(Activation('relu'))
             # _numhid x 14 x 14
 
             self.addData(Conv2D(self._numhid * 2, 4, strides=2, padding=1, use_bias=False))
-            self.addData(nn.BatchNorm())
-            self.addData(nn.LeakyReLU(0.2))
+            self.addData(BatchNorm())
+            self.addData(LeakyReLU(0.2))
             # self.add(Activation('relu'))
             # _numhid x 7 x 7
 
             self.addData(Conv2D(self._numhid * 4, 4, strides=1, padding=0, use_bias=False))
-            self.addData(nn.BatchNorm())
-            self.addData(nn.LeakyReLU(0.2))
+            self.addData(BatchNorm())
+            self.addData(LeakyReLU(0.2))
             # self.add(Activation('relu'))
             # _numhid x 4 x 4
 
@@ -222,20 +223,20 @@ class SCNFC28(Sequential):
         with self.name_scope():
             # _numhid x 28 x 28
             self.add(Conv2D(self._numhid, 4, strides=2, padding=1, use_bias=False))
-            self.add(nn.BatchNorm())
-            self.add(nn.LeakyReLU(0.2))
+            self.add(BatchNorm())
+            self.add(LeakyReLU(0.2))
             # self.add(Activation('relu'))
             # _numhid x 14 x 14
 
             self.add(Conv2D(self._numhid * 2, 4, strides=2, padding=1, use_bias=False))
-            self.add(nn.BatchNorm())
-            self.add(nn.LeakyReLU(0.2))
+            self.add(BatchNorm())
+            self.add(LeakyReLU(0.2))
             # self.add(Activation('relu'))
             # _numhid x 7 x 7
 
             self.add(Conv2D(self._numhid * 4, 4, strides=1, padding=0, use_bias=False))
-            self.add(nn.BatchNorm())
-            self.add(nn.LeakyReLU(0.2))
+            self.add(BatchNorm())
+            self.add(LeakyReLU(0.2))
             # self.add(Activation('relu'))
             # _numhid x 4 x 4
 
@@ -256,20 +257,20 @@ class SCO28(Sequential):
         with self.name_scope():
             # _numhid x 28 x 28
             self.add(Conv2D(self._numhid, 4, strides=2, padding=1, use_bias=False))
-            self.add(nn.BatchNorm())
-            self.add(nn.LeakyReLU(0.2))
+            self.add(BatchNorm())
+            self.add(LeakyReLU(0.2))
             # self.add(Activation('relu'))
             # _numhid x 14 x 14
 
             self.add(Conv2D(self._numhid * 2, 4, strides=2, padding=1, use_bias=False))
-            self.add(nn.BatchNorm())
-            self.add(nn.LeakyReLU(0.2))
+            self.add(BatchNorm())
+            self.add(LeakyReLU(0.2))
             # self.add(Activation('relu'))
             # _numhid x 7 x 7
 
             self.add(Conv2D(self._numhid * 4, 4, strides=1, padding=0, use_bias=False))
-            self.add(nn.BatchNorm())
-            self.add(nn.LeakyReLU(0.2))
+            self.add(BatchNorm())
+            self.add(LeakyReLU(0.2))
             # self.add(Activation('relu'))
             # _numhid x 4 x 4
 
@@ -314,12 +315,12 @@ class SCO28(Sequential):
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(nn.Dense(256))
-#             self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(256))
-#             self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(self._outnum, activation=self._outact))
 #
@@ -332,12 +333,12 @@ class SCO28(Sequential):
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(nn.Dense(64, activation='relu'))
-#             self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(64))
-#             self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(self._outnum, activation=self._outact))
 #
@@ -349,9 +350,9 @@ class SCO28(Sequential):
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(nn.Dense(64))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dense(64))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dense(self._outnum, activation=self._outact))
 #
 # @register_net
@@ -362,11 +363,11 @@ class SCO28(Sequential):
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(nn.Dense(64))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dense(64))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dense(64))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dense(self._outnum, activation=self._outact))
 #
 # @register_net
@@ -401,12 +402,12 @@ class SCO28(Sequential):
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(nn.Dense(64))
-#             self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(LeakyReLU(0.01))
 #             # self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(64))
-#             self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(self._outnum, activation=self._outact))
 #
@@ -464,8 +465,8 @@ class CDPFC(YSequential):
 #
 #             self.addCond(nn.Dense(1000))
 #
-#             self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
+#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(784,activation='tanh'))
 #
@@ -478,12 +479,12 @@ class CDPFC(YSequential):
 #
 #             self.addCond(nn.Dense(64))
 #
-#             # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
+#             # self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(256))
-#             # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
+#             # self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(2))
 
@@ -493,12 +494,12 @@ class CDPFC(YSequential):
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(nn.Conv2D(64,(5,5)),padding=2,stride=2)
-#             # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
+#             # self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Conv2D(128,(5,5)),stride=(2,2))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(256))
-#             # self.add(nn.BatchNorm(axis=1,center=True,scale=True))
-#             self.add(nn.LeakyReLU(0.01))
+#             # self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(2))
