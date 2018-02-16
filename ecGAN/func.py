@@ -55,13 +55,41 @@ class Sequential(Interpretable, Intermediate, nn.Sequential):
     #     for child,a in zip(self._children[::-1],A[::-1]):
     #         R.append(child.relevance(a,R[-1],method=method))
     #     return R if ret_all else R[-1]
-    def relevance(self,y=None,method='dtd',ret_all=False):
+    def relevance_layerwise(self,y=None,method='dtd',ret_all=False,**kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         R = [self._out if y is None else y]
         for child in self._children[::-1]:
             R.append(child.relevance(R[-1],method=method))
         return R if ret_all else R[-1]
+
+    def relevance_sensitivity(self,*args,**kwargs):
+        a = args[0]
+        a.attach_grad()
+        with autograd.record():
+            y = self.forward(a)
+         y.backward()
+         return a.grad
+
+    def relevance_intgrads(self,x,*args,num=50,base=None,**kwargs):
+        if base is None:
+            base = nd.zeros_like(x)
+
+        alpha = linspace(0.,1.,num)
+        diff = x - base
+
+        res = nd.zeros_like(x)
+        for a in alpha:
+            res += self.relevance_sensitivity(base + a*diff)
+
+        return res
+
+
+    def relevance_dtd(self,*args,**kwargs):
+        return self.relevance_layerwise(*args,method='dtd',**kwargs)
+
+    def relevance_lrp(self,*args,**kwargs):
+        return self.relevance_layerwise(*args,method='lrp',**kwargs)
 
     def forward_logged(self, x, depth=-1):
         self._in = [x]
@@ -121,7 +149,7 @@ class YSequential(Interpretable, Intermediate, nn.Block):
         combo = nd.concat(data,cond,dim=self._concat_dim)
         return self._main_net.forward(combo,depth=depth)
 
-    def relevance(self,y=None,method='dtd',ret_all=False):
+    def relevance_layerwise(self,y=None,method='dtd',ret_all=False):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         Rout = self._out if y is None else y
@@ -138,3 +166,17 @@ class YSequential(Interpretable, Intermediate, nn.Block):
         R += Rd
 
         return (R,Rc) if ret_all else (R[-1],Rc[-1])
+
+    def relevance_sensitivity(self,*args,**kwargs):
+        for a in args:
+            a.attach_grad()
+        with autograd.record():
+            y = self.forward(*args)
+         y.backward()
+         return [a.grad for a in args]
+
+    def relevance_dtd(self,*args,**kwargs):
+        return self.relevance_layerwise(*args,method='dtd',**kwargs)
+
+    def relevance_lrp(self,*args,**kwargs):
+        return self.relevance_layerwise(*args,method='lrp',**kwargs)

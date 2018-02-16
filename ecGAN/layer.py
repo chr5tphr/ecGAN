@@ -14,6 +14,19 @@ class Dense(Interpretable,nn.Dense):
             z = self(a)
         return autograd.grad(z,a,head_grads=R)
 
+    def relevance_lrp(self,R,alpha=1.,beta=0.):
+        if self._in is None:
+            raise RuntimeError('Block has not yet executed forward_logged!')
+        a = self._in[0]
+        wplus = nd.maximum(0.,self.weight.data())
+        wminus = nd.minimum(0.,self.weight.data())
+        with autograd.record():
+            zplus = nd.FullyConnected(a,wplus,None,no_bias=True,num_hidden=self._units,flatten=self._flatten)
+            zminus = nd.FullyConnected(a,wminus,None,no_bias=True,num_hidden=self._units,flatten=self._flatten)
+        cplus = autograd.grad(zplus,a,head_grads=alpha*R/zplus)
+        cminus = autograd.grad(zminus,a,head_grads=beta*R/zminus)
+        return a*(cplus - cminus)
+
     def relevance_dtd(self,R,lo=-1,hi=1):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
