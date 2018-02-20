@@ -16,6 +16,47 @@ def linspace(start=0.,stop=1.,num=1,ctx=None,dtype=None):
 def randint(low=0.,high=1.,shape=(1,),ctx=None,dtype='int32'):
     return nd.uniform(low=low,high=high,shape=shape,ctx=ctx).astype(dtype)
 
+def batchwise_covariance(X,Y):
+        meanx = meany = vary = n = C = 0
+        for x,y in zip(X,Y):
+            m = len(x)
+
+            meanx_ = x.mean(0,keepdims=True)
+            meany_ = y.mean(0,keepdims=True)
+            dx = x - meanx_
+            dy = y - meany_
+
+            C_ = (dx * dy).sum(0)
+            C += C_ + ((meanx - meanx_) * (meany - meany_)) * n * m / (n+m)
+
+            vary_ = (dy**2).sum(0)
+            vary += vary_ + ((meany - meany_)**2) * n * m / (n+m)
+
+            meanx  = (n * meanx + m * meanx_) / (n+m)
+            meany  = (n * meany + m * meany_) / (n+m)
+            n += m
+        return C / n, vary / n
+
+def batch_covariance_nd(X,Y):
+        meanx = meany = vary = n = C = 0
+        for x,y in zip(X,Y):
+            m = len(x)
+            meanx_ = x.mean(axis=0,keepdims=True)
+            meany_ = y.mean(axis=0,keepdims=True)
+            dx = x - meanx_
+            dy = y - meany_
+
+            C_ = nd.dot(dx, dy, transpose_a=True).T
+            C += C_ + nd.dot((meanx - meanx_), (meany - meany_), transpose_a=True).T * n * m / (n+m)
+
+            vary_ = nd.dot(dy, dy, transpose_a=True).T
+            vary += vary_ + (nd.dot((meany - meany_), (meany - meany_), transpose_a=True)).T * n * m / (n+m)
+
+            meanx = (n * meanx + m * meanx_) / (n+m)
+            meany = (n * meany + m * meany_) / (n+m)
+            n += m
+        return C / n, vary / n
+
 class Intermediate(object):
     def forward(self,*args,depth=-1):
         return self.forward(self,*args)
@@ -43,18 +84,58 @@ class Interpretable(object):
     def relevance_dtd(self,a,R):
         raise NotImplementedError
 
+class PatternNet(object):
+    def __init__(self,*args,*kwargs):
+        self.estimator = kwargs.pop('estimator','linear')
+        super().__init__(*args,**kwargs)
+        self._sigattr = None
+        self._meanx = 0
+        self._meany = 0
+        self._n = 0
+        self._vary = 0
+        self._cov = 0
+
+    def learn_pattern(self):
+        try:
+            func = getattr(self,'learn_pattern_'+self.estimator)
+        except AttributeError:
+            raise NotImplementedError(self.estimator)
+        return func(*args,**kwargs)
+
+    def assess_pattern(self):
+        try:
+            func = getattr(self,'assess_pattern_'+self.estimator)
+        except AttributeError:
+            raise NotImplementedError(self.estimator)
+        return func(*args,**kwargs)
+
+    def explain_pattern(self):
+        try:
+            func = getattr(self,'explain_pattern_'+self.estimator)
+        except AttributeError:
+            raise NotImplementedError(self.estimator)
+        return func(*args,**kwargs)
+
+    def learn_pattern_linear(self):
+        raise NotImplementedError
+
+    def learn_pattern_twocomponent(self):
+        raise NotImplementedError
+
+    def assess_pattern_linear(self):
+        raise NotImplementedError
+
+    def assess_pattern_twocomponent(self):
+        raise NotImplementedError
+
+    def explain_pattern_linear(self):
+        raise NotImplementedError
+
+    def explain_pattern_twocomponent(self):
+        raise NotImplementedError
+
+
 class Sequential(Interpretable, Intermediate, nn.Sequential):
-    # def relevance(self,x,y=None,method='dtd',ret_all=False):
-    #     if self._in is None:
-    #         raise RuntimeError('Block has not yet executed forward!')
-    #     A = [x]
-    #     for child in self._children:
-    #         A.append(child.forward(A[-1]))
-    #     z = A.pop()
-    #     R = [z if y is None else y]
-    #     for child,a in zip(self._children[::-1],A[::-1]):
-    #         R.append(child.relevance(a,R[-1],method=method))
-    #     return R if ret_all else R[-1]
     def relevance_layerwise(self,y=None,method='dtd',ret_all=False,**kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
@@ -83,7 +164,6 @@ class Sequential(Interpretable, Intermediate, nn.Sequential):
             res += self.relevance_sensitivity(base + a*diff)
 
         return res
-
 
     def relevance_dtd(self,*args,**kwargs):
         return self.relevance_layerwise(*args,method='dtd',**kwargs)

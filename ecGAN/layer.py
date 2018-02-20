@@ -4,7 +4,10 @@ from mxnet.gluon import nn
 from .func import Interpretable
 
 
-class Dense(Interpretable,nn.Dense):
+class Dense(Interpretable,PatternNet,nn.Dense):
+    #############
+    # RELEVANCE #
+    #############
     def relevance_sensitivity(self,R):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
@@ -54,6 +57,35 @@ class Dense(Interpretable,nn.Dense):
                     z = self.act(z)
             c = autograd.grad(z,a,head_grads=R/z)
             return a*c
+
+    ##############
+    # PatternNet #
+    ##############
+    def learn_pattern_linear(self):
+        if self._in is None:
+            raise RuntimeError('Block has not yet executed forward_logged!')
+        x = self._in
+        y = self._out
+        meanx = self._meanx
+        meany = self._meany
+        n = self._n
+        m = x.shape[0]
+
+        meanx_ = x.mean(axis=0,keepdims=True)
+        meany_ = y.mean(axis=0,keepdims=True)
+        dx = x - meanx_
+        dy = y - meany_
+
+        C_ = nd.dot(dx, dy, transpose_b=True).sum(axis=0)
+        self._cov += C_ + nd.dot((meanx - meanx_), (meany - meany_), transpose_b=True) * n * m / (n+m)
+
+        vary_ = nd.dot(dy, dy, transpose_b=True).sum(axis=0)
+        self._vary += vary_ + (nd.dot((meany - meany_), (meany - meany_), transpose_b=True)) * n * m / (n+m)
+
+        self._meanx = (n * meanx + m * meanx_) / (n+m)
+        self._meany = (n * meany + m * meany_) / (n+m)
+        self._n += m
+
 
 class Identity(Interpretable, nn.Block):
     def forward(self,*args,**kwargs):
