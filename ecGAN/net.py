@@ -1,7 +1,7 @@
 from mxnet import nd
 from mxnet.gluon import nn
-from .func import Sequential,YSequential,
-from .layer import Dense,Conv2D,Conv2DTranspose,Identity,BatchNorm,LeakyReLU,Activation
+from .func import Sequential, YSequential
+from .layer import Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, Activation
 
 nets = {}
 def register_net(obj):
@@ -10,10 +10,10 @@ def register_net(obj):
 
 @register_net
 class SFC(Sequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',1)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
             self.add(Dense(self._numhid, activation='relu'))
@@ -23,10 +23,10 @@ class SFC(Sequential):
 
 @register_net
 class YSFC(YSequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',1)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
             self.addData(Dense(self._numhid, activation='relu', isinput=True))
@@ -39,10 +39,10 @@ class YSFC(YSequential):
 
 @register_net
 class YTCN28(YSequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',1)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
 
@@ -67,10 +67,10 @@ class YTCN28(YSequential):
 
 @register_net
 class STCN28(Sequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',1)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
             self.add(Conv2DTranspose(self._numhid * 8, 4, strides=1, padding=0, use_bias=False, activation='relu', isinput=True))
@@ -91,10 +91,10 @@ class STCN28(Sequential):
 
 @register_net
 class SCN28(Sequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',1)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
             # _numhid x 28 x 28
@@ -119,10 +119,10 @@ class SCN28(Sequential):
 # Sequential Transposed Convolutional-only 28x28
 @register_net
 class STCO28(Sequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',1)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
             self.add(Conv2DTranspose(self._numhid * 4, 4, strides=1, padding=0, use_bias=False, isinput=True))
@@ -147,10 +147,10 @@ class STCO28(Sequential):
 # Y-shaped Sequential Transposed Convolutional-only 28x28
 @register_net
 class YTCO28(YSequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',1)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
 
@@ -179,10 +179,10 @@ class YTCO28(YSequential):
 # Y-shaped Sequential Convolutional/Fully-Connected 28x28
 @register_net
 class YCNFC28(YSequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',1)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
             # _numhid x 28 x 28
@@ -215,10 +215,10 @@ class YCNFC28(YSequential):
 # Sequential Convolutional/Fully-Connected 28x28
 @register_net
 class SCNFC28(Sequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',1)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
             # _numhid x 28 x 28
@@ -249,10 +249,10 @@ class SCNFC28(Sequential):
 # Sequential Convolutional-only 28x28
 @register_net
 class SCO28(Sequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',1)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
             # _numhid x 28 x 28
@@ -280,10 +280,10 @@ class SCO28(Sequential):
 
 # @register_net
 # class STCN(Sequential):
-#     def __init__(self,**kwargs):
-#         self._outnum = kwargs.pop('outnum',1)
-#         self._numhid = kwargs.pop('numhid',64)
-#         self._outact = kwargs.pop('outact',None)
+#     def __init__(self, **kwargs):
+#         self._outnum = kwargs.pop('outnum', 1)
+#         self._numhid = kwargs.pop('numhid', 64)
+#         self._outact = kwargs.pop('outact', None)
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.addData(Conv2DTranspose(self._numhid * 8, 4, strides=1, padding=0, use_bias=False, isinput=True))
@@ -309,17 +309,17 @@ class SCO28(Sequential):
 
 # @register_net
 # class GenFC(nn.Sequential):
-#     def __init__(self,**kwargs):
-#         self._outnum = kwargs.pop('outnum',784)
-#         self._outact = kwargs.pop('outact','tanh')
+#     def __init__(self, **kwargs):
+#         self._outnum = kwargs.pop('outnum', 784)
+#         self._outact = kwargs.pop('outact', 'tanh')
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(nn.Dense(256))
-#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(BatchNorm(axis=1, center=True, scale=True))
 #             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(256))
-#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(BatchNorm(axis=1, center=True, scale=True))
 #             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(self._outnum, activation=self._outact))
@@ -327,26 +327,26 @@ class SCO28(Sequential):
 #
 # @register_net
 # class DiscrFC(nn.Sequential):
-#     def __init__(self,**kwargs):
-#         self._outnum = kwargs.pop('outnum',1)
-#         self._outact = kwargs.pop('outact',None)
+#     def __init__(self, **kwargs):
+#         self._outnum = kwargs.pop('outnum', 1)
+#         self._outact = kwargs.pop('outact', None)
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(nn.Dense(64, activation='relu'))
-#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(BatchNorm(axis=1, center=True, scale=True))
 #             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(64))
-#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(BatchNorm(axis=1, center=True, scale=True))
 #             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(self._outnum, activation=self._outact))
 #
 # @register_net
 # class GSFC(nn.Sequential):
-#     def __init__(self,**kwargs):
-#         self._outnum = kwargs.pop('outnum',784)
-#         self._outact = kwargs.pop('outact','tanh')
+#     def __init__(self, **kwargs):
+#         self._outnum = kwargs.pop('outnum', 784)
+#         self._outact = kwargs.pop('outact', 'tanh')
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(nn.Dense(64))
@@ -357,9 +357,9 @@ class SCO28(Sequential):
 #
 # @register_net
 # class DSFC(nn.Sequential):
-#     def __init__(self,**kwargs):
-#         self._outnum = kwargs.pop('outnum',1)
-#         self._outact = kwargs.pop('outact',None)
+#     def __init__(self, **kwargs):
+#         self._outnum = kwargs.pop('outnum', 1)
+#         self._outact = kwargs.pop('outact', None)
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(nn.Dense(64))
@@ -372,9 +372,9 @@ class SCO28(Sequential):
 #
 # @register_net
 # class GPFC(Sequential):
-#     def __init__(self,**kwargs):
-#         self._outnum = kwargs.pop('outnum',784)
-#         self._outact = kwargs.pop('outact','relu')
+#     def __init__(self, **kwargs):
+#         self._outnum = kwargs.pop('outnum', 784)
+#         self._outact = kwargs.pop('outact', 'relu')
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(Dense(64, activation='relu', isinput=True))
@@ -384,9 +384,9 @@ class SCO28(Sequential):
 #
 # @register_net
 # class DPFC(Sequential):
-#     def __init__(self,**kwargs):
-#         self._outnum = kwargs.pop('outnum',1)
-#         self._outact = kwargs.pop('outact',None)
+#     def __init__(self, **kwargs):
+#         self._outnum = kwargs.pop('outnum', 1)
+#         self._outact = kwargs.pop('outact', None)
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(Dense(64, activation='relu'))
@@ -396,26 +396,26 @@ class SCO28(Sequential):
 #
 # @register_net
 # class ClassFC(nn.Sequential):
-#     def __init__(self,**kwargs):
-#         self._outnum = kwargs.pop('outnum',10)
-#         self._outact = kwargs.pop('outact',None)
+#     def __init__(self, **kwargs):
+#         self._outnum = kwargs.pop('outnum', 10)
+#         self._outact = kwargs.pop('outact', None)
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(nn.Dense(64))
-#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(BatchNorm(axis=1, center=True, scale=True))
 #             self.add(LeakyReLU(0.01))
 #             # self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(64))
-#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(BatchNorm(axis=1, center=True, scale=True))
 #             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(self._outnum, activation=self._outact))
 #
 # @register_net
 # class CPFC(Sequential):
-#     def __init__(self,**kwargs):
-#         self._outnum = kwargs.pop('outnum',10)
-#         self._outact = kwargs.pop('outact',None)
+#     def __init__(self, **kwargs):
+#         self._outnum = kwargs.pop('outnum', 10)
+#         self._outact = kwargs.pop('outact', None)
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.add(Dense(64, activation='relu'))
@@ -425,10 +425,10 @@ class SCO28(Sequential):
 #
 @register_net
 class CGPFC(YSequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',784)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 784)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
             self.addData(Dense(self._numhid, activation='relu', isinput=True))
@@ -442,10 +442,10 @@ class CGPFC(YSequential):
 
 @register_net
 class CDPFC(YSequential):
-    def __init__(self,**kwargs):
-        self._outnum = kwargs.pop('outnum',1)
-        self._numhid = kwargs.pop('numhid',64)
-        self._outact = kwargs.pop('outact',None)
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
             self.addData(Dense(self._numhid, activation='relu', isinput=True))
@@ -458,48 +458,48 @@ class CDPFC(YSequential):
 
 # @register_net
 # class CGenFC(YSequential):
-#     def __init__(self,**kwargs):
+#     def __init__(self, **kwargs):
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.addData(nn.Dense(200))
 #
 #             self.addCond(nn.Dense(1000))
 #
-#             self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(BatchNorm(axis=1, center=True, scale=True))
 #             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
-#             self.add(nn.Dense(784,activation='tanh'))
+#             self.add(nn.Dense(784, activation='tanh'))
 #
 # @register_net
 # class CDiscrFC(YSequential):
-#     def __init__(self,**kwargs):
+#     def __init__(self, **kwargs):
 #         super().__init__(**kwargs)
 #         with self.name_scope():
 #             self.addData(nn.Dense(256))
 #
 #             self.addCond(nn.Dense(64))
 #
-#             # self.add(BatchNorm(axis=1,center=True,scale=True))
+#             # self.add(BatchNorm(axis=1, center=True, scale=True))
 #             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(256))
-#             # self.add(BatchNorm(axis=1,center=True,scale=True))
+#             # self.add(BatchNorm(axis=1, center=True, scale=True))
 #             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(2))
 
 
 # class DiscrCNN(nn.Sequential):
-#     def __init__(self,**kwargs):
+#     def __init__(self, **kwargs):
 #         super().__init__(**kwargs)
 #         with self.name_scope():
-#             self.add(nn.Conv2D(64,(5,5)),padding=2,stride=2)
-#             # self.add(BatchNorm(axis=1,center=True,scale=True))
+#             self.add(nn.Conv2D(64, (5, 5)), padding=2, stride=2)
+#             # self.add(BatchNorm(axis=1, center=True, scale=True))
 #             self.add(LeakyReLU(0.01))
-#             self.add(nn.Conv2D(128,(5,5)),stride=(2,2))
+#             self.add(nn.Conv2D(128, (5, 5)), stride=(2, 2))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(256))
-#             # self.add(BatchNorm(axis=1,center=True,scale=True))
+#             # self.add(BatchNorm(axis=1, center=True, scale=True))
 #             self.add(LeakyReLU(0.01))
 #             self.add(nn.Dropout(.5))
 #             self.add(nn.Dense(2))

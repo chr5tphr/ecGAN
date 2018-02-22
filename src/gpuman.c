@@ -30,7 +30,7 @@ static PyObject * gpuman_nvidia_idle(PyObject *self, PyObject *args) {
   retval = nvmlDeviceGetCount(&numdev);
   if (retval != NVML_SUCCESS) {
     PyErr_SetString(NVMLError, nvmlErrorString(retval));
-    Py_DECREF(retlist);
+    // Py_DECREF(retlist);
     nvmlShutdown();
     return retlist;
   }
