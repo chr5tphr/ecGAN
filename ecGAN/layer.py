@@ -1,13 +1,77 @@
+import mxnet as mx
 from mxnet import nd, gluon, autograd
 from mxnet.gluon import nn
 
 from .func import Interpretable, PatternNet
 
+class DenseAdapter(nn.Dense):
+    def __init__(self, *args, **kwargs):
+        super(nn.Dense, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
-class Dense(Interpretable, PatternNet, nn.Dense):
-    #############
-    # RELEVANCE #
-    #############
+class DensePatternNet(PatternNet, DenseAdapter):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        with self.name_scope():
+            self.mean_x = self.params.get('mean_x',
+                                          shape=(1,in_units),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.mean_y = self.params.get('mean_y',
+                                          shape=(1,units),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.var_y = self.params.get('var_y',
+                                         shape=(1,units),
+                                         init=mx.initializer.Zero(),
+                                         grad_req='null')
+            self.cov = self.params.get('cov',
+                                       shape=self.weight.shape,
+                                       init=mx.initializer.Zero(),
+                                       grad_req='null')
+            self.num_samples = self.params.get('num_samples',
+                                               shape=(1,),
+                                               init=mx.initializer.Zero(),
+                                               grad_req='null')
+
+    def learn_pattern_linear(self):
+        if self._in is None:
+            raise RuntimeError('Block has not yet executed forward_logged!')
+        x = self._in
+        y = self._out
+        meanx = self.mean_x
+        meany = self.mean_y
+        n = self.num_samples
+        m = x.shape[0]
+
+        meanx_ = x.mean(axis=0, keepdims=True)
+        meany_ = y.mean(axis=0, keepdims=True)
+        dx = x - meanx_
+        dy = y - meany_
+
+        C_ = nd.dot(dx, dy, transpose_a=True)
+        self._cov += C_ + nd.dot((meanx - meanx_), (meany - meany_), transpose_a=True) * n * m / (n+m)
+
+        vary_ = nd.sum(dy**2, axis=0)
+        self._vary += vary_ + ((meany - meany_) * (meany - meany_)) * n * m / (n+m)
+
+        self.mean_x = (n * meanx + m * meanx_) / (n+m)
+        self.mean_y = (n * meany + m * meany_) / (n+m)
+        self.num_samples += m
+
+    def forward_pattern_linear(self, *args):
+        x = args[0]
+        # omit number of samples, since present in both cov and var
+        a = self.cov / self.var_y
+        z = nd.FullyConnected(x, a, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
+        if self.act is not None:
+            z = self.act(z)
+        return z
+
+    def assess_pattern_linear(self):
+        pass
+
+class DenseInterpretable(Interpretable, DenseAdapter):
     def relevance_sensitivity(self, R):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
@@ -44,59 +108,37 @@ class Dense(Interpretable, PatternNet, nn.Dense):
             lower.attach_grad()
             with autograd.record():
                 zlh = (  self(a)
-                       - nd.FullyConnected(lower, wplus, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
-                       - nd.FullyConnected(upper, wminus, None, no_bias=True, num_hidden=self._units, flatten=self._flatten) )
+                       - nd.FullyConnected(lower,
+                                           wplus,
+                                           None,
+                                           no_bias=True,
+                                           num_hidden=self._units,
+                                           flatten=self._flatten)
+                       - nd.FullyConnected(upper,
+                                           wminus,
+                                           None,
+                                           no_bias=True,
+                                           num_hidden=self._units,
+                                           flatten=self._flatten) )
             zlh.backward(out_grad=R/zlh)
             return a*a.grad + upper*upper.grad + lower*lower.grad
         else: #z+
             wplus = nd.maximum(0., self.weight.data())
             a.attach_grad()
             with autograd.record():
-                z = nd.FullyConnected(a, wplus, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
+                z = nd.FullyConnected(a,
+                                      wplus,
+                                      None,
+                                      no_bias=True,
+                                      num_hidden=self._units,
+                                      flatten=self._flatten)
                 if self.act is not None:
                     z = self.act(z)
             c = autograd.grad(z, a, head_grads=R/z)
             return a*c
 
-    ##############
-    # PatternNet #
-    ##############
-    def learn_pattern_linear(self):
-        if self._in is None:
-            raise RuntimeError('Block has not yet executed forward_logged!')
-        x = self._in
-        y = self._out
-        meanx = self._meanx
-        meany = self._meany
-        n = self._n
-        m = x.shape[0]
-
-        meanx_ = x.mean(axis=0, keepdims=True)
-        meany_ = y.mean(axis=0, keepdims=True)
-        dx = x - meanx_
-        dy = y - meany_
-
-        C_ = nd.dot(dx, dy, transpose_b=True).sum(axis=0)
-        self._cov += C_ + nd.dot((meanx - meanx_), (meany - meany_), transpose_b=True) * n * m / (n+m)
-
-        vary_ = nd.dot(dy, dy, transpose_b=True).sum(axis=0)
-        self._vary += vary_ + (nd.dot((meany - meany_), (meany - meany_), transpose_b=True)) * n * m / (n+m)
-
-        self._meanx = (n * meanx + m * meanx_) / (n+m)
-        self._meany = (n * meany + m * meany_) / (n+m)
-        self._n += m
-
-    def forward_pattern_linear(self, *args):
-        x = args[0]
-        # omit n, since present in both cov and var
-        a = self._cov / self._var
-        z = nd.FullyConnected(x, a, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
-        if self.act is not None:
-            z = self.act(z)
-        return z
-
-    def assess_pattern_linear(self):
-        pass
+class Dense(DenseInterpretable, DensePatternNet):
+    pass
 
 class Identity(Interpretable, nn.Block):
     def forward(self, *args, **kwargs):

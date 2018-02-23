@@ -14,44 +14,23 @@ def randint(low=0., high=1., shape=(1, ), ctx=None, dtype='int32'):
     return nd.uniform(low=low, high=high, shape=shape, ctx=ctx).astype(dtype)
 
 def batchwise_covariance(X, Y):
-    meanx = meany = vary = n = C = 0
-    for x, y in zip(X, Y):
-        m = len(x)
+        meanx = meany = vary = n = C = 0
+        for x, y in zip(X, Y):
+            m = len(x)
+            meanx_ = x.mean(axis=0, keepdims=True)
+            meany_ = y.mean(axis=0, keepdims=True)
+            dx = x - meanx_
+            dy = y - meany_
 
-        meanx_ = x.mean(0, keepdims=True)
-        meany_ = y.mean(0, keepdims=True)
-        dx = x - meanx_
-        dy = y - meany_
+            C_ = nd.dot(dx, dy, transpose_a=True)
+            C += C_ + nd.dot((meanx - meanx_), (meany - meany_), transpose_a=True) * n * m / (n+m)
 
-        C_ = (dx * dy).sum(0)
-        C += C_ + ((meanx - meanx_) * (meany - meany_)) * n * m / (n+m)
+            vary_ = nd.sum(dy**2, axis=0)
+            vary += vary_ + ((meany - meany_)**2) * n * m / (n+m)
 
-        vary_ = (dy**2).sum(0)
-        vary += vary_ + ((meany - meany_)**2) * n * m / (n+m)
-
-        meanx = (n * meanx + m * meanx_) / (n+m)
-        meany = (n * meany + m * meany_) / (n+m)
-        n += m
-    return C / n, vary / n
-
-def batch_covariance_nd(X, Y):
-    meanx = meany = vary = n = C = 0
-    for x, y in zip(X, Y):
-        m = len(x)
-        meanx_ = x.mean(axis=0, keepdims=True)
-        meany_ = y.mean(axis=0, keepdims=True)
-        dx = x - meanx_
-        dy = y - meany_
-
-        C_ = nd.dot(dx, dy, transpose_a=True).T
-        C += C_ + nd.dot((meanx - meanx_), (meany - meany_), transpose_a=True).T * n * m / (n+m)
-
-        vary_ = nd.dot(dy, dy, transpose_a=True).T
-        vary += vary_ + (nd.dot((meany - meany_), (meany - meany_), transpose_a=True)).T * n * m / (n+m)
-
-        meanx = (n * meanx + m * meanx_) / (n+m)
-        meany = (n * meany + m * meany_) / (n+m)
-        n += m
+            meanx = (n * meanx + m * meanx_) / (n+m)
+            meany = (n * meany + m * meany_) / (n+m)
+            n += m
         return C / n, vary / n
 
 class Intermediate(object):
@@ -88,12 +67,11 @@ class PatternNet(object):
     def __init__(self, *args, **kwargs):
         self.estimator = kwargs.pop('estimator', 'linear')
         super().__init__(*args, **kwargs)
-        self._sigattr = None
-        self._meanx = 0
-        self._meany = 0
-        self._n = 0
-        self._vary = 0
-        self._cov = 0
+        self.mean_x = None
+        self.mean_y = None
+        self.num_samples = None
+        self.var_y = None
+        self.cov = None
 
     def learn_pattern(self, *args, **kwargs):
         try:

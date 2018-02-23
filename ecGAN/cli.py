@@ -200,6 +200,43 @@ def explain_gan(args, config):
             save_explanation(Rc, label, data_desc='condition', net='generator', config=config, logger=logger, i=i)
 
 @register_command
+def learn_pattern(args, config):
+    ctx = config_ctx(config)
+    batch_size = config.batch_size
+    data = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
+
+    logger = None
+    if config.log:
+        logger = mkfilelogger('learning', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+
+    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model.learn_pattern(data, batch_size)
+
+@register_command
+def explain_pattern(args, config):
+    ctx = config_ctx(config)
+
+    logger = None
+    if config.log:
+        logger = mkfilelogger('explaining', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+
+    model = models[config.model](ctx=ctx, logger=logger, config=config)
+
+    data_fp = data_funcs[config.data.func](*(config.data.args), **(config.data.kwargs))
+    data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
+
+    loss = gluon.loss.SoftmaxCrossEntropyLoss()
+    for i, (data, label) in enumerate(data_iter):
+        if i >= args.iter:
+            break
+        data = data.as_in_context(ctx)
+        label = label.as_in_context(ctx)
+
+        relevance = model.explain(data, label=label)
+
+        save_explanation(relevance, data=data, data_desc=config.data.func, net=config.explanation.top_net, config=config, logger=logger, i=i)
+
+@register_command
 def predict(args, config):
     ctx = config_ctx(config)
 
