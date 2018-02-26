@@ -4,7 +4,7 @@ from time import time
 from mxnet import gluon, autograd, nd
 from imageio import imwrite
 
-from .func import fuzzy_one_hot, Interpretable, Intermediate, YSequential, linspace, randint
+from .func import fuzzy_one_hot, Interpretable, PatternNet, Intermediate, YSequential, linspace, randint
 from .util import Config, config_ctx, draw_heatmap
 from .net import nets
 
@@ -153,10 +153,10 @@ class Classifier(Model):
 
         return R[-1]
 
-    def learn_pattern(self, data, label=None):
+    def learn_pattern(self, data, batch_size):
         estimator = self.config.pattern.estimator
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
 
         data_iter = gluon.data.DataLoader(data, batch_size)
         self.netC.estimator = estimator
@@ -171,32 +171,15 @@ class Classifier(Model):
         if self.logger:
             self.logger.info('Learned signal estimator %s for net %s=%.4f', estimator, self.config.nets.classifier.type)
 
-    def explain_pattern(self, data, label=None):
-        method = self.config.explanation.method
+    def explain_pattern(self, data):
+        estimator = self.config.pattern.estimator
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
 
-        if method == 'sensitivity':
-            # loss = gluon.loss.SoftmaxCrossEntropyLoss()
-            # output = self.netC(data)
-            # output.attach_grad()
-            # with autograd.record():
-            #     err = loss(output, label)
-            # dEdy = autograd.grad(err, output)
-            dEdy = nd.ones(300, ctx=self.ctx)
-        else:
-            dEdy = None
+        self.netC.estimator = estimator
+        R = self.netC.explain_pattern(data)
 
-        R = self.netC.relevance(data, dEdy, method=method, ret_all=True)
-
-        if self.config.debug:
-            Rsums = []
-            for rel in R:
-                Rsums.append(rel.sum().asscalar())
-            if self.logger:
-                self.logger.debug('Explanation sums: %s', ', '.join([str(fl) for fl in Rsums]))
-
-        return R[-1]
+        return R
 
 @register_model
 class GAN(Model):
