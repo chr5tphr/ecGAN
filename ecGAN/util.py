@@ -63,6 +63,9 @@ class ConfigNode(dict):
     def sub(self, param, **kwargs):
         return Template(self.flat()[param]).safe_substitute(self.flat(), **kwargs)
 
+    def exsub(self, param, **kwargs):
+        return Template(param).safe_substitute(self.flat(), **kwargs)
+
 class Config(ConfigNode):
 
     default_config = {
@@ -161,22 +164,22 @@ def draw_heatmap(data, lo, hi):
 def align_images(im, H, W, h, w, C=1):
     return im.reshape(H, W, h, w, C).transpose(0, 2, 1, 3, 4).reshape(H*h, W*w, C)
 
-def save_explanation(relevance, data, config, data_desc='some', net='classifier', logger=None, i=0):
-    if config.explanation.output:
-        fpath = config.sub('explanation.output', iter=i, epoch=config.start_epoch, data_desc=data_desc)
+def save_explanation(relevance, data, config, ouput=None, image=None, source=None, data_desc='some', net='classifier', logger=None, i=0):
+    if output:
+        fpath = config.exsub(output, iter=i, epoch=config.start_epoch, data_desc=data_desc)
         with h5py.File(fpath, 'w') as fp:
             fp['heatmap'] = relevance.asnumpy()
         if logger:
             logger.info('Saved explanation of \'%s\' checkpoint \'%s\' in \'%s\'.',
                         config.nets[net].type, config.sub('nets.%s.param'%net), fpath)
-    if config.explanation.image:
+    if image:
         rdat = relevance
-        if config.explanation.method == 'sensitivity':
-            rdat = relevance.abs()
+#        if config.explanation.method == 'sensitivity':
+#            rdat = relevance.abs()
         lo, hi = rdat.min(), rdat.max()
         if logger:
             logger.debug('Explanation min %f, max %f', lo.asscalar(), hi.asscalar())
-        fpath = config.sub('explanation.image', iter=i, epoch=config.start_epoch, net=net, data_desc=data_desc)
+        fpath = config.exsub(image, iter=i, epoch=config.start_epoch, net=net, data_desc=data_desc)
         rdat = (draw_heatmap(rdat, lo, hi)*255).astype(np.uint8)
         if net in ['classifier', 'discriminator']:
             rdat = align_images(rdat, 5, 6, 28, 28, 3)
@@ -184,9 +187,9 @@ def save_explanation(relevance, data, config, data_desc='some', net='classifier'
         if logger:
             logger.info('Saved explanation image of \'%s\' checkpoint \'%s\' in \'%s\'.',
                         config.nets[net].type, config.sub('nets.%s.param'%net), fpath)
-    if config.explanation.input and data is not None:
+    if source and data is not None:
         bbox = config.data.bbox
-        fpath = config.sub('explanation.input', iter=i, data_desc=data_desc)
+        fpath = config.exsub(source, iter=i, data_desc=data_desc)
 
         if net in ['classifier', 'discriminator']:
             indat = ((data - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0, 255).astype(np.uint8)

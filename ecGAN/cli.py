@@ -173,7 +173,16 @@ def explain(args, config):
 
         relevance = model.explain(data, label=label)
 
-        save_explanation(relevance, data=data, data_desc=config.data.func, net=config.explanation.top_net, config=config, logger=logger, i=i)
+        save_explanation(relevance,
+                         data=data,
+                         config=config,
+                         image=config.explanation.image,
+                         output=config.explanation.output,
+                         source=config.explanation.input,
+                         data_desc=config.data.func,
+                         net=config.explanation.top_net,
+                         logger=logger,
+                         i=i)
 
 @register_command
 def explain_gan(args, config):
@@ -193,11 +202,38 @@ def explain_gan(args, config):
     for i in range(args.iter):
         relTop, Rtc, relG, Rc, noise, gen = model.explain(label=label)
 
-        save_explanation(relTop, gen, data_desc='%s.%s'%(config.nets.generator.type, config.start_epoch), net=config.explanation.top_net, config=config, logger=logger, i=i)
-        save_explanation(relG, noise, data_desc='noise', net='generator', config=config, logger=logger, i=i)
+        save_explanation(relTop,
+                         data=gen,
+                         config=config,
+                         image=config.explanation.image,
+                         output=config.explanation.output,
+                         source=config.explanation.input,
+                         data_desc='%s.%s'%(config.nets.generator.type, config.start_epoch),
+                         net=config.explanation.top_net,
+                         logger=logger,
+                         i=i)
+        save_explanation(relG,
+                         data=noise,
+                         config=config,
+                         image=config.explanation.image,
+                         output=config.explanation.output,
+                         source=config.explanation.input,
+                         data_desc='noise',
+                         net='generator',
+                         logger=logger,
+                         i=i)
 
         if Rc is not None:
-            save_explanation(Rc, label, data_desc='condition', net='generator', config=config, logger=logger, i=i)
+            save_explanation(Rc,
+                             data=label,
+                             config=config,
+                             image=config.explanation.image,
+                             output=config.explanation.output,
+                             source=config.explanation.input,
+                             data_desc='condition',
+                             net='generator',
+                             logger=logger,
+                             i=i)
 
 @register_command
 def learn_pattern(args, config):
@@ -233,7 +269,16 @@ def explain_pattern(args, config):
 
         relevance = model.explain_pattern(data)
 
-        save_explanation(relevance, data=data, data_desc=config.data.func, net=config.pattern.top_net, config=config, logger=logger, i=i)
+        save_explanation(relevance,
+                         data=data,
+                         config=config,
+                         image=config.pattern.image,
+                         output=config.pattern.output,
+                         source=config.pattern.input,
+                         data_desc=config.data.func,
+                         net=config.pattern.top_net,
+                         logger=logger,
+                         i=i)
 
 @register_command
 def predict(args, config):
