@@ -1,4 +1,4 @@
-root_dir: '/home/chrstphr/projects/ecGAN/result'
+root_dir: '/home/chrstphr/docs/ml/projects/ecGAN'
 exp_dir: 'classify'
 
 device: 'cpu'
@@ -6,37 +6,51 @@ device_id: 'auto'
 debug: False
 
 batch_size: 64
-nepochs: 10
+nepochs: 100
 start_epoch: 0
-save_freq: 5
+save_freq: 10
+
+init: False
 
 data:
   func: 'mnist'
   args: []
-  kwargs: {'train':True,'bbox':[0,1]}
+  kwargs:
+    train: True
+    bbox: [0,1]
   bbox: [0,1]
 
-model: 'Classifier'
+model: 'CGAN'
 nets:
-  # generator:
-  #   type: 'GenFC'
-  #   param: '${root_dir}/params/${model}.${nets.generator.type}.${start_epoch}.params'
-  #   save: '${root_dir}/params/${model}.${nets.generator.type}.${epoch}.params'
-  # discriminator:
-  #   type: 'DiscrFC'
-  #   param: '${root_dir}/params/${model}.${nets.discriminator.type}.${start_epoch}.params'
-  #   save: '${root_dir}/params/${model}.${nets.discriminator.type}.${epoch}.params'
-  classifier:
-    type: 'CPFC'
-    param: '${root_dir}/${exp_dir}/params/${model}.${nets.classifier.type}.${start_epoch}.params'
-    save: '${root_dir}/${exp_dir}/params/${model}.${nets.classifier.type}.${epoch}.params'
+   classifier:
+    type: 'SCNFC28'
+    name: 'Cls'
+    kwargs:
+      numhid: 256
+      outact: NULL
+      outnum: 1
+    param: '${root_dir}/${exp_dir}/params/${model}.${nets.classifier.type}.${nets.classifier.name}.${start_epoch}.params'
+    save: '${root_dir}/${exp_dir}/params/${model}.${nets.classifier.type}.${nets.classifier.name}.${epoch}.params'
+    optimizer: 'adam'
+    optkwargs:
+      learning_rate: 0.01
 
 log: '${root_dir}/${exp_dir}/log/${model}.log'
+gen_freq: 10
+genout: '${root_dir}/${exp_dir}/gen/${model}.${nets.generator.type}.${epoch}.png'
+
+pattern:
+  estimator: 'linear'
+  top_net: 'classifier'
+  # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${pattern.estimator}.${iter}.h5'
+  output: NULL
+  image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${pattern.estimator}.${data_desc}.${iter}.png'
+  input:  '${root_dir}/${exp_dir}/rel/${model}.${data_desc}.${iter}.png'
 
 explanation:
   method: 'dtd'
   top_net: 'classifier'
-  # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation}.${iter}.h5'
+  # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation.method}.${iter}.h5'
   output: NULL
   image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation.method}.${data_desc}.${iter}.png'
-  input:  '${root_dir}/${exp_dir}/rel/${model}.input.${data_desc}.${iter}.png'
+  input:  '${root_dir}/${exp_dir}/rel/${model}.${data_desc}.${iter}.png'
