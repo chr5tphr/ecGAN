@@ -44,9 +44,9 @@ class Interpretable(object):
         self._in = None
         self._out = None
 
-    def forward(self, *args, **kwargs):
-        raise NotImplementedError
-
+#    def forward(self, *args, **kwargs):
+#        raise NotImplementedError
+#
     def forward_logged(self, *args, **kwargs):
         self._in = args
         self._out = self.forward(*args)

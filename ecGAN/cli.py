@@ -35,7 +35,7 @@ def main():
 
     args = parser.parse_args(sys.argv[1:])
 
-    config = Config(args.config)
+    config = Config(fname=args.config)
     if args.update:
         config.update(yaml.safe_load(args.update))
 

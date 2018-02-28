@@ -88,7 +88,7 @@ class Classifier(Model):
                 tic = time()
                 for i, (data, label) in enumerate(data_iter):
 
-                    data = data.as_in_context(ctx).reshape((-1, 784))
+                    data = data.as_in_context(ctx)
                     label = label.as_in_context(ctx)
 
                     with autograd.record():

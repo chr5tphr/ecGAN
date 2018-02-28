@@ -4,34 +4,39 @@ from mxnet.gluon import nn
 
 from .func import Interpretable, PatternNet
 
-class DenseAdapter(nn.Dense):
-    def __init__(self, *args, **kwargs):
-        super(nn.Dense, self).__init__(*args, **kwargs)
-        super().__init__(*args, **kwargs)
+#class DenseAdapter(nn.Dense):
+#    def __init__(self, *args, **kwargs):
+#        super(nn.Dense, self).__init__(*args, **kwargs)
+#        super().__init__(*args, **kwargs)
 
-class DensePatternNet(PatternNet, DenseAdapter):
+class DensePatternNet(PatternNet, nn.Dense):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         with self.name_scope():
             self.mean_x = self.params.get('mean_x',
                                           shape=(1, self._in_units),
                                           init=mx.initializer.Zero(),
+                                          allow_deferred_init=True,
                                           grad_req='null')
             self.mean_y = self.params.get('mean_y',
                                           shape=(1, self._units),
                                           init=mx.initializer.Zero(),
+                                          allow_deferred_init=True,
                                           grad_req='null')
             self.var_y = self.params.get('var_y',
                                          shape=(1, self._units),
                                          init=mx.initializer.Zero(),
+                                         allow_deferred_init=True,
                                          grad_req='null')
             self.cov = self.params.get('cov',
                                        shape=self.weight.shape,
                                        init=mx.initializer.Zero(),
+                                       allow_deferred_init=True,
                                        grad_req='null')
             self.num_samples = self.params.get('num_samples',
                                                shape=(1, ),
                                                init=mx.initializer.Zero(),
+                                               allow_deferred_init=True,
                                                grad_req='null')
 
     def learn_pattern_linear(self):
@@ -71,7 +76,7 @@ class DensePatternNet(PatternNet, DenseAdapter):
     def assess_pattern_linear(self):
         pass
 
-class DenseInterpretable(Interpretable, DenseAdapter):
+class DenseInterpretable(Interpretable, nn.Dense):
     def relevance_sensitivity(self, R):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')

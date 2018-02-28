@@ -123,14 +123,14 @@ class Config(ConfigNode):
         },
     }
 
-    def __init__(self, fname=None, *args, **kwargs):
+    def __init__(self, *args, fname=None, **kwargs):
         super().__init__(*args, **kwargs)
 
         defcfg = ConfigNode(__class__.default_config)
         defcfg.update(self)
         self.update(defcfg)
 
-        if fname:
+        if fname is not None:
             with open(fname, 'r') as fp:
                 self.update(yaml.safe_load(fp))
 
