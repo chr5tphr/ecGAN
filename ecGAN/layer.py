@@ -14,15 +14,15 @@ class DensePatternNet(PatternNet, DenseAdapter):
         super().__init__(*args, **kwargs)
         with self.name_scope():
             self.mean_x = self.params.get('mean_x',
-                                          shape=(1,in_units),
+                                          shape=(1, self._in_units),
                                           init=mx.initializer.Zero(),
                                           grad_req='null')
             self.mean_y = self.params.get('mean_y',
-                                          shape=(1,units),
+                                          shape=(1, self._units),
                                           init=mx.initializer.Zero(),
                                           grad_req='null')
             self.var_y = self.params.get('var_y',
-                                         shape=(1,units),
+                                         shape=(1, self._units),
                                          init=mx.initializer.Zero(),
                                          grad_req='null')
             self.cov = self.params.get('cov',
@@ -30,7 +30,7 @@ class DensePatternNet(PatternNet, DenseAdapter):
                                        init=mx.initializer.Zero(),
                                        grad_req='null')
             self.num_samples = self.params.get('num_samples',
-                                               shape=(1,),
+                                               shape=(1, ),
                                                init=mx.initializer.Zero(),
                                                grad_req='null')
 
@@ -50,10 +50,10 @@ class DensePatternNet(PatternNet, DenseAdapter):
         dy = y - meany_
 
         C_ = nd.dot(dx, dy, transpose_a=True)
-        self._cov += C_ + nd.dot((meanx - meanx_), (meany - meany_), transpose_a=True) * n * m / (n+m)
+        self.cov += C_ + nd.dot((meanx - meanx_), (meany - meany_), transpose_a=True) * n * m / (n+m)
 
         vary_ = nd.sum(dy**2, axis=0)
-        self._vary += vary_ + ((meany - meany_) * (meany - meany_)) * n * m / (n+m)
+        self.var_y += vary_ + ((meany - meany_) * (meany - meany_)) * n * m / (n+m)
 
         self.mean_x = (n * meanx + m * meanx_) / (n+m)
         self.mean_y = (n * meany + m * meany_) / (n+m)

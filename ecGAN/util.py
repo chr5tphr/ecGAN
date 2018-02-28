@@ -1,11 +1,12 @@
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import mxnet as mx
 import logging
 import yaml
 import random
+import h5py
 
+import mxnet as mx
 from mxnet import nd
 from string import Template as STemplate
 from imageio import imwrite
@@ -164,7 +165,7 @@ def draw_heatmap(data, lo, hi):
 def align_images(im, H, W, h, w, C=1):
     return im.reshape(H, W, h, w, C).transpose(0, 2, 1, 3, 4).reshape(H*h, W*w, C)
 
-def save_explanation(relevance, data, config, ouput=None, image=None, source=None, data_desc='some', net='classifier', logger=None, i=0):
+def save_explanation(relevance, data, config, output=None, image=None, source=None, data_desc='some', net='classifier', logger=None, i=0):
     if output:
         fpath = config.exsub(output, iter=i, epoch=config.start_epoch, data_desc=data_desc)
         with h5py.File(fpath, 'w') as fp:

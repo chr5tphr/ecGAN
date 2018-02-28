@@ -129,7 +129,7 @@ class Classifier(Model):
     def explain(self, data, label=None):
         method = self.config.explanation.method
         if not isinstance(self.netC, Interpretable):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
 
         if method == 'sensitivity':
             # loss = gluon.loss.SoftmaxCrossEntropyLoss()
@@ -334,7 +334,7 @@ class GAN(Model):
 
         if not isinstance(netTop, Interpretable):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%
-                (config.nets.get('classifier' if topC else 'discriminator', config.nets.discriminator).type))
+                (self.config.nets.get(self.config.explanation.top_net, self.config.nets.discriminator).type))
 
         if data is None:
             noise = nd.random_normal(shape=(30, 100, 1, 1), ctx=self.ctx)
