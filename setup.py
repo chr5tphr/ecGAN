@@ -3,10 +3,12 @@ import setuptools
 from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, DistutilsPlatformError
 
+VERSION = '0.1'
+
 #########################################
 ### inspired by simplejson's setup.py ###
 #########################################
-ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError, IOError, ValueError)
+ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError)
 
 class BuildFailed(Exception):
     pass
@@ -30,8 +32,8 @@ class ve_build_ext(build_ext):
 
 def run_setup(gpu_support):
     if gpu_support:
-        setup_kw = {
-            ext_modules : [
+        setup_kw = dict(
+            ext_modules = [
                 Extension(
                     'ecGAN.gpuman',
                     ['src/gpuman.c'],
@@ -41,16 +43,16 @@ def run_setup(gpu_support):
                     library_dirs=['/usr/lib/nvidia-384']
                 )
             ],
-            cmdclass : {
-                build_ext : ve_build_ext,
-            }
-        }
+            cmdclass = dict(
+                build_ext = ve_build_ext,
+            )
+        )
     else:
-        setup_kw = {}
+        setup_kw = dict()
 
     setup(
         name="ecGAN",
-        version="0.1",
+        version=VERSION,
         packages=find_packages(),
         entry_points={
             'console_scripts': [
@@ -87,7 +89,7 @@ def run_setup(gpu_support):
         **setup_kw)
 
 try:
-    setup(gpu_support=True)
+    run_setup(gpu_support=True)
 except BuildFailed:
     print("Building extension Failed, retrying without gpu support.")
-    setup(gpu_support=False)
+    run_setup(gpu_support=False)
