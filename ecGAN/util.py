@@ -11,7 +11,11 @@ from mxnet import nd
 from string import Template as STemplate
 from imageio import imwrite
 
-from .gpuman import nvidia_idle
+try:
+    from .gpuman import nvidia_idle
+    GPU_SUPPORT = True
+except ModuleNotFoundError:
+    GPU_SUPPORT = False
 
 class Template(STemplate):
     idpattern = r'[_a-z][_\.a-z0-9]*'
@@ -131,7 +135,7 @@ class Config(ConfigNode):
                 self.update(yaml.safe_load(fp))
 
 def config_ctx(config):
-    if config.device == 'cpu':
+    if config.device == 'cpu' or not GPU_SUPPORT:
         return mx.context.cpu()
     elif config.device == 'gpu':
         if isinstance(config.device_id, int):
