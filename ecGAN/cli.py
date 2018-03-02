@@ -258,7 +258,7 @@ def explain_pattern(args, config):
 
     model = models[config.model](ctx=ctx, logger=logger, config=config)
 
-    data_fp = data_funcs[config.data.func](*(config.data.args), **(config.data.kwargs))
+    data_fp = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
 
     for i, (data, label) in enumerate(data_iter):

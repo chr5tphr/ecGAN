@@ -1,5 +1,5 @@
 from mxnet import nd, autograd
-from mxnet.gluon import nn
+from mxnet.gluon import nn, ParameterDict
 
 def fuzzy_one_hot(arr, size):
     x = arr.reshape((-1, ))
@@ -67,11 +67,31 @@ class PatternNet(object):
     def __init__(self, *args, **kwargs):
         self.estimator = kwargs.pop('estimator', 'linear')
         super().__init__(*args, **kwargs)
+        self._pparams = ParameterDict(getattr(self, '_prefix', ''))
         self.mean_x = None
         self.mean_y = None
         self.num_samples = None
         self.var_y = None
         self.cov = None
+
+    @property
+    def pparams(self):
+        return self._pparams
+
+    def collect_pparams(self, select=None):
+        self._check_container_with_block()
+        ret = ParameterDict(self.pparams.prefix)
+        if not select:
+            ret.update(self.pparams)
+        else:
+            pattern = re.compile(select)
+            ret.update({name:value for name, value in self.pparams.items() if pattern.match(name)})
+        for cld in self._children:
+            try:
+                ret.update(cld.collect_pparams(select=select))
+            except AttributeError:
+                pass
+        return ret
 
     def learn_pattern(self, *args, **kwargs):
         try:
@@ -101,6 +121,9 @@ class PatternNet(object):
             raise NotImplementedError(self.estimator)
         return func(*args, **kwargs)
 
+    def init_pattern(self, *args, **kwargs):
+        raise NotImplementedError
+
     def learn_pattern_linear(self, *args, **kwargs):
         raise NotImplementedError
 
@@ -126,7 +149,7 @@ class PatternNet(object):
         raise NotImplementedError
 
 
-class Sequential(Interpretable, PatternNet,Intermediate, nn.Sequential):
+class Sequential(Interpretable, PatternNet, Intermediate, nn.Sequential):
     def forward(self, x, depth=-1):
         rdep = depth if depth > 0 else (len(self._children) + depth)
         for i, block in enumerate(self._children):
@@ -185,6 +208,11 @@ class Sequential(Interpretable, PatternNet,Intermediate, nn.Sequential):
     ##############
     # PatternNet #
     ##############
+    def init_pattern(self):
+        for block in self._children:
+            block.estimator = self.estimator
+            block.init_pattern()
+
     def forward_pattern(self, *args):
         x = args[0]
         for block in self._children:

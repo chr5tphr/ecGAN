@@ -12,41 +12,44 @@ from .func import Interpretable, PatternNet
 class DensePatternNet(PatternNet, nn.Dense):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def init_pattern(self):
+        units, in_units = self.weight.shape
         with self.name_scope():
-            self.mean_x = self.params.get('mean_x',
-                                          shape=(1, self._in_units),
+            self.mean_x = self.pparams.get('mean_x',
+                                          shape=(1, in_units),
                                           init=mx.initializer.Zero(),
-                                          allow_deferred_init=True,
                                           grad_req='null')
-            self.mean_y = self.params.get('mean_y',
-                                          shape=(1, self._units),
+            self.mean_y = self.pparams.get('mean_y',
+                                          shape=(1, units),
                                           init=mx.initializer.Zero(),
-                                          allow_deferred_init=True,
                                           grad_req='null')
-            self.var_y = self.params.get('var_y',
-                                         shape=(1, self._units),
+            self.var_y = self.pparams.get('var_y',
+                                         shape=(1, units),
                                          init=mx.initializer.Zero(),
-                                         allow_deferred_init=True,
                                          grad_req='null')
-            self.cov = self.params.get('cov',
+            self.cov = self.pparams.get('cov',
                                        shape=self.weight.shape,
                                        init=mx.initializer.Zero(),
-                                       allow_deferred_init=True,
                                        grad_req='null')
-            self.num_samples = self.params.get('num_samples',
-                                               shape=(1, ),
+            self.num_samples = self.pparams.get('num_samples',
+                                               shape=(1,),
                                                init=mx.initializer.Zero(),
-                                               allow_deferred_init=True,
-                                               grad_req='null')
+                                                grad_req='null')
+
+    def hybrid_forward(self, F, x, weight, bias=None, **kwargs):
+        return super().hybrid_forward(F, x, weight, bias)
 
     def learn_pattern_linear(self):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
-        x = self._in
-        y = self._out
-        meanx = self.mean_x
-        meany = self.mean_y
-        n = self.num_samples
+        x = self._in[0].flatten()
+        y = self._out.flatten()
+        meanx = self.mean_x.data()
+        meany = self.mean_y.data()
+        n = self.num_samples.data()
+        var_y = self.var_y.data()
+        cov = self.cov.data()
         m = x.shape[0]
 
         meanx_ = x.mean(axis=0, keepdims=True)
@@ -54,15 +57,21 @@ class DensePatternNet(PatternNet, nn.Dense):
         dx = x - meanx_
         dy = y - meany_
 
-        C_ = nd.dot(dx, dy, transpose_a=True)
-        self.cov += C_ + nd.dot((meanx - meanx_), (meany - meany_), transpose_a=True) * n * m / (n+m)
+        C_ = nd.dot(dy, dx, transpose_a=True)
+        cov += C_ + nd.dot((meany - meany_), (meanx - meanx_), transpose_a=True) * n * m / (n+m)
 
         vary_ = nd.sum(dy**2, axis=0)
-        self.var_y += vary_ + ((meany - meany_) * (meany - meany_)) * n * m / (n+m)
+        var_y += vary_ + ((meany - meany_) * (meany - meany_)) * n * m / (n+m)
 
-        self.mean_x = (n * meanx + m * meanx_) / (n+m)
-        self.mean_y = (n * meany + m * meany_) / (n+m)
-        self.num_samples += m
+        mean_x = (n * meanx + m * meanx_) / (n+m)
+        mean_y = (n * meany + m * meany_) / (n+m)
+        n += m
+
+        self.mean_x.set_data(meanx)
+        self.mean_y.set_data(meany)
+        self.num_samples.set_data(n)
+        self.var_y.set_data(var_y)
+        self.cov.set_data(cov)
 
     def forward_pattern_linear(self, *args):
         x = args[0]

@@ -156,10 +156,13 @@ class Classifier(Model):
     def learn_pattern(self, data, batch_size):
         estimator = self.config.pattern.estimator
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets.classifier.type)
 
         data_iter = gluon.data.DataLoader(data, batch_size)
         self.netC.estimator = estimator
+
+        self.netC.init_pattern()
+        self.netC.collect_pparams().initialize(mx.initializer.Zero(), ctx=self.ctx)
 
         for i, (data, label) in enumerate(data_iter):
             data = data.as_in_context(self.ctx)
@@ -168,8 +171,12 @@ class Classifier(Model):
             self.netC.forward_logged(data)
             self.netC.learn_pattern()
 
+        self.netC.collect_pparams().save(self.config.sub('pattern.save',
+                                                    net_name=self.config.nets.classifier.name,
+                                                    net_type=self.config.nets.classifier.type))
+
         if self.logger:
-            self.logger.info('Learned signal estimator %s for net %s=%.4f', estimator, self.config.nets.classifier.type)
+            self.logger.info('Learned signal estimator %s for net %s', estimator, self.config.nets.classifier.type)
 
     def explain_pattern(self, data):
         estimator = self.config.pattern.estimator
