@@ -5,7 +5,7 @@ from mxnet import gluon, autograd, nd
 from imageio import imwrite
 
 from .func import fuzzy_one_hot, Interpretable, PatternNet, Intermediate, YSequential, linspace, randint
-from .util import Config, config_ctx, draw_heatmap
+from .util import Config, config_ctx
 from .net import nets
 
 models = {}
@@ -177,6 +177,14 @@ class Classifier(Model):
 
         if self.logger:
             self.logger.info('Learned signal estimator %s for net %s', estimator, self.config.nets.classifier.type)
+
+    def load_pattern_params(self):
+        for nrole, net in self.nets.items():
+            net.init_pattern()
+            nname = self.config.nets.get(nrole, {}).get('name', '')
+            ntype = self.config.nets.get(nrole, {}).get('type', '')
+            if self.config.pattern.get('load') is not None:
+                net.collect_pparams().load(self.config.sub('pattern.load', net_name=nname, net_type=ntype), ctx=self.ctx)
 
     def explain_pattern(self, data):
         estimator = self.config.pattern.estimator

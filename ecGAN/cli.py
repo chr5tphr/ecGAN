@@ -6,6 +6,7 @@ import sys
 import os
 import logging
 import h5py
+import ipdb
 
 from argparse import ArgumentParser
 from imageio import imwrite
@@ -14,7 +15,8 @@ from mxnet import nd, gluon, autograd, random
 from .net import nets
 from .model import models
 from .data import data_funcs
-from .util import mkfilelogger, plot_data, Config, config_ctx, save_explanation
+from .util import mkfilelogger, Config, config_ctx
+from .plot import plot_data, save_explanation
 from .func import linspace
 
 commands = {}
@@ -32,6 +34,7 @@ def main():
     parser.add_argument('--iter', type=int, default=1)
     parser.add_argument('--seed', type=int)
     parser.add_argument('--classnum', type=int, default=10)
+    parser.add_argument('--debug', action='store_true')
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -42,7 +45,10 @@ def main():
     if args.seed:
         random.seed(args.seed)
 
-    commands[args.command](args, config)
+    if args.debug:
+        ipdb.run('commands[args.command](args, config)')
+    else:
+        commands[args.command](args, config)
 
 # @register_command
 # def setup(args, config):
@@ -146,7 +152,7 @@ def test(args, config):
         logger = mkfilelogger('testing', config.sub('log'))
 
     batch_size = config.batch_size
-    data = data_funcs[config.data.func](*(config.data.args), **(config.data.kwargs))
+    data = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     model = models[config.model](ctx=ctx, logger=logger, config=config)
     model.test(data=data, batch_size=batch_size)
@@ -257,6 +263,8 @@ def explain_pattern(args, config):
         logger = mkfilelogger('explaining', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
     model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model.load_pattern_params()
+
 
     data_fp = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
@@ -278,7 +286,12 @@ def explain_pattern(args, config):
                          data_desc=config.data.func,
                          net=config.pattern.top_net,
                          logger=logger,
-                         i=i)
+                         i=i,
+                         center=0.,
+                         cmap='coldnhot',
+                        )
+
+#        import ipdb; ipdb.set_trace()
 
 @register_command
 def predict(args, config):

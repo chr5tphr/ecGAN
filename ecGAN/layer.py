@@ -13,7 +13,7 @@ class DensePatternNet(PatternNet, nn.Dense):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def init_pattern(self):
+    def init_pattern_linear(self):
         units, in_units = self.weight.shape
         with self.name_scope():
             self.mean_x = self.pparams.get('mean_x',
@@ -37,38 +37,35 @@ class DensePatternNet(PatternNet, nn.Dense):
                                                init=mx.initializer.Zero(),
                                                 grad_req='null')
 
-    def hybrid_forward(self, F, x, weight, bias=None, **kwargs):
-        return super().hybrid_forward(F, x, weight, bias)
-
     def learn_pattern_linear(self):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         x = self._in[0].flatten()
         y = self._out.flatten()
-        meanx = self.mean_x.data()
-        meany = self.mean_y.data()
+        mean_x = self.mean_x.data()
+        mean_y = self.mean_y.data()
         n = self.num_samples.data()
         var_y = self.var_y.data()
         cov = self.cov.data()
         m = x.shape[0]
 
-        meanx_ = x.mean(axis=0, keepdims=True)
-        meany_ = y.mean(axis=0, keepdims=True)
-        dx = x - meanx_
-        dy = y - meany_
+        mean_x_cur = x.mean(axis=0, keepdims=True)
+        mean_y_cur = y.mean(axis=0, keepdims=True)
+        dx = x - mean_x_cur
+        dy = y - mean_y_cur
 
-        C_ = nd.dot(dy, dx, transpose_a=True)
-        cov += C_ + nd.dot((meany - meany_), (meanx - meanx_), transpose_a=True) * n * m / (n+m)
+        cov_cur = nd.dot(dy, dx, transpose_a=True)
+        cov += cov_cur + nd.dot((mean_y - mean_y_cur), (mean_x - mean_x_cur), transpose_a=True) * n * m / (n+m)
 
-        vary_ = nd.sum(dy**2, axis=0)
-        var_y += vary_ + ((meany - meany_) * (meany - meany_)) * n * m / (n+m)
+        var_y_cur = nd.sum(dy**2, axis=0)
+        var_y += var_y_cur + ((mean_y - mean_y_cur) * (mean_y - mean_y_cur)) * n * m / (n+m)
 
-        mean_x = (n * meanx + m * meanx_) / (n+m)
-        mean_y = (n * meany + m * meany_) / (n+m)
+        mean_x = (n * mean_x + m * mean_x_cur) / (n+m)
+        mean_y = (n * mean_y + m * mean_y_cur) / (n+m)
         n += m
 
-        self.mean_x.set_data(meanx)
-        self.mean_y.set_data(meany)
+        self.mean_x.set_data(mean_x)
+        self.mean_y.set_data(mean_y)
         self.num_samples.set_data(n)
         self.var_y.set_data(var_y)
         self.cov.set_data(cov)
@@ -76,7 +73,7 @@ class DensePatternNet(PatternNet, nn.Dense):
     def forward_pattern_linear(self, *args):
         x = args[0]
         # omit number of samples, since present in both cov and var
-        a = self.cov / self.var_y
+        a = self.cov.data() / (self.var_y.data().T + 1e-12)
         z = nd.FullyConnected(x, a, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
         if self.act is not None:
             z = self.act(z)
@@ -84,6 +81,92 @@ class DensePatternNet(PatternNet, nn.Dense):
 
     def assess_pattern_linear(self):
         pass
+
+    def init_pattern_twocomponent(self):
+        units, in_units = self.weight.shape
+        with self.name_scope():
+            self.mean_x_pos = self.pparams.get('mean_x_pos',
+                                          shape=(1, in_units),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.mean_x_neg = self.pparams.get('mean_x_neg',
+                                          shape=(1, in_units),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.mean_y = self.pparams.get('mean_y',
+                                          shape=(1, units),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.cov_pos = self.pparams.get('cov_pos',
+                                       shape=self.weight.shape,
+                                       init=mx.initializer.Zero(),
+                                       grad_req='null')
+            self.cov_neg = self.pparams.get('cov_neg',
+                                       shape=self.weight.shape,
+                                       init=mx.initializer.Zero(),
+                                       grad_req='null')
+            self.num_samples = self.pparams.get('num_samples',
+                                               shape=(1,),
+                                               init=mx.initializer.Zero(),
+                                               grad_req='null')
+
+    def learn_pattern_twocomponent(self):
+        if self._in is None:
+            raise RuntimeError('Block has not yet executed forward_logged!')
+        x = self._in[0].flatten()
+        y = self._out.flatten()
+        mean_x_pos = self.mean_x_pos.data()
+        mean_x_neg = self.mean_x_neg.data()
+        mean_y = self.mean_y.data()
+        n = self.num_samples.data()
+        cov_pos = self.cov_pos.data()
+        cov_neg = self.cov_neg.data()
+        m = x.shape[0]
+
+        x_pos = nd.minimum(0., x)
+        x_neg = nd.maximum(0., x)
+
+        mean_x_pos_cur = x_pos.mean(axis=0, keepdims=True)
+        mean_x_neg_cur = x_neg.mean(axis=0, keepdims=True)
+        mean_y_cur = y.mean(axis=0, keepdims=True)
+
+        dx_pos = x_pos - mean_x_pos_cur
+        dx_neg = x_neg - mean_x_neg_cur
+        dy = y - mean_y_cur
+
+        cov_pos_cur = nd.dot(dy, dx_pos, transpose_a=True)
+        cov_neg_cur = nd.dot(dy, dx_neg, transpose_a=True)
+        cov_pos += cov_pos_cur + nd.dot((mean_y - mean_y_cur), (mean_x_pos - mean_x_pos_cur), transpose_a=True) * n * m / (n+m)
+        cov_neg += cov_neg_cur + nd.dot((mean_y - mean_y_cur), (mean_x_neg - mean_x_neg_cur), transpose_a=True) * n * m / (n+m)
+
+        mean_x_pos = (n * mean_x_pos + m * mean_x_pos_cur) / (n+m)
+        mean_x_neg = (n * mean_x_neg + m * mean_x_neg_cur) / (n+m)
+        mean_y = (n * mean_y + m * mean_y_cur) / (n+m)
+        n += m
+
+        self.mean_x_pos.set_data(mean_x_pos)
+        self.mean_x_neg.set_data(mean_x_neg)
+        self.mean_y.set_data(mean_y)
+        self.num_samples.set_data(n)
+        self.cov_pos.set_data(cov_pos)
+        self.cov_neg.set_data(cov_neg)
+
+    def forward_pattern_twocomponent(self, *args):
+        x = args[0]
+        # omit number of samples, since present in both cov and var
+        a = self.cov.data() / (self.var_y.data().T + 1e-12)
+        cov_pos = self.cov_pos.data()
+        cov_neg = self.cov_neg.data()
+        weight = self.weight.data()
+#        a_pos = cov_pos /
+        z = nd.FullyConnected(x, a, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
+        if self.act is not None:
+            z = self.act(z)
+        return z
+
+    def assess_pattern_twocomponent(self):
+        pass
+
 
 class DenseInterpretable(Interpretable, nn.Dense):
     def relevance_sensitivity(self, R):

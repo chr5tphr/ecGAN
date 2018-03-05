@@ -74,6 +74,9 @@ class PatternNet(object):
         self.var_y = None
         self.cov = None
 
+    def hybrid_forward(self, F, x, weight, bias=None, **kwargs):
+        return super().hybrid_forward(F, x, weight, bias)
+
     @property
     def pparams(self):
         return self._pparams
@@ -109,7 +112,7 @@ class PatternNet(object):
 
     def forward_pattern(self, *args, **kwargs):
         try:
-            func = getattr(self, 'assess_pattern_'+self.estimator)
+            func = getattr(self, 'forward_pattern_'+self.estimator)
         except AttributeError:
             raise NotImplementedError(self.estimator)
         return func(*args, **kwargs)
@@ -122,6 +125,16 @@ class PatternNet(object):
         return func(*args, **kwargs)
 
     def init_pattern(self, *args, **kwargs):
+        try:
+            func = getattr(self, 'init_pattern_'+self.estimator)
+        except AttributeError:
+            raise NotImplementedError(self.estimator)
+        return func(*args, **kwargs)
+
+    def init_pattern_linear(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def init_pattern_twocomponent(self, *args, **kwargs):
         raise NotImplementedError
 
     def learn_pattern_linear(self, *args, **kwargs):
@@ -214,6 +227,7 @@ class Sequential(Interpretable, PatternNet, Intermediate, nn.Sequential):
             block.init_pattern()
 
     def forward_pattern(self, *args):
+        self._in = args
         x = args[0]
         for block in self._children:
             block.estimator = self.estimator
