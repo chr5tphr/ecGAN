@@ -13,6 +13,10 @@ class DensePatternNet(PatternNet, nn.Dense):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    ##############
+    ### Linear ###
+    ##############
+
     def init_pattern_linear(self):
         units, in_units = self.weight.shape
         with self.name_scope():
@@ -72,15 +76,25 @@ class DensePatternNet(PatternNet, nn.Dense):
 
     def forward_pattern_linear(self, *args):
         x = args[0]
+        if len(args) < 2:
+            x_neut = x
+        else:
+            x_neut = args[1]
         # omit number of samples, since present in both cov and var
         a = self.cov.data() / (self.var_y.data().T + 1e-12)
+        z_neut = self.forward(x_neut)
         z = nd.FullyConnected(x, a, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
-        if self.act is not None:
-            z = self.act(z)
-        return z
+
+        # this depends on ReLU!
+        z = nd.where(z_neut>0, z, nd.zeros_like(z))
+        return z, z_neut
 
     def assess_pattern_linear(self):
         pass
+
+    #####################
+    ### Two-Component ###
+    #####################
 
     def init_pattern_twocomponent(self):
         units, in_units = self.weight.shape
@@ -123,8 +137,8 @@ class DensePatternNet(PatternNet, nn.Dense):
         cov_neg = self.cov_neg.data()
         m = x.shape[0]
 
-        x_pos = nd.minimum(0., x)
-        x_neg = nd.maximum(0., x)
+        x_pos = nd.maximum(0., x)
+        x_neg = nd.minimum(0., x)
 
         mean_x_pos_cur = x_pos.mean(axis=0, keepdims=True)
         mean_x_neg_cur = x_neg.mean(axis=0, keepdims=True)
@@ -153,16 +167,24 @@ class DensePatternNet(PatternNet, nn.Dense):
 
     def forward_pattern_twocomponent(self, *args):
         x = args[0]
-        # omit number of samples, since present in both cov and var
-        a = self.cov.data() / (self.var_y.data().T + 1e-12)
+        if len(args) < 2:
+            x_neut = x
+        else:
+            x_neut = args[1]
         cov_pos = self.cov_pos.data()
         cov_neg = self.cov_neg.data()
         weight = self.weight.data()
-#        a_pos = cov_pos /
-        z = nd.FullyConnected(x, a, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
-        if self.act is not None:
-            z = self.act(z)
-        return z
+        a_pos = cov_pos / ((weight * cov_pos).sum(axis=1, keepdims=True) + 1e-12)
+        a_neg = cov_neg / ((weight * cov_neg).sum(axis=1, keepdims=True) + 1e-12)
+
+        z_neut = self.forward(x_neut)
+        z_pos = nd.FullyConnected(x, a_pos, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
+        z_neg = nd.FullyConnected(x, a_neg, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
+
+        # this depends on ReLU!
+        z = nd.where(z_neut>0, z_pos, z_neg)
+
+        return z, z_neut
 
     def assess_pattern_twocomponent(self):
         pass

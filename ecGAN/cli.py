@@ -291,7 +291,7 @@ def explain_pattern(args, config):
                          cmap='coldnhot',
                         )
 
-#        import ipdb; ipdb.set_trace()
+        import ipdb; ipdb.set_trace()
 
 @register_command
 def predict(args, config):

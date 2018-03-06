@@ -180,6 +180,7 @@ class Classifier(Model):
 
     def load_pattern_params(self):
         for nrole, net in self.nets.items():
+            net.estimator = self.config.pattern.estimator
             net.init_pattern()
             nname = self.config.nets.get(nrole, {}).get('name', '')
             ntype = self.config.nets.get(nrole, {}).get('type', '')

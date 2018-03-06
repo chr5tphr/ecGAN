@@ -228,11 +228,11 @@ class Sequential(Interpretable, PatternNet, Intermediate, nn.Sequential):
 
     def forward_pattern(self, *args):
         self._in = args
-        x = args[0]
+        x = args
         for block in self._children:
             block.estimator = self.estimator
-            x = block.forward_pattern(x)
-        self._out = x
+            x = block.forward_pattern(*x)
+        self._out = x[0]
         return self._out
 
     def learn_pattern(self, *args, **kwargs):
