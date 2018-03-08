@@ -39,7 +39,23 @@ class DensePatternNet(PatternNet, nn.Dense):
             self.num_samples = self.pparams.get('num_samples',
                                                shape=(1,),
                                                init=mx.initializer.Zero(),
-                                                grad_req='null')
+                                               grad_req='null')
+            self.qual_dtd = self.pparams.get('qual_dtd',
+                                            shape=(in_units, in_units),
+                                            init=mx.initializer.Zero(),
+                                            grad_req='null')
+            self.qual_dty = self.pparams.get('qual_dty',
+                                            shape=self.weight.shape,
+                                            init=mx.initializer.Zero(),
+                                            grad_req='null')
+            self.cov_dy = self.pparams.get('qual_dty',
+                                            shape=self.weight.shape,
+                                            init=mx.initializer.Zero(),
+                                            grad_req='null')
+            self.qual_v = self.pparams.get('qual_v',
+                                          shape=(1, in_units),
+                                          init=mx.initializer.One(),
+                                          grad_req='null')
 
     def learn_pattern_linear(self):
         if self._in is None:
@@ -89,8 +105,25 @@ class DensePatternNet(PatternNet, nn.Dense):
         z = nd.where(z_neut>0, z, nd.zeros_like(z))
         return z, z_neut
 
-    def assess_pattern_linear(self):
-        pass
+    def assess_pattern(self):
+        return
+
+    def learn_assess_pattern_linear(self):
+        if self._in is None:
+            raise RuntimeError('Block has not yet executed forward_logged!')
+        x = self._in[0].flatten()
+        y = self._out.flatten()
+        a = self.cov.data() / (self.var_y.data().T + 1e-12)
+        dtd = self.qual_dtd.data()
+        dty = self.qual_dty.data()
+        signal = nd.dot(a, y, transpose_a=True)
+        d = x - signal
+
+        dtd += nd.dot(d, d, transpose_a=True)
+        dty += nd.dot(d, y, transpose_a=True)
+
+        self.qual_dtd.set_data(dtd)
+        self.qual_dty.set_data(dty)
 
     #####################
     ### Two-Component ###
