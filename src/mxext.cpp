@@ -3,7 +3,9 @@
 #include <dmlc/memory_io.h>
 #include <vector>
 
-//g++ -fPIC -shared -I/usr/include/python3.6m -I/home/chrstphr/libs/mxnet/{{.,nnvm,dmlc-core,dlpack}/include,mshadow} -o mxext.so mxext.cpp -DMSHADOW_USE_{MKL,CUDA}=0
+#include "operator/nn/im2col.h"
+
+//g++ -fPIC -shared -I/usr/include/python3.6m -I/home/chrstphr/libs/mxnet/{{.,nnvm,dmlc-core,dlpack}/include,mshadow,src} -o mxext.so mxext.cpp -DMSHADOW_USE_{MKL,CUDA}=0
 
 static PyObject * mxext_nddict2raw(PyObject *self, PyObject *args) {
 
@@ -124,6 +126,52 @@ static PyObject * mxext_nddict2raw(PyObject *self, PyObject *args) {
 //   // Py_RETURN_NONE;
 //   // return ;
 // }
+
+static PyObject * mxext_im2col(PyObject *self, PyObject *args) {
+
+  PyObject *ndmodule = PyImport_ImportModule("mxnet.ndarray");
+  PyObject *nddict = PyModule_GetDict(ndmodule);
+  PyObject *PyNDArray_Type = PyDict_GetItemString(nddict, "NDArray");
+
+  PyObject *pydict;
+
+  // parse arguments
+  if (!PyArg_ParseTuple(args, "O!", &PyDict_Type, &pydict)){
+    return NULL;
+  }
+
+  Py_ssize_t num_args = PyDict_Size(pydict);
+
+  // return PyLong_FromLong(num_args);
+
+  std::vector<mxnet::NDArray> data(num_args);
+  std::vector<std::string> names(num_args);
+
+  Py_ssize_t pos = 0;
+  int offset = 0;
+  PyObject *key,*val;
+
+  while (PyDict_Next(pydict, &pos, &key, &val)){
+    PyObject *pyhandle = PyObject_GetAttrString(val,"handle");
+    PyObject *pylong = PyObject_GetAttrString(pyhandle,"value");
+    data[offset] = *static_cast<mxnet::NDArray*>(PyLong_AsVoidPtr(pylong));
+    Py_ssize_t strsize;
+    char *cname = PyUnicode_AsUTF8AndSize(key,&strsize);
+    std::string name(cname,strsize);
+    names[offset] = name;
+    offset++;
+  }
+
+  std::string *ret = dmlc::ThreadLocalStore<std::string>::Get();
+
+  dmlc::MemoryStringStream strm(ret);
+  mxnet::NDArray::Save(&strm, data, names);
+
+  return PyBytes_FromStringAndSize(ret->c_str(), ret->length());
+  // return PyLong_FromLong((long)(ndarr->dtype()));
+  // Py_RETURN_NONE;
+  // return ;
+}
 
 static PyMethodDef methods[] = {
   {"nddict2raw", mxext_nddict2raw, METH_VARARGS, "Serialize dict of NDArrays." },
