@@ -40,7 +40,7 @@ def draw_heatmap(data, lo=0., hi=1., center=None, cmap='hot'):
 def align_images(im, H, W, h, w, C=1):
     return im.reshape(H, W, h, w, C).transpose(0, 2, 1, 3, 4).reshape(H*h, W*w, C)
 
-def save_explanation(relevance, data, config, output=None, image=None, source=None, data_desc='some', net='classifier', logger=None, center=None, cmap='hot', i=0):
+def save_explanation(relevance, data, config, output=None, image=None, source=None, data_desc='some', net='classifier', logger=None, center=None, cmap='hot', i=0, batchnorm=False):
     if output:
         fpath = config.exsub(output, iter=i, epoch=config.start_epoch, data_desc=data_desc)
         with h5py.File(fpath, 'w') as fp:
@@ -52,7 +52,11 @@ def save_explanation(relevance, data, config, output=None, image=None, source=No
         rdat = relevance
 #        if config.explanation.method == 'sensitivity':
 #            rdat = relevance.abs()
-        lo, hi = rdat.min().asscalar(), rdat.max().asscalar()
+        if batchnorm:
+            lo, hi = rdat.min().asscalar(), rdat.max().asscalar()
+        else:
+            lo = rdat.min(axis=(2, 3), keepdims=True).asnumpy()
+            hi = rdat.max(axis=(2, 3), keepdims=True).asnumpy()
         if logger:
             logger.debug('Explanation min %f, max %f', lo, hi)
         fpath = config.exsub(image, iter=i, epoch=config.start_epoch, net=net, data_desc=data_desc)

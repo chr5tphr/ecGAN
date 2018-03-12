@@ -1,3 +1,4 @@
+import re
 from mxnet import nd, autograd
 from mxnet.gluon import nn, ParameterDict
 

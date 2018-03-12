@@ -6,7 +6,6 @@ import sys
 import os
 import logging
 import h5py
-import ipdb
 
 from argparse import ArgumentParser
 from imageio import imwrite
@@ -46,9 +45,8 @@ def main():
         random.seed(args.seed)
 
     if args.debug:
-        ipdb.run('commands[args.command](args, config)')
-    else:
-        commands[args.command](args, config)
+        import ipdb; ipdb.set_trace()
+    commands[args.command](args, config)
 
 # @register_command
 # def setup(args, config):
