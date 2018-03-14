@@ -36,22 +36,22 @@ class DensePatternNet(PatternNet, nn.Dense):
                                                shape=(1,),
                                                init=mx.initializer.Zero(),
                                                grad_req='null')
-#            self.qual_dtd = self.pparams.get('qual_dtd',
-#                                            shape=(in_units, in_units),
-#                                            init=mx.initializer.Zero(),
-#                                            grad_req='null')
-#            self.qual_dty = self.pparams.get('qual_dty',
-#                                            shape=self.weight.shape,
-#                                            init=mx.initializer.Zero(),
-#                                            grad_req='null')
-#            self.cov_dy = self.pparams.get('qual_dty',
-#                                            shape=self.weight.shape,
-#                                            init=mx.initializer.Zero(),
-#                                            grad_req='null')
-#            self.qual_v = self.pparams.get('qual_v',
-#                                          shape=(1, in_units),
-#                                          init=mx.initializer.One(),
-#                                          grad_req='null')
+            #self.qual_dtd = self.pparams.get('qual_dtd',
+            #                                shape=(in_units, in_units),
+            #                                init=mx.initializer.Zero(),
+            #                                grad_req='null')
+            #self.qual_dty = self.pparams.get('qual_dty',
+            #                                shape=self.weight.shape,
+            #                                init=mx.initializer.Zero(),
+            #                                grad_req='null')
+            #self.cov_dy = self.pparams.get('qual_dty',
+            #                                shape=self.weight.shape,
+            #                                init=mx.initializer.Zero(),
+            #                                grad_req='null')
+            #self.qual_v = self.pparams.get('qual_v',
+            #                              shape=(1, in_units),
+            #                              init=mx.initializer.One(),
+            #                              grad_req='null')
 
     def learn_pattern_linear(self):
         if self._in is None:
@@ -103,21 +103,21 @@ class DensePatternNet(PatternNet, nn.Dense):
 
     def learn_assess_pattern_linear(self):
         pass
-#        if self._in is None:
-#            raise RuntimeError('Block has not yet executed forward_logged!')
-#        x = self._in[0].flatten()
-#        y = self._out.flatten()
-#        a = self.cov.data() / (self.var_y.data().T + 1e-12)
-#        dtd = self.qual_dtd.data()
-#        dty = self.qual_dty.data()
-#        signal = nd.dot(a, y, transpose_a=True)
-#        d = x - signal
-#
-#        dtd += nd.dot(d, d, transpose_a=True)
-#        dty += nd.dot(d, y, transpose_a=True)
-#
-#        self.qual_dtd.set_data(dtd)
-#        self.qual_dty.set_data(dty)
+        #if self._in is None:
+        #    raise RuntimeError('Block has not yet executed forward_logged!')
+        #x = self._in[0].flatten()
+        #y = self._out.flatten()
+        #a = self.cov.data() / (self.var_y.data().T + 1e-12)
+        #dtd = self.qual_dtd.data()
+        #dty = self.qual_dty.data()
+        #signal = nd.dot(a, y, transpose_a=True)
+        #d = x - signal
+
+        #dtd += nd.dot(d, d, transpose_a=True)
+        #dty += nd.dot(d, y, transpose_a=True)
+
+        #self.qual_dtd.set_data(dtd)
+        #self.qual_dty.set_data(dty)
 
     def assess_pattern(self):
         return
@@ -141,14 +141,31 @@ class DensePatternNet(PatternNet, nn.Dense):
                                           shape=(1, units),
                                           init=mx.initializer.Zero(),
                                           grad_req='null')
-            self.cov_pos = self.pparams.get('cov_pos',
-                                       shape=self.weight.shape,
-                                       init=mx.initializer.Zero(),
-                                       grad_req='null')
-            self.cov_neg = self.pparams.get('cov_neg',
-                                       shape=self.weight.shape,
-                                       init=mx.initializer.Zero(),
-                                       grad_req='null')
+            self.mean_xy_pos = self.pparams.get('mean_xy_pos',
+                                          shape=(units, in_units),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.mean_xy_neg = self.pparams.get('mean_xy_neg',
+                                          shape=(units, in_units),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+
+            self.n_x_pos = self.pparams.get('n_x_pos',
+                                          shape=(1, in_units),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.n_x_neg = self.pparams.get('n_x_neg',
+                                          shape=(1, in_units),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.n_xy_pos = self.pparams.get('n_xy_pos',
+                                          shape=(units, in_units),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.n_xy_neg = self.pparams.get('n_xy_neg',
+                                          shape=(units, in_units),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
             self.num_samples = self.pparams.get('num_samples',
                                                shape=(1,),
                                                init=mx.initializer.Zero(),
@@ -162,38 +179,57 @@ class DensePatternNet(PatternNet, nn.Dense):
         mean_x_pos = self.mean_x_pos.data()
         mean_x_neg = self.mean_x_neg.data()
         mean_y = self.mean_y.data()
+        mean_xy_pos = self.mean_xy_pos.data()
+        mean_xy_neg = self.mean_xy_neg.data()
         n = self.num_samples.data()
-        cov_pos = self.cov_pos.data()
-        cov_neg = self.cov_neg.data()
+        n_x_pos = self.n_x_pos.data()
+        n_x_neg = self.n_x_neg.data()
+        n_xy_pos = self.n_xy_pos.data()
+        n_xy_neg = self.n_xy_neg.data()
         m = x.shape[0]
 
         x_pos = nd.maximum(0., x)
         x_neg = nd.minimum(0., x)
+        m_x_pos = (x >= 0.).sum(axis=0, keepdims=True)
+        m_x_neg = (x < 0.).sum(axis=0, keepdims=True)
 
-        mean_x_pos_cur = x_pos.mean(axis=0, keepdims=True)
-        mean_x_neg_cur = x_neg.mean(axis=0, keepdims=True)
-        mean_y_cur = y.mean(axis=0, keepdims=True)
+        xy = y.expand_dims(axis=1) * x.expand_dims(axis=2)
+        xy_pos = nd.maximum(0., xy)
+        xy_neg = nd.minimum(0., xy)
+        m_xy_pos = (xy >= 0.).sum(axis=0, keepdims=True)
+        m_xy_neg = (xy < 0.).sum(axis=0, keepdims=True)
 
-        dx_pos = x_pos - mean_x_pos_cur
-        dx_neg = x_neg - mean_x_neg_cur
-        dy = y - mean_y_cur
+        # "/m_x_pos" omitted since multiplied later
+        sum_x_pos_cur = x_pos.sum(axis=0, keepdims=True)
+        sum_x_neg_cur = x_neg.sum(axis=0, keepdims=True)
+        sum_y_cur = y.sum(axis=0, keepdims=True)
 
-        cov_pos_cur = nd.dot(dy, dx_pos, transpose_a=True)
-        cov_neg_cur = nd.dot(dy, dx_neg, transpose_a=True)
-        cov_pos += cov_pos_cur + nd.dot((mean_y - mean_y_cur), (mean_x_pos - mean_x_pos_cur), transpose_a=True) * n * m / (n+m)
-        cov_neg += cov_neg_cur + nd.dot((mean_y - mean_y_cur), (mean_x_neg - mean_x_neg_cur), transpose_a=True) * n * m / (n+m)
+        # note that we omit "<sum> / m_xy_pos" since we would multiply it later anyway 
+        sum_xy_pos_cur = xy_pos.sum(axis=0, keepdims=True)
+        sum_xy_neg_cur = xy_neg.sum(axis=0, keepdims=True)
 
-        mean_x_pos = (n * mean_x_pos + m * mean_x_pos_cur) / (n+m)
-        mean_x_neg = (n * mean_x_neg + m * mean_x_neg_cur) / (n+m)
-        mean_y = (n * mean_y + m * mean_y_cur) / (n+m)
+        mean_x_pos = (n_x_pos * mean_x_pos + sum_x_pos_cur) / (n_x_pos+m_x_pos)
+        mean_x_neg = (n_x_neg * mean_x_neg + sum_x_neg_cur) / (n_x_neg+m_x_neg)
+        mean_y = (n * mean_y + sum_y_cur) / (n+m)
+        mean_xy_pos = (n_xy_pos * mean_xy_pos + sum_xy_pos_cur) / (n_xy_pos+m_xy_pos)
+        mean_xy_neg = (n_xy_neg * mean_xy_neg + sum_xy_neg_cur) / (n_xy_neg+m_xy_neg)
+
         n += m
+        n_x_pos += m_x_pos
+        n_x_neg += m_x_neg
+        n_xy_pos += m_xy_pos
+        n_xy_neg += m_xy_neg
 
         self.mean_x_pos.set_data(mean_x_pos)
         self.mean_x_neg.set_data(mean_x_neg)
         self.mean_y.set_data(mean_y)
+        self.mean_xy_pos.set_data(mean_xy_pos)
+        self.mean_xy_neg.set_data(mean_xy_neg)
         self.num_samples.set_data(n)
-        self.cov_pos.set_data(cov_pos)
-        self.cov_neg.set_data(cov_neg)
+        self.n_x_pos.set_data(n_x_pos)
+        self.n_x_neg.set_data(n_x_neg)
+        self.n_xy_pos.set_data(n_xy_pos)
+        self.n_xy_neg.set_data(n_xy_neg)
 
     def forward_pattern_twocomponent(self, *args):
         x = args[0]
@@ -201,8 +237,8 @@ class DensePatternNet(PatternNet, nn.Dense):
             x_neut = x
         else:
             x_neut = args[1]
-        cov_pos = self.cov_pos.data()
-        cov_neg = self.cov_neg.data()
+        cov_pos = self.mean_xy_pos.data() - nd.dot(self.mean_y.data(), self.mean_x_pos.data(), transpose_a=True)
+        cov_neg = self.mean_xy_neg.data() - nd.dot(self.mean_y.data(), self.mean_x_neg.data(), transpose_a=True)
         weight = self.weight.data()
         a_pos = cov_pos / ((weight * cov_pos).sum(axis=1, keepdims=True) + 1e-12)
         a_neg = cov_neg / ((weight * cov_neg).sum(axis=1, keepdims=True) + 1e-12)
