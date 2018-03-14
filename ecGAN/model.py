@@ -4,7 +4,10 @@ from time import time
 from mxnet import gluon, autograd, nd
 from imageio import imwrite
 
-from .func import fuzzy_one_hot, Interpretable, PatternNet, Intermediate, YSequential, linspace, randint
+from .func import fuzzy_one_hot, linspace, randint
+from .explain.base import Interpretable
+from .pattern.base import PatternNet
+from .layer import Intermediate, YSequential
 from .util import Config, config_ctx
 from .net import nets
 
