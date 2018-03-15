@@ -3,9 +3,9 @@ import mxnet as mx
 from mxnet import nd, autograd
 from mxnet.gluon import nn, ParameterDict
 
-from ..layer import Block
+from ..base import Block
 
-class PatternNet(Block):
+class PatternNet(bl.Block):
     def __init__(self, *args, **kwargs):
         self.estimator = kwargs.pop('estimator', 'linear')
         super().__init__(*args, **kwargs)

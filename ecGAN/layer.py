@@ -4,17 +4,11 @@ from mxnet.gluon import nn
 import numpy as np
 
 from .func import im2col_indices
+from .base import Block, Intermediate
 from .pattern.base import PatternNet
 from .pattern.layer import SequentialPatternNet, BatchNormPatternNet, DensePatternNet, Conv2DPatternNet, Conv2DTransposePatternNet
 from .explain.base import Interpretable
 from .explain.layer import SequentialInterpretable, YSequentialInterpretable
-
-
-class Block(nn.Block):
-    def forward_logged(self, *args, **kwargs):
-        self._in = args
-        self._out = self.forward(*args)
-        return self._out
 
 
 class Dense(DenseInterpretable, DensePatternNet):
@@ -86,10 +80,6 @@ class Activation(Interpretable, nn.Activation):
 class MaxOut(Block):
     pass
 
-
-class Intermediate(Block):
-    def forward(self, *args, depth=-1):
-        return self.forward(self, *args)
 
 class SequentialIntermediate(Intermediate, nn.Sequential):
     def forward(self, x, depth=-1):

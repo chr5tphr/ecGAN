@@ -3,7 +3,7 @@ from mxnet import nd, gluon, autograd
 from mxnet.gluon import nn
 import numpy as np
 
-from ..layer import Block
+from ..base import Block
 
 class Interpretable(Block):
     def __init__(self, *args, **kwargs):
