@@ -153,9 +153,11 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
             x_neut = args[1]
         cov_pos = self.mean_xy_pos.data() - nd.dot(self.mean_y.data(), self.mean_x_pos.data(), transpose_a=True)
         cov_neg = self.mean_xy_neg.data() - nd.dot(self.mean_y.data(), self.mean_x_neg.data(), transpose_a=True)
-        weight = self.weight.data().flatten()
-        a_pos = cov_pos / ((weight * cov_pos).sum(axis=1, keepdims=True) + 1e-12)
-        a_neg = cov_neg / ((weight * cov_neg).sum(axis=1, keepdims=True) + 1e-12)
+        weight = self.weight.data()
+        shape = weight.shape
+        weight = weight.flatten()
+        a_pos = (cov_pos / ((weight * cov_pos).sum(axis=1, keepdims=True) + 1e-12)).reshape(shape)
+        a_neg = (cov_neg / ((weight * cov_neg).sum(axis=1, keepdims=True) + 1e-12)).reshape(shape)
 
         z_neut = self.forward(x_neut)
         kwargs = self._kwargs

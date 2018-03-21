@@ -5,7 +5,7 @@ from mxnet.gluon import nn, ParameterDict
 
 from ..base import Block
 
-class PatternNet(bl.Block):
+class PatternNet(Block):
     def __init__(self, *args, **kwargs):
         self.estimator = kwargs.pop('estimator', 'linear')
         super().__init__(*args, **kwargs)
