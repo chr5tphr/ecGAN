@@ -9,6 +9,7 @@ class PatternNet(Block):
     def __init__(self, *args, **kwargs):
         #self.estimator = kwargs.pop('estimator', 'linear')
         self._regimes = kwargs.pop('regimes', [PatternRegime('linear', lambda y: nd.ones_like(y))])
+        #self._regimes = kwargs.pop('regimes', [PatternRegime('pos', lambda y: y>0)])
         super().__init__(*args, **kwargs)
         self._pparams = ParameterDict(getattr(self, '_prefix', ''))
         self.num_samples = None
@@ -114,7 +115,7 @@ class PatternNet(Block):
         for regime in self._regimes:
             mean_x = regime.mean_x.data()
             mean_xy = regime.mean_xy.data()
-            num_y = regime.num_samples.data()
+            num_y = regime.num_y.data()
             num_x = num_y.sum()
 
             cond_y = regime(y)
@@ -134,7 +135,7 @@ class PatternNet(Block):
             mean_x = (num_x * mean_x + wsum_x) / (num_x + num_x_cur + 1e-12)
 
             num_y_cur = cond_y.sum(axis=0)
-            mean_xy = (num_y * mean_xy + sum_xy) / (num_y + num_y_cur + 1e-12)
+            mean_xy = (num_y.T * mean_xy + sum_xy) / (num_y + num_y_cur + 1e-12).T
 
             num_y += num_y_cur
 
@@ -148,13 +149,14 @@ class PatternNet(Block):
         self.mean_y.set_data(mean_y)
         self.num_samples.set_data(num)
 
-    def compute_patterns(self):
-        weight = self.weight.data().flatten()
+    def _compute_pattern(self, weight):
         for regime in self._regimes:
             cov = regime.mean_xy.data() - nd.dot(self.mean_y.data(), regime.mean_x.data(), transpose_a=True)
             pat = cov / ((weight * cov).sum(axis=1, keepdims=True) + 1e-12)
             regime.pattern.set_data(pat)
 
+    def compute_pattern(self):
+        raise NotImplementedError
 
 #    def _init_pattern_linear(self, shape):
 #        outsize, insize = shape

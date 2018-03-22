@@ -1,5 +1,6 @@
 from mxnet.gluon import nn
 from mxnet import nd
+
 class Block(nn.Block):
     def forward_logged(self, *args, **kwargs):
         self._in = args

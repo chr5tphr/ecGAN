@@ -162,7 +162,7 @@ class Classifier(Model):
             raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets.classifier.type)
 
         data_iter = gluon.data.DataLoader(data, batch_size)
-        self.netC.estimator = estimator
+        #self.netC.estimator = estimator
 
         self.netC.init_pattern()
         self.netC.collect_pparams().initialize(mx.initializer.Zero(), ctx=self.ctx)
@@ -174,6 +174,7 @@ class Classifier(Model):
             self.netC.forward_logged(data)
             self.netC.learn_pattern()
 
+        self.netC.compute_pattern()
         self.netC.collect_pparams().save(self.config.sub('pattern.save',
                                                     net_name=self.config.nets.classifier.name,
                                                     net_type=self.config.nets.classifier.type))
@@ -191,11 +192,11 @@ class Classifier(Model):
                 net.collect_pparams().load(self.config.sub('pattern.load', net_name=nname, net_type=ntype), ctx=self.ctx)
 
     def explain_pattern(self, data):
-        estimator = self.config.pattern.estimator
+        #estimator = self.config.pattern.estimator
         if not isinstance(self.netC, PatternNet):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
 
-        self.netC.estimator = estimator
+        #self.netC.estimator = estimator
         R = self.netC.explain_pattern(data)
 
         return R

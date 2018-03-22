@@ -29,8 +29,11 @@ def draw_heatmap(data, lo=0., hi=1., center=None, cmap='hot'):
     except AttributeError:
         dat = data
     if center is not None:
-        lodat = (dat.clip(lo, center) - lo) / (center - lo) - 1.
-        hidat = (dat.clip(center, hi) - center) / (hi - center)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            lodat = (dat.clip(lo, center) - lo) / (center - lo) - 1.
+            lodat[~np.isfinite(lodat)] = 0.
+            hidat = (dat.clip(center, hi) - center) / (hi - center)
+            hidat[~np.isfinite(hidat)] = 0.
         ndat = ((hidat + lodat) + 1.) / 2.
     else:
         ndat = ((dat - lo)/(hi-lo))

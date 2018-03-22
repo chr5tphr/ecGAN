@@ -23,9 +23,13 @@ class DensePatternNet(PatternNet, nn.Dense):
         y = self._out.flatten()
         self._learn_pattern(x, y)
 
+    def compute_pattern(self):
+        weight = self.weight.data().flatten()
+        self._compute_pattern(weight)
+
     def forward_pattern(self, *args):
         x_neut = args[0]
-        x_regs = args[1:]
+        x_regs = list(args[1:])
         z_neut = self.forward(x_neut)
         z_regs = []
         for regime, x_reg in zip(self._regimes, x_regs):
@@ -309,11 +313,15 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
             #block.estimator = self.estimator
             block.learn_pattern()
 
+    def compute_pattern(self):
+        for block in self._children:
+            block.compute_pattern()
+
     def explain_pattern(self, *args, num_reg=1):
         x = args[0]
         x.attach_grad()
         with autograd.record():
-            y = self.forward_pattern(x)
+            y = self.forward_pattern(*([x]*2))
         y[num_reg].backward(out_grad=y[num_reg])
         return x.grad
 
@@ -324,9 +332,12 @@ class ReLUPatternNet(PatternNet, ReLUBase):
     def learn_pattern(self, *args):
         pass
 
+    def compute_pattern(self):
+        pass
+
     def forward_pattern(self, *args):
         x_neut = args[0]
-        x_regs = args[1:]
+        x_regs = list(args[1:])
         z_neut = self.forward(x_neut)
         z_regs = x_regs
         #z_regs = []
