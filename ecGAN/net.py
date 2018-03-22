@@ -1,6 +1,6 @@
 from mxnet import nd
 from mxnet.gluon import nn
-from .layer import Sequential, YSequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, Activation
+from .layer import Sequential, YSequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, Activation, ReLU
 
 nets = {}
 def register_net(obj):
