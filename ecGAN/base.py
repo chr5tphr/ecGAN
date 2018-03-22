@@ -42,3 +42,6 @@ class YSequentialBase(Block):
         combo = nd.concat(data, cond, dim=self._concat_dim)
         return self._main_net.forward(combo)
 
+class ReLUBase(Block):
+    def forward(self, x):
+        return nd.maximum(0., x)

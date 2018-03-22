@@ -21,6 +21,22 @@ class SFC(Sequential):
             self.add(Dense(self._outnum, activation=self._outact))
 
 @register_net
+class SOFC(Sequential):
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self.add(Dense(self._numhid))
+            self.add(ReLU())
+            self.add(Dense(self._numhid))
+            self.add(ReLU())
+            self.add(Dense(self._numhid))
+            self.add(ReLU())
+            self.add(Dense(self._outnum))
+
+@register_net
 class YSFC(YSequential):
     def __init__(self, **kwargs):
         self._outnum = kwargs.pop('outnum', 1)

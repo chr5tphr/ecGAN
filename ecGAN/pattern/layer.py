@@ -4,11 +4,14 @@ from mxnet.gluon import nn
 import numpy as np
 
 from .base import PatternNet
+from ..base import ReLUBase
 from ..func import im2col_indices
 
 class DensePatternNet(PatternNet, nn.Dense):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.act is not None:
+            raise RuntimeError('Inline activations are not supported!')
 
     def assess_pattern(self):
         return
@@ -35,8 +38,6 @@ class DensePatternNet(PatternNet, nn.Dense):
         z_neut = self.forward(x_neut)
         z = nd.FullyConnected(x, a, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
 
-        # this depends on ReLU!
-        z = nd.where(z_neut>0, z, nd.zeros_like(z))
         return z, z_neut
 
     def learn_assess_pattern_linear(self):
@@ -84,10 +85,7 @@ class DensePatternNet(PatternNet, nn.Dense):
         z_pos = nd.FullyConnected(x, a_pos, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
         z_neg = nd.FullyConnected(x, a_neg, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
 
-        # this depends on ReLU!
-        z = nd.where(z_neut>0., z_pos, z_neg)
-
-        return z, z_neut
+        return [z_pos, z_neg], z_neut
 
     def assess_pattern_twocomponent(self):
         pass
@@ -95,6 +93,8 @@ class DensePatternNet(PatternNet, nn.Dense):
 class Conv2DPatternNet(PatternNet, nn.Conv2D):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.act is not None:
+            raise RuntimeError('Inline activations are not supported!')
 
 
     def init_pattern_linear(self):
@@ -173,6 +173,8 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
 class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.act is not None:
+            raise RuntimeError('Inline activations are not supported!')
 
     def assess_pattern(self):
         return
@@ -294,3 +296,30 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
             y = self.forward_pattern(x)
         y.backward()
         return x.grad
+
+class ReLUPatternNet(PatternNet, ReLUBase):
+    def init_pattern(self, *args):
+        pass
+
+    def learn_pattern(self, *args):
+        pass
+
+    def forward_pattern_linear(self, *args):
+        x = args[0]
+        if len(args) < 2:
+            x_neut = x
+        else:
+            x_neut = args[1]
+        z_neut = nd.maximum(0., x_neut)
+        z = nd.where(x_neut>0, x, nd.zeros_like(x))
+        return z, z_neut
+
+    def forward_pattern_twocomponent(self, *args):
+        if (len(args) != 2) or (len(args[1]) != 2):
+            raise RuntimeError('Invalid Input')
+        x_pos, x_neg = args[0]
+        x_neut = args[1]
+
+        z_neut = self.forward(x_neut)
+        z = nd.where(x_neut>0., z_pos, z_neg)
+        return z, z_neut
