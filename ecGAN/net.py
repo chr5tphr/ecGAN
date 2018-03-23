@@ -1,6 +1,7 @@
 from mxnet import nd
 from mxnet.gluon import nn
 from .layer import Sequential, YSequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, Activation, ReLU
+from .pattern.regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime
 
 nets = {}
 def register_net(obj):
@@ -28,13 +29,14 @@ class SOFC(Sequential):
         self._outact = kwargs.pop('outact', None)
         super().__init__(**kwargs)
         with self.name_scope():
-            self.add(Dense(self._numhid))
-            self.add(ReLU())
-            self.add(Dense(self._numhid))
-            self.add(ReLU())
-            self.add(Dense(self._numhid))
-            self.add(ReLU())
-            self.add(Dense(self._outnum))
+            self.add(Dense(self._numhid, regimes=[PositivePatternRegime(), NegativePatternRegime()]))
+            self.add(ReLU(regimes=[PositivePatternRegime(), NegativePatternRegime()))
+            self.add(Dense(self._numhid, regimes=[PositivePatternRegime(), NegativePatternRegime()))
+            self.add(ReLU(regimes=[PositivePatternRegime(), NegativePatternRegime()))
+            self.add(Dense(self._numhid, regimes=[PositivePatternRegime(), NegativePatternRegime()))
+            self.add(ReLU(regimes=[PositivePatternRegime(), NegativePatternRegime()))
+            self.add(Dense(self._outnum, regimes=[PositivePatternRegime(), NegativePatternRegime()))
+            self.add(Identity(regimes=[PositivePatternRegime(), NegativePatternRegime()))
 
 @register_net
 class YSFC(YSequential):

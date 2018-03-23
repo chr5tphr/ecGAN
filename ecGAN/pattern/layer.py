@@ -28,15 +28,16 @@ class DensePatternNet(PatternNet, nn.Dense):
         self._compute_pattern(weight)
 
     def forward_pattern(self, *args):
-        x_neut = args[0]
-        x_regs = list(args[1:])
-        z_neut = self.forward(x_neut)
-        z_regs = []
-        for regime, x_reg in zip(self._regimes, x_regs):
-            a_reg = regime.pattern.data()
-            z_regs.append(nd.FullyConnected(x_reg, a_reg, None, no_bias=True, num_hidden=self._units, flatten=self._flatten))
+        x_neut, x_acc, x_regs = self._args_forward_pattern(*args)
 
-        return [z_neut] + z_regs
+        z_neut = self.forward(x_neut)
+        z_acc = x_acc
+        z_regs = {}
+        for regime in self._regimes:
+            a_reg = regime.pattern.data()
+            z_regs[regime.name] = nd.FullyConnected(x_acc, a_reg, None, no_bias=True, num_hidden=self._units, flatten=self._flatten))
+
+        return z_neut, z_acc, z_regs
 
 #    def assess_pattern(self):
 #        return
@@ -324,28 +325,6 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
             y = self.forward_pattern(*([x]*2))
         y[num_reg].backward(out_grad=y[num_reg])
         return x.grad
-
-class ReLUPatternNet(PatternNet, ReLUBase):
-    def init_pattern(self, *args):
-        pass
-
-    def learn_pattern(self, *args):
-        pass
-
-    def compute_pattern(self):
-        pass
-
-    def forward_pattern(self, *args):
-        x_neut = args[0]
-        x_regs = list(args[1:])
-        z_neut = self.forward(x_neut)
-        z_regs = x_regs
-        #z_regs = []
-        #for regime, x_reg in zip(self._regimes, x_regs):
-        #    a_reg = regime.pattern.data()
-        #    z_regs.append(nd.FullyConnected(x_reg, a_reg, None, no_bias=True, num_hidden=self._units, flatten=self._flatten))
-
-        return [z_neut] + z_regs
 
 #    def forward_pattern_linear(self, *args):
 #        x = args[0]

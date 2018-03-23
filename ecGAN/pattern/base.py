@@ -79,6 +79,9 @@ class PatternNet(Block):
         #    raise NotImplementedError(self.estimator)
         #return func(*args, **kwargs)
 
+    def compute_pattern(self):
+        raise NotImplementedError
+
     def _init_pattern(self, shape):
         outsize, insize = shape
         with self.name_scope():
@@ -149,14 +152,22 @@ class PatternNet(Block):
         self.mean_y.set_data(mean_y)
         self.num_samples.set_data(num)
 
+    @staticmethod
+    def _args_forward_pattern(*args):
+        if len(args) == 1:
+            return args[0], args[0], {}
+        elif len(args) == 2:
+            return args[0], args[1], {}
+        elif len(args) == 3:
+            return args
+        else:
+            raise RuntimeError('Number of input arguments not correct!')
+
     def _compute_pattern(self, weight):
         for regime in self._regimes:
             cov = regime.mean_xy.data() - nd.dot(self.mean_y.data(), regime.mean_x.data(), transpose_a=True)
             pat = cov / ((weight * cov).sum(axis=1, keepdims=True) + 1e-12)
             regime.pattern.set_data(pat)
-
-    def compute_pattern(self):
-        raise NotImplementedError
 
 #    def _init_pattern_linear(self, shape):
 #        outsize, insize = shape
@@ -358,6 +369,28 @@ class PatternNet(Block):
 #
 #    def explain_pattern_twocomponent(self, *args, **kwargs):
 #        raise NotImplementedError
+
+class ActPatternNet(PatternNet):
+    def init_pattern(self, *args):
+        pass
+
+    def learn_pattern(self, *args):
+        pass
+
+    def compute_pattern(self):
+        pass
+
+    def forward_pattern(self, *args):
+        x_neut, x_acc, x_regs = self._args_forward_pattern(*args)
+
+        z_neut = self.forward(x_neut)
+        z_regs = {}
+        z_acc = nd.zeros_like(x_neut)
+        for regime in self._regimes:
+            z_reg = x_regs[regime.name]
+            z_acc = nd.where(regime(z_neut), z_reg, z_acc)
+
+        return z_neut, z_acc, z_regs
 
 class PatternRegime(object):
     def __init__(self, name, condition):
