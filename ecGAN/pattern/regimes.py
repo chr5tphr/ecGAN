@@ -8,7 +8,7 @@ class LinearPatternRegime(PatternRegime):
 
     @staticmethod
     def condition(y):
-        return nd.ones_like(y, ctx=y.ctx)
+        return nd.ones_like(y, ctx=y.context)
 
 class PositivePatternRegime(PatternRegime):
     def __init__(self):

@@ -35,7 +35,7 @@ class DensePatternNet(PatternNet, nn.Dense):
         z_regs = {}
         for regime in self._regimes:
             a_reg = regime.pattern.data()
-            z_regs[regime.name] = nd.FullyConnected(x_acc, a_reg, None, no_bias=True, num_hidden=self._units, flatten=self._flatten))
+            z_regs[regime.name] = nd.FullyConnected(x_acc, a_reg, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
 
         return z_neut, z_acc, z_regs
 
@@ -323,7 +323,7 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         x.attach_grad()
         with autograd.record():
             y = self.forward_pattern(*([x]*2))
-        y[num_reg].backward(out_grad=y[num_reg])
+        y[1].backward(out_grad=y[0])
         return x.grad
 
 #    def forward_pattern_linear(self, *args):

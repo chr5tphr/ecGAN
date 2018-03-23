@@ -387,7 +387,7 @@ class ActPatternNet(PatternNet):
         z_regs = {}
         z_acc = nd.zeros_like(x_neut)
         for regime in self._regimes:
-            z_reg = x_regs[regime.name]
+            z_reg = self.forward(x_regs[regime.name])
             z_acc = nd.where(regime(z_neut), z_reg, z_acc)
 
         return z_neut, z_acc, z_regs
