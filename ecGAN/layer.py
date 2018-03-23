@@ -4,7 +4,7 @@ from mxnet.gluon import nn
 import numpy as np
 
 from .func import im2col_indices
-from .base import Block, Intermediate, YSequentialBase
+from .base import Block, Intermediate, YSequentialBase, ReLUBase
 from .pattern.base import PatternNet, ActPatternNet
 from .pattern.layer import SequentialPatternNet, BatchNormPatternNet, DensePatternNet, Conv2DPatternNet, Conv2DTransposePatternNet
 from .explain.base import Interpretable
@@ -24,29 +24,12 @@ class BatchNorm(BatchNormInterpretable, BatchNormPatternNet):
     pass
 
 
-class Identity(Interpretable, PatternNet, Block):
+class Identity(Interpretable, ActPatternNet, Block):
     def forward(self, *args, **kwargs):
         return args[0]
 
     def relevance(self, *args, **kwargs):
         return args[0]
-
-    def init_pattern(self, *args, **kwargs):
-        pass
-
-    def learn_pattern(self, *args, **kwargs):
-        pass
-
-    def assess_pattern(self, *args, **kwargs):
-        pass
-
-    def forward_pattern(self, *args, **kwargs):
-        x = args[0]
-        if len(args) < 2:
-            x_neut = x
-        else:
-            x_neut = args[1]
-        return self.forward(x)
 
 class Clip(Interpretable, Block):
     def forward(self, x):

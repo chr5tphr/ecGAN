@@ -2,6 +2,7 @@ from mxnet import nd
 from mxnet.gluon import nn
 from .layer import Sequential, YSequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, Activation, ReLU
 from .pattern.regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime
+from .pattern.estimator import linear_estimator, relu_estimator
 
 nets = {}
 def register_net(obj):
@@ -27,16 +28,36 @@ class SOFC(Sequential):
         self._outnum = kwargs.pop('outnum', 1)
         self._numhid = kwargs.pop('numhid', 64)
         self._outact = kwargs.pop('outact', None)
+        self._patest = kwargs.pop('patest', linear_estimator)
+        self._outest = kwargs.pop('outest', self._patest)
         super().__init__(**kwargs)
         with self.name_scope():
-            self.add(Dense(self._numhid, regimes=[PositivePatternRegime(), NegativePatternRegime()]))
-            self.add(ReLU(regimes=[PositivePatternRegime(), NegativePatternRegime()))
-            self.add(Dense(self._numhid, regimes=[PositivePatternRegime(), NegativePatternRegime()))
-            self.add(ReLU(regimes=[PositivePatternRegime(), NegativePatternRegime()))
-            self.add(Dense(self._numhid, regimes=[PositivePatternRegime(), NegativePatternRegime()))
-            self.add(ReLU(regimes=[PositivePatternRegime(), NegativePatternRegime()))
-            self.add(Dense(self._outnum, regimes=[PositivePatternRegime(), NegativePatternRegime()))
-            self.add(Identity(regimes=[PositivePatternRegime(), NegativePatternRegime()))
+            self.add(Dense(self._numhid, regimes=self._patest()))
+            self.add(ReLU(regimes=self._patest()))
+            self.add(Dense(self._numhid, regimes=self._patest()))
+            self.add(ReLU(regimes=self._patest()))
+            self.add(Dense(self._numhid, regimes=self._patest()))
+            self.add(ReLU(regimes=self._patest()))
+            self.add(Dense(self._outnum, regimes=self._outest()))
+            self.add(Identity(regimes=self._outest()))
+
+@register_net
+class SOFCLin(Sequential):
+    def __init__(self, **kwargs):
+        self._outnum = kwargs.pop('outnum', 1)
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outact = kwargs.pop('outact', None)
+        self._outest = kwargs.pop()
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self.add(Dense(self._numhid, regimes=[LinearPatternRegime()]))
+            self.add(ReLU(regimes=[LinearPatternRegime()]))
+            self.add(Dense(self._numhid, regimes=[LinearPatternRegime()]))
+            self.add(ReLU(regimes=[LinearPatternRegime()]))
+            self.add(Dense(self._numhid, regimes=[LinearPatternRegime()]))
+            self.add(ReLU(regimes=[LinearPatternRegime()]))
+            self.add(Dense(self._outnum, regimes=[LinearPatternRegime()]))
+            self.add(Identity(regimes=[LinearPatternRegime()]))
 
 @register_net
 class YSFC(YSequential):
