@@ -3,6 +3,7 @@ import logging
 import yaml
 import random
 import h5py
+import importlib.util
 
 import mxnet as mx
 from mxnet import nd
@@ -78,6 +79,7 @@ class Config(ConfigNode):
         'fuzzy_labels':     False,
         'feature_matching': False,
         'semi_supervised':  False,
+        'net_file': None,
         'nets': {
             # 'generator': {
             #     'type':     'GenFC',
@@ -153,3 +155,15 @@ def mkfilelogger(lname, fname, level=logging.INFO):
     logger.addHandler(shdl)
     logger.addHandler(fhdl)
     return logger
+
+def load_module_file(fname, module_name):
+    spec = importlib.util.spec_from_file_location(module_name, fname)
+    tmodule = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tmodule)
+    return tmodule
+
+def exec_file(fname):
+    if fname is not None:
+        with open(fname, 'r') as fp:
+            exec(fp.read(), {'__builtins__': __builtins__}, {})
+

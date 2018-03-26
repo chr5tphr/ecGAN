@@ -14,7 +14,7 @@ from mxnet import nd, gluon, autograd, random
 from .net import nets
 from .model import models
 from .data import data_funcs
-from .util import mkfilelogger, Config, config_ctx
+from .util import mkfilelogger, Config, config_ctx, load_module_file
 from .plot import plot_data, save_explanation
 from .func import linspace
 
@@ -46,6 +46,9 @@ def main():
 
     if args.debug:
         import ipdb; ipdb.set_trace()
+
+    net_module = load_module_file(config.sub('net_file'), 'net_module')
+
     commands[args.command](args, config)
 
 # @register_command

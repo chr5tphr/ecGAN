@@ -1,7 +1,9 @@
 from .regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime
 
+estimators = {}
+
 def register_estimator(func):
-    estimator[func.__name__] = func
+    estimators[func.__name__] = func
     return func
 
 @register_estimator
