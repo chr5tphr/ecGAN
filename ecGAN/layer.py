@@ -37,25 +37,8 @@ class Clip(Interpretable, Block):
     def relevance(self, R):
         return R
 
-class LeakyReLU(Interpretable, PatternNet, nn.LeakyReLU):
-    def init_pattern(self, *args, **kwargs):
-        pass
-
-    def learn_pattern(self, *args, **kwargs):
-        pass
-
-    def assess_pattern(self, *args, **kwargs):
-        pass
-
-    def forward_pattern(self, *args, **kwargs):
-        x = args[0]
-        if len(args) < 2:
-            x_neut = x
-        else:
-            x_neut = args[1]
-        z = nd.where(x_neut>0, x, self._alpha * x)
-        z_neut = self.forward(x_neut)
-        return z, z_neut
+class LeakyReLU(Interpretable, ActPatternNet, nn.LeakyReLU):
+    pass
 
 class Activation(Interpretable, nn.Activation):
     pass
@@ -87,3 +70,4 @@ class YSequentialIntermediate(Intermediate, YSequentialBase):
 
 class YSequential(YSequentialInterpretable, YSequentialIntermediate):
     pass
+
