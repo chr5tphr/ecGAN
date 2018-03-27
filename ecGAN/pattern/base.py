@@ -80,11 +80,12 @@ class PatternNet(Block):
 
         return z_neut, z_acc, z_regs
 
-    def compute_pattern(self, weight):
-        weight = self._shape_pattern()
+    def compute_pattern(self):
+        weight = self._weight_pattern()
         for regime in self._regimes:
             cov = regime.mean_xy.data() - nd.dot(self.mean_y.data(), regime.mean_x.data(), transpose_a=True)
-            pat = cov / ((weight * cov).sum(axis=1, keepdims=True) + 1e-12)
+            var_y = (weight * cov).sum(axis=1, keepdims=True) + 1e-12
+            pat = cov / var_y
             regime.pattern.set_data(pat)
 
     def learn_pattern(self, *args, **kwargs):
@@ -127,7 +128,6 @@ class PatternNet(Block):
             regime.num_y.set_data(num_y)
             regime.mean_x.set_data(mean_x)
             regime.mean_xy.set_data(mean_xy)
-            import ipdb; ipdb.set_trace()
 
         num = self.num_samples.data()
         num_cur = x.shape[0]
@@ -139,6 +139,9 @@ class PatternNet(Block):
         self.num_samples.set_data(num)
 
     def _shape_pattern(self):
+        raise NotImplementedError
+
+    def _weight_pattern(self):
         raise NotImplementedError
 
     @staticmethod

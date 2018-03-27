@@ -16,6 +16,9 @@ class DensePatternNet(PatternNet, nn.Dense):
     def _shape_pattern(self):
         return self.weight.shape
 
+    def _weight_pattern(self):
+        return self.weight.data().flatten()
+
     def learn_pattern(self):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
@@ -36,6 +39,9 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
         chan = self.weight.shape[0]
         ksize = np.prod(self.weight.shape[1:])
         return (chan, ksize)
+
+    def _weight_pattern(self):
+        return self.weight.data().flatten()
 
     def learn_pattern(self):
         if self._in is None:
@@ -62,6 +68,9 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
         chan = self.weight.shape[0]
         ksize = np.prod(self.weight.shape[1:])
         return (chan, ksize)
+
+    def _weight_pattern(self):
+        return self.weight.data().flatten()
 
     def learn_pattern_linear(self):
         if self._in is None:
