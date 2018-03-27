@@ -5,8 +5,8 @@ import numpy as np
 
 from .func import im2col_indices
 from .base import Block, Intermediate, YSequentialBase, ReLUBase
-from .pattern.base import PatternNet
-from .pattern.layer import SequentialPatternNet, BatchNormPatternNet, DensePatternNet, Conv2DPatternNet, Conv2DTransposePatternNet, ReLUPatternNet
+from .pattern.base import PatternNet, ActPatternNet
+from .pattern.layer import SequentialPatternNet, BatchNormPatternNet, DensePatternNet, Conv2DPatternNet, Conv2DTransposePatternNet, ReLUPatternNet, IdentityPatternNet
 from .explain.base import Interpretable
 from .explain.layer import SequentialInterpretable, YSequentialInterpretable, DenseInterpretable, Conv2DTransposeInterpretable, Conv2DInterpretable, BatchNormInterpretable
 
@@ -24,12 +24,8 @@ class BatchNorm(BatchNormInterpretable, BatchNormPatternNet):
     pass
 
 
-class Identity(Interpretable, ActPatternNet, Block):
-    def forward(self, *args, **kwargs):
-        return args[0]
-
-    def relevance(self, *args, **kwargs):
-        return args[0]
+class Identity(IdentityPatternNet):
+    pass
 
 class Clip(Interpretable, Block):
     def forward(self, x):

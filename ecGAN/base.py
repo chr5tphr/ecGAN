@@ -46,3 +46,8 @@ class YSequentialBase(Block):
 class ReLUBase(Block):
     def forward(self, x):
         return nd.maximum(0., x)
+
+class IdentityBase(Block):
+    def forward(self, *args, **kwargs):
+        return args[0]
+

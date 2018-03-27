@@ -3,8 +3,8 @@ from mxnet import nd, gluon, autograd
 from mxnet.gluon import nn
 import numpy as np
 
-from .base import PatternNet
-from ..base import ReLUBase
+from .base import PatternNet, ActPatternNet
+from ..base import ReLUBase, IdentityBase
 from ..func import im2col_indices
 
 class DensePatternNet(PatternNet, nn.Dense):
@@ -130,4 +130,8 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
 class ReLUPatternNet(ActPatternNet, ReLUBase):
     def _forward_pattern(self, x_neut, x_reg):
         return nd.where(x_neut>=0., x_reg, nd.zeros_like(x_neut, ctx=x_neut.context))
+
+class IdentityPatternNet(ActPatternNet, IdentityBase):
+    def _forward_pattern(self, x_neut, x_reg):
+        return x_reg
 
