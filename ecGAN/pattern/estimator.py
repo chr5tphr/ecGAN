@@ -13,3 +13,8 @@ def linear():
 @register_estimator
 def relu():
     return [PositivePatternRegime(), NegativePatternRegime()]
+
+@register_estimator
+def positive():
+    return [PositivePatternRegime()]
+

@@ -13,8 +13,8 @@ class DensePatternNet(PatternNet, nn.Dense):
         if self.act is not None:
             raise RuntimeError('Inline activations are not supported!')
 
-    def init_pattern(self):
-        self._init_pattern(self.weight.shape)
+    def _shape_pattern(self):
+        return self.weight.shape
 
     def learn_pattern(self):
         if self._in is None:
@@ -23,13 +23,8 @@ class DensePatternNet(PatternNet, nn.Dense):
         y = self._out.flatten()
         self._learn_pattern(x, y)
 
-    def compute_pattern(self):
-        weight = self.weight.data().flatten()
-        self._compute_pattern(weight)
-
-    def forward_pattern(self, *args):
-        func = lambda x, w: nd.FullyConnected(x, w, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
-        return self._forward_pattern(*args, func=func)
+    def _forward_pattern(self, x, w):
+        return nd.FullyConnected(x, w, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
 
 class Conv2DPatternNet(PatternNet, nn.Conv2D):
     def __init__(self, *args, **kwargs):
@@ -37,10 +32,10 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
         if self.act is not None:
             raise RuntimeError('Inline activations are not supported!')
 
-    def init_pattern(self):
+    def _shape_pattern(self):
         chan = self.weight.shape[0]
         ksize = np.prod(self.weight.shape[1:])
-        self._init_pattern((chan, ksize))
+        return (chan, ksize)
 
     def learn_pattern(self):
         if self._in is None:
@@ -52,15 +47,10 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
             y = y.flatten().T
             self._learn_pattern(x, y)
 
-    def compute_pattern(self):
-        weight = self.weight.data().flatten()
-        self._compute_pattern(weight)
-
-    def forward_pattern(self, *args):
+    def _forward_pattern(self, x, w):
         kwargs = self._kwargs
         kwargs['no_bias'] = True
-        func = lambda x, w: nd.Convolution(x, w, None, name='fwd', **kwargs)
-        return self._forward_pattern(*args, func=func)
+        return nd.Convolution(x, w, None, name='fwd', **kwargs)
 
 class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
     def __init__(self, *args, **kwargs):
@@ -68,10 +58,10 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
         if self.act is not None:
             raise RuntimeError('Inline activations are not supported!')
 
-    def init_pattern(self):
+    def _shape_pattern(self):
         chan = self.weight.shape[0]
         ksize = np.prod(self.weight.shape[1:])
-        self._init_pattern((chan, ksize))
+        return (chan, ksize)
 
     def learn_pattern_linear(self):
         if self._in is None:
@@ -83,15 +73,10 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
             y = im2col_indices(nd.expand_dims(y, 0), self._kwargs['kernel'][0], self._kwargs['kernel'][1], self._kwargs['pad'][0], self._kwargs['stride'][0]).T
             self._learn_pattern_linear(x, y)
 
-    def compute_pattern(self):
-        weight = self.weight.data().flatten()
-        self._compute_pattern(weight)
-
-    def forward_pattern(self, *args):
+    def _forward_pattern(self, x, w):
         kwargs = self._kwargs
         kwargs['no_bias'] = True
-        func = lambda x, w: nd.Deconvolution(x, w, None, name='fwd', **kwargs)
-        return self._forward_pattern(*args, func=func)
+        return nd.Deconvolution(x, w, None, name='fwd', **kwargs)
 
 class BatchNormPatternNet(PatternNet, nn.BatchNorm):
     def init_pattern(self, *args):
@@ -137,7 +122,12 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         x = args[0]
         x.attach_grad()
         with autograd.record():
-            y = self.forward_pattern(*([x]*2))
-        y[1].backward(out_grad=y[0])
+            y = self.forward_pattern(x)
+        #y[1].backward(out_grad=y[0])
+        y[1].backward()
         return x.grad
+
+class ReLUPatternNet(ActPatternNet, ReLUBase):
+    def _forward_pattern(self, x_neut, x_reg):
+        return nd.where(x_neut>=0., x_reg, nd.zeros_like(x_neut, ctx=x_neut.context))
 

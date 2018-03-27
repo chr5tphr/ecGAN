@@ -5,8 +5,8 @@ import numpy as np
 
 from .func import im2col_indices
 from .base import Block, Intermediate, YSequentialBase, ReLUBase
-from .pattern.base import PatternNet, ActPatternNet
-from .pattern.layer import SequentialPatternNet, BatchNormPatternNet, DensePatternNet, Conv2DPatternNet, Conv2DTransposePatternNet
+from .pattern.base import PatternNet
+from .pattern.layer import SequentialPatternNet, BatchNormPatternNet, DensePatternNet, Conv2DPatternNet, Conv2DTransposePatternNet, ReLUPatternNet
 from .explain.base import Interpretable
 from .explain.layer import SequentialInterpretable, YSequentialInterpretable, DenseInterpretable, Conv2DTransposeInterpretable, Conv2DInterpretable, BatchNormInterpretable
 
@@ -46,7 +46,7 @@ class Activation(Interpretable, nn.Activation):
 class MaxOut(Block):
     pass
 
-class ReLU(ActPatternNet, ReLUBase):
+class ReLU(ReLUPatternNet):
     pass
 
 class SequentialIntermediate(Intermediate, nn.Sequential):
