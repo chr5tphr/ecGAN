@@ -54,6 +54,14 @@ class Model(object):
                     fpath = self.config.sub('nets.%s.save'%(key), epoch=epoch)
                     self.logger.debug('Not saving %s \'%s\' epoch %s.', key, self.config.nets[key].type, epoch, fpath)
 
+    def load_pattern_params(self):
+        for nrole, net in self.nets.items():
+            net.init_pattern()
+            nname = self.config.nets.get(nrole, {}).get('name', '')
+            ntype = self.config.nets.get(nrole, {}).get('type', '')
+            if self.config.pattern.get('load') is not None:
+                net.collect_pparams().load(self.config.sub('pattern.load', net_name=nname, net_type=ntype), ctx=self.ctx)
+
     def generate_sample(self, epoch):
         raise NotImplementedError('Not supported for class %s'%self.__class__)
 
@@ -182,15 +190,6 @@ class Classifier(Model):
         if self.logger:
             self.logger.info('Learned signal estimator %s for net %s', estimator, self.config.nets.classifier.type)
 
-    def load_pattern_params(self):
-        for nrole, net in self.nets.items():
-            net.estimator = self.config.pattern.estimator
-            net.init_pattern()
-            nname = self.config.nets.get(nrole, {}).get('name', '')
-            ntype = self.config.nets.get(nrole, {}).get('type', '')
-            if self.config.pattern.get('load') is not None:
-                net.collect_pparams().load(self.config.sub('pattern.load', net_name=nname, net_type=ntype), ctx=self.ctx)
-
     def explain_pattern(self, data):
         #estimator = self.config.pattern.estimator
         if not isinstance(self.netC, PatternNet):
@@ -198,6 +197,105 @@ class Classifier(Model):
 
         #self.netC.estimator = estimator
         R = self.netC.explain_pattern(data)
+
+        return R
+
+@register_model
+class Regressor(Model):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.netR = self.nets['regressor']
+
+    def train(self, data, batch_size, nepochs):
+        config = self.config
+
+        netR = self.netR
+        ctx = self.ctx
+
+        data_iter = gluon.data.DataLoader(data, batch_size, shuffle=True, last_batch='discard')
+        loss = gluon.loss.L2Loss()
+        trainer = gluon.Trainer(netR.collect_params(), 'adam', {'learning_rate': 0.01})
+        epoch = self.start_epoch
+
+        metric = mx.metric.Loss()
+
+        if self.logger:
+            self.logger.info('Starting training of model %s, regressor %s at epoch %d',
+                            config.model, config.nets.regressor.type, epoch)
+
+        try:
+            for epoch in range(self.start_epoch, self.start_epoch + nepochs):
+                tic = time()
+                for i, (data, label) in enumerate(data_iter):
+
+                    data = data.as_in_context(ctx)
+                    label = label.as_in_context(ctx)
+
+                    with autograd.record():
+                        output = netR(data)
+                        err = loss(output, label)
+
+                        err.backward()
+
+                    trainer.step(batch_size)
+                    metric.update([label, ], [output, ])
+
+                name, acc = metric.get()
+                metric.reset()
+                if self.logger:
+                    self.logger.info('netR training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
+                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)) :
+                    self.checkpoint(epoch+1)
+        except KeyboardInterrupt:
+            self.logger.info('Training interrupted by user.')
+            self.checkpoint('I%d'%epoch)
+
+    def test(self, data, batch_size):
+        data_iter = gluon.data.DataLoader(data, batch_size, last_batch='discard')
+
+        metric = mx.metric.Loss()
+        for i, (data, label) in enumerate(data_iter):
+            data = data.as_in_context(self.ctx)
+            label = label.as_in_context(self.ctx)
+
+            output = self.netR(data)
+            metric.update([label, ], [output, ])
+
+        name, acc = metric.get()
+
+        if self.logger:
+            self.logger.info('%s test acc: %s=%.4f', self.config.nets.regressor.type, name, acc)
+
+    def learn_pattern(self, data, batch_size):
+        estimator = self.config.pattern.estimator
+        if not isinstance(self.netR, PatternNet):
+            raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets.regressor.type)
+
+        data_iter = gluon.data.DataLoader(data, batch_size)
+        #self.netR.estimator = estimator
+
+        self.netR.init_pattern()
+
+        for i, (data, label) in enumerate(data_iter):
+            data = data.as_in_context(self.ctx)
+            label = label.as_in_context(self.ctx)
+
+            self.netR.forward_logged(data)
+            self.netR.learn_pattern()
+
+        self.netR.compute_pattern()
+        self.netR.collect_pparams().save(self.config.sub('pattern.save',
+                                                    net_name=self.config.nets.regressor.name,
+                                                    net_type=self.config.nets.regressor.type))
+
+        if self.logger:
+            self.logger.info('Learned signal estimator %s for net %s', estimator, self.config.nets.regressor.type)
+
+    def explain_pattern(self, data):
+        if not isinstance(self.netR, PatternNet):
+            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.regressor.type)
+
+        R = self.netR.explain_pattern(data)
 
         return R
 

@@ -1,4 +1,5 @@
 import numpy as np
+import h5py
 from imageio import imwrite
 import matplotlib as mpl
 import matplotlib.pyplot as plt

@@ -44,10 +44,10 @@ def main():
     if args.seed:
         random.seed(args.seed)
 
+    net_module = load_module_file(config.sub('net_file'), 'net_module')
+
     if args.debug:
         import ipdb; ipdb.set_trace()
-
-    net_module = load_module_file(config.sub('net_file'), 'net_module')
 
     commands[args.command](args, config)
 
@@ -157,6 +157,21 @@ def test(args, config):
 
     model = models[config.model](ctx=ctx, logger=logger, config=config)
     model.test(data=data, batch_size=batch_size)
+
+@register_command
+def debug(args, config):
+    ctx = config_ctx(config)
+
+    logger = None
+    if config.log:
+        logger = mkfilelogger('debugging', config.sub('log'))
+
+    batch_size = config.batch_size
+    data = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
+
+    model = models[config.model](ctx=ctx, logger=logger, config=config)
+
+    import ipdb; ipdb.set_trace()
 
 @register_command
 def explain(args, config):
@@ -291,8 +306,6 @@ def explain_pattern(args, config):
                          center=0.,
                          cmap='coldnhot',
                         )
-
-        import ipdb; ipdb.set_trace()
 
 @register_command
 def predict(args, config):
