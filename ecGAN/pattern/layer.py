@@ -97,6 +97,7 @@ class BatchNormPatternNet(PatternNet, nn.BatchNorm):
     def compute_pattern(self):
         pass
 
+    # TODO: do this correctly
     def forward_pattern(self, *args):
         x_neut, x_acc, x_regs = self._args_forward_pattern(*args)
 

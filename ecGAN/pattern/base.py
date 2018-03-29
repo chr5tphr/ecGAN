@@ -105,9 +105,9 @@ class PatternNet(Block):
             num_x = num_y.sum()
 
             cond_y = regime(y)
-            # number of times w.t dot x was inside the regime
+            # number of times each sample's x for w.t dot x was inside the regime
             num_n = cond_y.sum(axis=1, keepdims=True)
-            # weighted sum of x
+            # => weighted sum over x
             wsum_x = nd.dot(num_n, x, transpose_a=True)
 
             # y's in regime
