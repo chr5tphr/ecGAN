@@ -65,8 +65,8 @@ class PatternNet(Block):
                                                    grad_req='null')
                 regime.pattern = self.pparams.get('pattern_%s'%str(regime),
                                                     shape=(outsize, insize),
-                                                    init=mx.initializer.Zero(),
-                                                    grad_req='null')
+                                                    init=mx.initializer.Xavier(),
+                                                    grad_req='write')
 
     def forward_pattern(self, *args):
         x_neut, x_acc, x_regs = self._args_forward_pattern(*args)
@@ -90,6 +90,20 @@ class PatternNet(Block):
 
     def learn_pattern(self, *args, **kwargs):
         raise NotImplementedError
+
+    def fit_pattern(self, x):
+        y = self(x)
+        #computes only gradients for batch step!
+        for regime in self._regimes:
+            y_reg = y * regime(y)
+            pattern = regime.pattern.data(ctx=x.context)
+            loss = mx.gluon.loss.L2Loss()
+            with autograd.record():
+                p_in = self._backward_pattern(y_reg, pattern)
+                err = loss(p_in, x)
+            err.backward()
+        return y
+
 
     def assess_pattern(self, *args, **kwargs):
         raise NotImplementedError
@@ -138,6 +152,9 @@ class PatternNet(Block):
         self.mean_y.set_data(mean_y)
         self.num_samples.set_data(num)
 
+    def _backward_pattern(self, y, pattern):
+        raise NotImplementedError
+
     def _shape_pattern(self):
         raise NotImplementedError
 
@@ -164,6 +181,9 @@ class ActPatternNet(PatternNet):
 
     def learn_pattern(self, *args):
         pass
+
+    def fit_pattern(self, x):
+        return self(x)
 
     def compute_pattern(self):
         pass

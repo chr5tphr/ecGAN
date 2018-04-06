@@ -47,10 +47,10 @@ class ConfigNode(dict):
             else:
                 self[key] = self.parse(val)
 
-    @classmethod
-    def parse(clss, X):
+    @staticmethod
+    def parse(X):
         if type(X) is dict:
-            return clss(X)
+            return ConfigNode(X)
         else:
             return X
 

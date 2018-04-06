@@ -29,6 +29,10 @@ class DensePatternNet(PatternNet, nn.Dense):
     def _forward_pattern(self, x, w):
         return nd.FullyConnected(x, w, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
 
+    def _backward_pattern(self, y, pattern):
+        return nd.FullyConnected(y, pattern.T, no_bias=True,
+                                 num_hidden=pattern.shape[1], flatten=self._flatten)
+
 class Conv2DPatternNet(PatternNet, nn.Conv2D):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,7 +60,15 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
     def _forward_pattern(self, x, w):
         kwargs = self._kwargs
         kwargs['no_bias'] = True
-        return nd.Convolution(x, w, None, name='fwd', **kwargs)
+        w = w.reshape(self.weight.shape)
+        return nd.Convolution(x, w, name='fwd', **kwargs)
+
+    def _backward_pattern(self, y, pattern):
+        kwargs = self._kwargs
+        kwargs['no_bias'] = True
+        kwargs['num_filter'] = self.weight.shape[1]
+        pattern = pattern.reshape(self.weight.shape)
+        return nd.Deconvolution(y, pattern, name='fwd', **kwargs)
 
 class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
     def __init__(self, *args, **kwargs):
@@ -85,7 +97,15 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
     def _forward_pattern(self, x, w):
         kwargs = self._kwargs
         kwargs['no_bias'] = True
-        return nd.Deconvolution(x, w, None, name='fwd', **kwargs)
+        w = w.reshape(self.weight.shape)
+        return nd.Deconvolution(x, w, name='fwd', **kwargs)
+
+    def _backward_pattern(self, y, pattern):
+        kwargs = self._kwargs
+        kwargs['no_bias'] = True
+        kwargs['num_filter'] = self.weight.shape[0]
+        pattern = pattern.reshape(self.weight.shape)
+        return nd.Convolution(y, pattern, name='fwd', **kwargs)
 
 class BatchNormPatternNet(PatternNet, nn.BatchNorm):
     def init_pattern(self, *args):
@@ -96,6 +116,9 @@ class BatchNormPatternNet(PatternNet, nn.BatchNorm):
 
     def compute_pattern(self):
         pass
+
+    def fit_pattern(self, x):
+        return self(x)
 
     # TODO: do this correctly
     def forward_pattern(self, *args):
@@ -120,9 +143,14 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
             x = block.forward_pattern(*x)
         return x
 
-    def learn_pattern(self, *args, **kwargs):
+    def learn_pattern(self):
         for block in self._children:
             block.learn_pattern()
+
+    def fit_pattern(self, x):
+        for block in self._children:
+            x = block.fit_pattern(x)
+        return x
 
     def compute_pattern(self):
         for block in self._children:

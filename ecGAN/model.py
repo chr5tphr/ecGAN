@@ -16,6 +16,30 @@ def register_model(obj):
     models[obj.__name__] = obj
     return obj
 
+class TrainingRoutine(object):
+    def __init__(self):
+        self.data_iter = None
+        self.trainers = []
+        self.batch_size = None
+        self.start_epoch = None
+        self.nepochs = None
+        self.save_freq = None
+        self.logger = None
+
+    def __call__(data):
+        for epoch in range(start_epoch, start_epoch + nepochs):
+            try:
+                for i, (data, label) in enumerate(data_iter):
+                    self.step(data)
+                    for trainer in self.trainers:
+                        trainer.step(self.batch_size)
+
+                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or ((epoch + 1) >= (self.start_epoch + nepochs)) :
+                    self.save(epoch+1)
+            except KeyboardInterrupt:
+                self.save(epoch+1, intr=True)
+
+
 class Model(object):
     def __init__(self, **kwargs):
         self.logger = kwargs.get('logger')
@@ -59,8 +83,24 @@ class Model(object):
             net.init_pattern()
             nname = self.config.nets.get(nrole, {}).get('name', '')
             ntype = self.config.nets.get(nrole, {}).get('type', '')
-            if self.config.pattern.get('load') is not None:
+            if self.config.pattern.get('load') is not None and not self.config.pattern.get('init', False):
                 net.collect_pparams().load(self.config.sub('pattern.load', net_name=nname, net_type=ntype), ctx=self.ctx)
+            else:
+                net.collect_pparams().initialize(ctx=self.ctx)
+
+    def save_pattern_params(self, epoch):
+        if self.config.pattern.get('save') is not None:
+            for nrole, net in self.nets.items():
+                nname = self.config.nets.get(nrole, {}).get('name', '')
+                ntype = self.config.nets.get(nrole, {}).get('type', '')
+                fpath = self.config.sub('pattern.save', net_name=nname,
+                                        net_type=ntype, epoch=epoch)
+                net.collect_pparams().save(fpath)
+                if self.logger:
+                    self.logger.info('Saved pattern of \'%s %s\' epoch %s in file \'%s\'.', ntype, nname, epoch, fpath)
+        else:
+            if self.logger:
+                self.logger.debug('Not saving pattern.')
 
     def generate_sample(self, epoch):
         raise NotImplementedError('Not supported for class %s'%self.__class__)
@@ -190,12 +230,42 @@ class Classifier(Model):
         if self.logger:
             self.logger.info('Learned signal estimator %s for net %s', estimator, self.config.nets.classifier.type)
 
+    def fit_pattern(self, data, batch_size):
+        if not isinstance(self.netC, PatternNet):
+            raise NotImplementedError('\'%s\' is not a PatternNet!'%self.config.nets.classifier.type)
+
+        data_iter = gluon.data.DataLoader(data, batch_size)
+
+        trainer = gluon.Trainer(self.netC.collect_pparams(),
+            self.config.pattern.get('optimizer', 'SGD'),
+            self.config.pattern.get('optkwargs', {'learning_rate': 0.01}))
+
+        start_epoch = self.config.pattern.get('start_epoch', 0)
+        nepochs = self.config.pattern.get('nepochs', 1)
+        save_freq = self.config.pattern.get('save_freq', 1)
+
+        for epoch in range(start_epoch, start_epoch + nepochs):
+            tic = time()
+            for i, (data, label) in enumerate(data_iter):
+                data = data.as_in_context(self.ctx)
+                label = label.as_in_context(self.ctx)
+
+                self.netC.fit_pattern(data)
+                trainer.step(batch_size)
+
+            if self.logger:
+                self.logger.info('pattern training epoch %04d , time: %.2f', epoch, (time() - tic))
+            if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
+                self.save_pattern_params(epoch+1)
+
+        if self.logger:
+            self.logger.info('Learned pattern for net %s',
+                             self.config.nets.classifier.type)
+
     def explain_pattern(self, data):
-        #estimator = self.config.pattern.estimator
         if not isinstance(self.netC, PatternNet):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
 
-        #self.netC.estimator = estimator
         R = self.netC.explain_pattern(data)
 
         return R
@@ -275,6 +345,7 @@ class Regressor(Model):
         #self.netR.estimator = estimator
 
         self.netR.init_pattern()
+        self.netR.collect_pparams().initialize(ctx=self.ctx)
 
         for i, (data, label) in enumerate(data_iter):
             data = data.as_in_context(self.ctx)
@@ -290,6 +361,35 @@ class Regressor(Model):
 
         if self.logger:
             self.logger.info('Learned signal estimator %s for net %s', estimator, self.config.nets.regressor.type)
+
+    def fit_pattern(self, data, batch_size):
+        if not isinstance(self.netR, PatternNet):
+            raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets.regressor.type)
+
+        data_iter = gluon.data.DataLoader(data, batch_size)
+
+        trainer = gluon.Trainer(self.netR.collect_pparams(),
+            self.config.pattern.get('optimizer', 'SGD'),
+            self.config.pattern.get('optkwargs', {'learning_rate': 0.01}))
+
+        start_epoch = self.config.pattern.get('start_epoch', 0)
+        nepochs = self.config.pattern.get('nepochs', 1)
+        save_freq = self.config.pattern.get('save_freq', 1)
+
+        for epoch in range(start_epoch, start_epoch + nepochs):
+            for i, (data, label) in enumerate(data_iter):
+                data = data.as_in_context(self.ctx)
+                label = label.as_in_context(self.ctx)
+
+                self.netR.fit_pattern(data)
+                trainer.step(batch_size)
+
+            if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
+                self.save_pattern_params(epoch+1)
+
+        if self.logger:
+            self.logger.info('Learned pattern for net %s',
+                             self.config.nets.regressor.type)
 
     def explain_pattern(self, data):
         if not isinstance(self.netR, PatternNet):

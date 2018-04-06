@@ -271,6 +271,20 @@ def learn_pattern(args, config):
     model.learn_pattern(data, batch_size)
 
 @register_command
+def fit_pattern(args, config):
+    ctx = config_ctx(config)
+    batch_size = config.batch_size
+    data = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
+
+    logger = None
+    if config.log:
+        logger = mkfilelogger('learning', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+
+    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model.load_pattern_params()
+    model.fit_pattern(data, batch_size)
+
+@register_command
 def explain_pattern(args, config):
     ctx = config_ctx(config)
 
@@ -293,6 +307,7 @@ def explain_pattern(args, config):
 
         relevance = model.explain_pattern(data)
 
+        print(relevance.sum())
         save_explanation(relevance,
                          data=data,
                          config=config,
