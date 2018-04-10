@@ -251,7 +251,7 @@ class Classifier(Model):
                 label = label.as_in_context(self.ctx)
 
                 self.netC.fit_pattern(data)
-                trainer.step(batch_size)
+                trainer.step(batch_size, ignore_stale_grad=True)
 
             if self.logger:
                 self.logger.info('pattern training epoch %04d , time: %.2f', epoch, (time() - tic))

@@ -86,3 +86,28 @@ def batchwise_covariance(X, Y):
             meany = (n * meany + m * meany_) / (n+m)
             n += m
         return C / n, vary / n
+
+def cov_reg_it(self, x, y, mean_x, mean_xy, num_x, num_y, regime):
+    cond_y = regime(y)
+    # number of times each sample's x for w.t dot x was inside the regime
+    num_n = cond_y.sum(axis=1, keepdims=True)
+    # => weighted sum over x
+    wsum_x = nd.dot(num_n, x, transpose_a=True)
+
+    # y's in regime
+    reg_y = y * cond_y
+    # sum of xy's in regime
+    # sum_xy = (reg_y.expand_dims(axis=2) * x.expand_dims(axis=1)).sum(axis=0)
+    sum_xy = nd.dot(reg_y, x, transpose_a=True)
+
+
+    num_x_cur = num_n.sum()
+    mean_x = (num_x * mean_x + wsum_x) / (num_x + num_x_cur + 1e-12)
+
+    num_y_cur = cond_y.sum(axis=0)
+    mean_xy = (num_y.T * mean_xy + sum_xy) / (num_y + num_y_cur + 1e-12).T
+
+    num_y += num_y_cur
+
+    return mean_x, mean_xy, num_y
+

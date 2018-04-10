@@ -43,30 +43,34 @@ class PatternNet(Block):
         outsize, insize = self._shape_pattern()
         with self.name_scope():
             self.num_samples = self.pparams.get('num_samples',
-                                               shape=(1,),
-                                               init=mx.initializer.Zero(),
-                                               grad_req='null')
+                                                shape=(1,),
+                                                init=mx.initializer.Zero(),
+                                                grad_req='null')
             self.mean_y = self.pparams.get('mean_y',
-                                          shape=(1, outsize),
-                                          init=mx.initializer.Zero(),
-                                          grad_req='null')
-            for regime in self._regimes:
-                regime.mean_x = self.pparams.get('mean_x_%s'%str(regime),
-                                              shape=(1, insize),
-                                              init=mx.initializer.Zero(),
-                                              grad_req='null')
-                regime.mean_xy = self.pparams.get('mean_xy_%s'%str(regime),
-                                           shape=(outsize, insize),
+                                           shape=(1, outsize),
                                            init=mx.initializer.Zero(),
                                            grad_req='null')
+            self.w_qual = self.pparams.get('w_qual',
+                                           shape=(outsize, insize),
+                                           init=mx.initializer.Xavier(),
+                                           grad_req='write')
+            for regime in self._regimes:
+                regime.mean_x = self.pparams.get('mean_x_%s'%str(regime),
+                                                 shape=(1, insize),
+                                                 init=mx.initializer.Zero(),
+                                                 grad_req='null')
+                regime.mean_xy = self.pparams.get('mean_xy_%s'%str(regime),
+                                                  shape=(outsize, insize),
+                                                  init=mx.initializer.Zero(),
+                                                  grad_req='null')
                 regime.num_y = self.pparams.get('num_y_%s'%str(regime),
-                                                   shape=(1, outsize),
-                                                   init=mx.initializer.Zero(),
-                                                   grad_req='null')
+                                                shape=(1, outsize),
+                                                init=mx.initializer.Zero(),
+                                                grad_req='null')
                 regime.pattern = self.pparams.get('pattern_%s'%str(regime),
-                                                    shape=(outsize, insize),
-                                                    init=mx.initializer.Xavier(),
-                                                    grad_req='write')
+                                                  shape=(outsize, insize),
+                                                  init=mx.initializer.Xavier(),
+                                                  grad_req='write')
 
     def forward_pattern(self, *args):
         x_neut, x_acc, x_regs = self._args_forward_pattern(*args)
@@ -94,21 +98,82 @@ class PatternNet(Block):
     def fit_pattern(self, x):
         y = self(x)
         #computes only gradients for batch step!
-        for regime in self._regimes:
-            y_reg = y * regime(y)
-            pattern = regime.pattern.data(ctx=x.context)
-            loss = mx.gluon.loss.L2Loss()
-            with autograd.record():
-                p_in = self._backward_pattern(y_reg, pattern)
-                err = loss(p_in, x)
-            err.backward()
+        loss = mx.gluon.loss.L2Loss()
+        with autograd.record():
+            signal = self._signal_pattern(y)
+            err = loss(signal, x)
+        err.backward()
         return y
 
+    def fit_assess_pattern(self, x):
+        y = self(x)
+        #computes only gradients for batch step!
+        w_qual = self.w_qual.data(ctx=x.context)
+        signal = self._signal_pattern(y)
+        distractor = x - signal
+        loss = mx.gluon.loss.L2Loss()
+        with autograd.record():
+            vtd = self._forward_pattern(distractor, w_qual)
+            err = loss(vtd, y)
+        err.backward()
+        return y
 
-    def assess_pattern(self, *args, **kwargs):
-        raise NotImplementedError
+    def _compute_assess_pattern(self, x, y):
+        for regime in self._regimes:
+            mean_x = regime.mean_x.data()
+            mean_xy = regime.mean_xy.data()
+            num_y = regime.num_y.data()
+            num_x = num_y.sum()
+
+            cond_y = regime(y)
+            # number of times each sample's x for w.t dot x was inside the regime
+            num_n = cond_y.sum(axis=1, keepdims=True)
+            # => weighted sum over x
+            wsum_x = nd.dot(num_n, x, transpose_a=True)
+
+            # y's in regime
+            reg_y = y * cond_y
+            # sum of xy's in regime
+            # sum_xy = (reg_y.expand_dims(axis=2) * x.expand_dims(axis=1)).sum(axis=0)
+            sum_xy = nd.dot(reg_y, x, transpose_a=True)
+
+
+            num_x_cur = num_n.sum()
+            mean_x = (num_x * mean_x + wsum_x) / (num_x + num_x_cur + 1e-12)
+
+            num_y_cur = cond_y.sum(axis=0)
+            mean_xy = (num_y.T * mean_xy + sum_xy) / (num_y + num_y_cur + 1e-12).T
+
+            num_y += num_y_cur
+
+            regime.num_y.set_data(num_y)
+            regime.mean_x.set_data(mean_x)
+            regime.mean_xy.set_data(mean_xy)
+
+        num = self.num_samples.data()
+        num_cur = x.shape[0]
+        mean_y = self.mean_y.data()
+        sum_y = y.sum(axis=0, keepdims=True)
+        mean_y = (num * mean_y + sum_y) / (num + num_cur + 1e-12)
+        num += num_cur
+        self.mean_y.set_data(mean_y)
+        self.num_samples.set_data(num)
+
+    def _signal_pattern(self, y):
+        # shape is set in first regime
+        signal = 0.
+        for regime in self._regimes:
+            y_reg = y * regime(y)
+            pattern = regime.pattern.data(ctx=y.context)
+            s_reg = self._backward_pattern(y_reg, pattern)
+            # regimes are assumed to be disjunct
+            signal += s_reg
+        return signal
 
     def explain_pattern(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def assess_pattern(self, *args, **kwargs):
         raise NotImplementedError
 
     def _learn_pattern(self, x, y):
@@ -193,7 +258,7 @@ class ActPatternNet(PatternNet):
 
         z_neut = self.forward(x_neut)
         z_regs = {}
-        z_acc = nd.zeros_like(x_neut)
+        z_acc = nd.zeros_like(x_neut, ctx=x_neut.context)
         for regime in self._regimes:
             z_reg = self._forward_pattern(x_neut, x_regs[regime.name])
             z_acc = nd.where(regime(z_neut), z_reg, z_acc)

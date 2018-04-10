@@ -307,7 +307,7 @@ def explain_pattern(args, config):
 
         relevance = model.explain_pattern(data)
 
-        print(relevance.sum())
+        # print(relevance.sum())
         save_explanation(relevance,
                          data=data,
                          config=config,
