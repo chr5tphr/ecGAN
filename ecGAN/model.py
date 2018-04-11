@@ -377,13 +377,16 @@ class Regressor(Model):
         save_freq = self.config.pattern.get('save_freq', 1)
 
         for epoch in range(start_epoch, start_epoch + nepochs):
+            tic = time()
             for i, (data, label) in enumerate(data_iter):
                 data = data.as_in_context(self.ctx)
                 label = label.as_in_context(self.ctx)
 
                 self.netR.fit_pattern(data)
-                trainer.step(batch_size)
+                trainer.step(batch_size, ignore_stale_grad=True)
 
+            if self.logger:
+                self.logger.info('pattern training epoch %04d , time: %.2f', epoch, (time() - tic))
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
                 self.save_pattern_params(epoch+1)
 

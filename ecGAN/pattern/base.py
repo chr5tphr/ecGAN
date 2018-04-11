@@ -71,6 +71,10 @@ class PatternNet(Block):
                                                   shape=(outsize, insize),
                                                   init=mx.initializer.Xavier(),
                                                   grad_req='write')
+                regime.pias = self.pparams.get('pias_%s'%str(regime),
+                                               shape=(insize,),
+                                               init=mx.initializer.Zero(),
+                                               grad_req='write')
 
     def forward_pattern(self, *args):
         x_neut, x_acc, x_regs = self._args_forward_pattern(*args)
@@ -80,7 +84,8 @@ class PatternNet(Block):
         z_regs = {}
         for regime in self._regimes:
             a_reg = regime.pattern.data()
-            z_regs[regime.name] = self._forward_pattern(x_acc, a_reg)
+            b_reg = regime.pias.data()
+            z_regs[regime.name] = self._forward_pattern(x_acc, a_reg, b_reg)
 
         return z_neut, z_acc, z_regs
 
@@ -165,7 +170,8 @@ class PatternNet(Block):
         for regime in self._regimes:
             y_reg = y * regime(y)
             pattern = regime.pattern.data(ctx=y.context)
-            s_reg = self._backward_pattern(y_reg, pattern)
+            pias = regime.pias.data(ctx=y.context)
+            s_reg = self._backward_pattern(y_reg, pattern, pias)
             # regimes are assumed to be disjunct
             signal += s_reg
         return signal
@@ -217,7 +223,7 @@ class PatternNet(Block):
         self.mean_y.set_data(mean_y)
         self.num_samples.set_data(num)
 
-    def _backward_pattern(self, y, pattern):
+    def _backward_pattern(self, y, pattern, pias=None):
         raise NotImplementedError
 
     def _shape_pattern(self):
@@ -237,7 +243,7 @@ class PatternNet(Block):
         else:
             raise RuntimeError('Number of input arguments not correct!')
 
-    def _forward_pattern(self, *args):
+    def _forward_pattern(self, x, pattern, pias=None):
         raise NotImplementedError
 
 class ActPatternNet(PatternNet):

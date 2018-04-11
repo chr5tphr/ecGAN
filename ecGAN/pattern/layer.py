@@ -26,11 +26,12 @@ class DensePatternNet(PatternNet, nn.Dense):
         y = self._out.flatten()
         self._learn_pattern(x, y)
 
-    def _forward_pattern(self, x, w):
-        return nd.FullyConnected(x, w, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
+    def _forward_pattern(self, x, w, bias):
+        return nd.FullyConnected(x, w, bias, no_bias=(bias is None),
+                                 num_hidden=self._units, flatten=self._flatten)
 
-    def _backward_pattern(self, y, pattern):
-        return nd.FullyConnected(y, pattern.T, no_bias=True,
+    def _backward_pattern(self, y, pattern, pias=None):
+        return nd.FullyConnected(y, pattern.T, pias, no_bias=(pias is None),
                                  num_hidden=pattern.shape[1], flatten=self._flatten)
 
 class Conv2DPatternNet(PatternNet, nn.Conv2D):
