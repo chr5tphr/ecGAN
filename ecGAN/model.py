@@ -254,7 +254,9 @@ class Classifier(Model):
                 trainer.step(batch_size, ignore_stale_grad=True)
 
             if self.logger:
-                self.logger.info('pattern training epoch %04d , time: %.2f', epoch, (time() - tic))
+                errs = str(self.netC._err)
+                self.logger.info('pattern training epoch %04d , time: %.2f, errors: %s',
+                                 epoch, (time() - tic), errs)
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
                 self.save_pattern_params(epoch+1)
 
@@ -267,6 +269,15 @@ class Classifier(Model):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
 
         R = self.netC.explain_pattern(data)
+
+        return R
+
+    def backward_pattern(self, data):
+        if not isinstance(self.netC, PatternNet):
+            raise NotImplementedError('\'%s\' is no PatternNet!'%self.config.nets.classifier.type)
+
+        y = self.netC.forward_logged(data)
+        R = self.netC.backward_pattern(y)
 
         return R
 

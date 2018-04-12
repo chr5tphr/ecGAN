@@ -26,7 +26,7 @@ class DensePatternNet(PatternNet, nn.Dense):
         y = self._out.flatten()
         self._learn_pattern(x, y)
 
-    def _forward_pattern(self, x, w, bias):
+    def _forward_pattern(self, x, w, bias=None):
         return nd.FullyConnected(x, w, bias, no_bias=(bias is None),
                                  num_hidden=self._units, flatten=self._flatten)
 
@@ -149,8 +149,10 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
             block.learn_pattern()
 
     def fit_pattern(self, x):
+        self._err = []
         for block in self._children:
             x = block.fit_pattern(x)
+            self._err.append(block._err)
         return x
 
     def compute_pattern(self):
@@ -166,11 +168,22 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         y[1].backward()
         return x.grad
 
+    def backward_pattern(self, y_sig):
+        for block in self._children[::-1]:
+            y_sig = block.backward_pattern(y_sig)
+        return y_sig
+
 class ReLUPatternNet(ActPatternNet, ReLUBase):
     def _forward_pattern(self, x_neut, x_reg):
         return nd.where(x_neut>=0., x_reg, nd.zeros_like(x_neut, ctx=x_neut.context))
 
+    def backward_pattern(self, y_sig):
+        return self(y_sig)
+
 class IdentityPatternNet(ActPatternNet, IdentityBase):
     def _forward_pattern(self, x_neut, x_reg):
         return x_reg
+
+    def backward_pattern(self, y_sig):
+        return y_sig
 

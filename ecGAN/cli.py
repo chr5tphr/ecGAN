@@ -305,8 +305,12 @@ def explain_pattern(args, config):
         data = data.as_in_context(ctx)
         label = label.as_in_context(ctx)
 
-        relevance = model.explain_pattern(data)
+        if config.pattern.get('manual', False):
+            relevance = model.backward_pattern(data)
+        else:
+            relevance = model.explain_pattern(data)
 
+        relevance = relevance.reshape(data.shape)
         # print(relevance.sum())
         save_explanation(relevance,
                          data=data,

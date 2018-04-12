@@ -14,6 +14,7 @@ class PatternNet(Block):
         self._pparams = ParameterDict(getattr(self, '_prefix', ''))
         self.num_samples = None
         self.mean_y = None
+        self._err = None
 
     def hybrid_forward(self, F, x, weight, bias=None, **kwargs):
         # exists since there is a bug with the way mxnet uses params and our pparams
@@ -69,7 +70,7 @@ class PatternNet(Block):
                                                 grad_req='null')
                 regime.pattern = self.pparams.get('pattern_%s'%str(regime),
                                                   shape=(outsize, insize),
-                                                  init=mx.initializer.Xavier(),
+                                                  init=mx.initializer.Constant(1.),
                                                   grad_req='write')
                 regime.pias = self.pparams.get('pias_%s'%str(regime),
                                                shape=(insize,),
@@ -84,10 +85,15 @@ class PatternNet(Block):
         z_regs = {}
         for regime in self._regimes:
             a_reg = regime.pattern.data()
-            b_reg = regime.pias.data()
-            z_regs[regime.name] = self._forward_pattern(x_acc, a_reg, b_reg)
+            z_regs[regime.name] = self._forward_pattern(x_acc, a_reg)
 
         return z_neut, z_acc, z_regs
+
+    def backward_pattern(self, y_sig):
+        if self._out is None:
+            raise RuntimeError('Block has not yet executed forward_logged!')
+        y_cond = self._out
+        return self._signal_pattern(y_sig, y_cond)
 
     def compute_pattern(self):
         weight = self._weight_pattern()
@@ -108,6 +114,7 @@ class PatternNet(Block):
             signal = self._signal_pattern(y)
             err = loss(signal, x)
         err.backward()
+        self._err = err
         return y
 
     def fit_assess_pattern(self, x):
@@ -164,11 +171,13 @@ class PatternNet(Block):
         self.mean_y.set_data(mean_y)
         self.num_samples.set_data(num)
 
-    def _signal_pattern(self, y):
+    def _signal_pattern(self, y, y_cond=None):
+        if y_cond is None:
+            y_cond = y
         # shape is set in first regime
         signal = 0.
         for regime in self._regimes:
-            y_reg = y * regime(y)
+            y_reg = y * regime(y_cond)
             pattern = regime.pattern.data(ctx=y.context)
             pias = regime.pias.data(ctx=y.context)
             s_reg = self._backward_pattern(y_reg, pattern, pias)
@@ -270,6 +279,9 @@ class ActPatternNet(PatternNet):
             z_acc = nd.where(regime(z_neut), z_reg, z_acc)
 
         return z_neut, z_acc, z_regs
+
+    def backward_pattern(self, y_sig):
+        raise NotImplementedError
 
 class PatternRegime(object):
     def __init__(self, name, condition):
