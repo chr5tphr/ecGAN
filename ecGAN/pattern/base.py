@@ -4,6 +4,7 @@ from mxnet import nd, autograd
 from mxnet.gluon import nn, ParameterDict
 
 from ..base import Block
+from ..func import stats_batchwise
 
 class PatternNet(Block):
     def __init__(self, *args, **kwargs):
@@ -15,6 +16,7 @@ class PatternNet(Block):
         self.num_samples = None
         self.mean_y = None
         self._err = None
+        self.w_qual = None
 
     def hybrid_forward(self, F, x, weight, bias=None, **kwargs):
         # exists since there is a bug with the way mxnet uses params and our pparams
@@ -51,6 +53,22 @@ class PatternNet(Block):
                                            shape=(1, outsize),
                                            init=mx.initializer.Zero(),
                                            grad_req='null')
+            self.var_y = self.pparams.get('var_y',
+                                          shape=(1, outsize),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.mean_d = self.pparams.get('mean_d',
+                                          shape=(1, insize),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.var_d = self.pparams.get('var_d',
+                                          shape=(1, insize),
+                                          init=mx.initializer.Zero(),
+                                          grad_req='null')
+            self.cov_dy = self.pparams.get('cov_dy',
+                                           shape=(outsize, insize),
+                                           init=mx.initializer.Zero(),
+                                           grad_req='null')
             self.w_qual = self.pparams.get('w_qual',
                                            shape=(outsize, insize),
                                            init=mx.initializer.Xavier(),
@@ -70,7 +88,8 @@ class PatternNet(Block):
                                                 grad_req='null')
                 regime.pattern = self.pparams.get('pattern_%s'%str(regime),
                                                   shape=(outsize, insize),
-                                                  init=mx.initializer.Constant(1.),
+                                                  #init=mx.initializer.Constant(1.),
+                                                  init=mx.initializer.Xavier(),
                                                   grad_req='write')
                 regime.pias = self.pparams.get('pias_%s'%str(regime),
                                                shape=(insize,),
@@ -165,11 +184,54 @@ class PatternNet(Block):
         num = self.num_samples.data()
         num_cur = x.shape[0]
         mean_y = self.mean_y.data()
-        sum_y = y.sum(axis=0, keepdims=True)
+        sum_y = y.sum(axis=0, keepdms=True)
         mean_y = (num * mean_y + sum_y) / (num + num_cur + 1e-12)
         num += num_cur
         self.mean_y.set_data(mean_y)
         self.num_samples.set_data(num)
+
+    def _stats_assess_pattern(self, x, y):
+        s = self._signal_pattern(y)
+        d = x - s
+
+        attrs = ['num_samples', 'mean_d', 'mean_y', 'var_d', 'var_y', 'cov_yd']
+
+        args = [d, y] + [getattr(self, name).data(ctx=d.context) for name in attrs]
+        retval = stats_batchwise(*args)
+        for name, val in zip(attrs, reval):
+            getattr(self, name).set_data(val)
+
+
+    def stats_batchwise(x_bat, y_bat, n, x_mean, y_mean, x_var=None, y_var=None, cov=None, x_mean_skip=False, y_mean_skip=False):
+        m = x.shape[0]
+
+        x_bat_mean = x.mean(axis=0, keepdims=True)
+        y_bat_mean = y.mean(axis=0, keepdims=True)
+
+        dx = x - x_bat_mean
+        dy = y - y_bat_mean
+
+        if x_var is not None:
+            x_bat_var = nd.sum(dx**2, axis=0)
+            x_var += x_bat_var + ((x_mean - x_bat_mean)**2) * n * m / (n+m)
+
+        if y_var is not None:
+            y_bat_var = nd.sum(dy**2, axis=0)
+            y_var += y_bat_var + ((y_mean - y_bat_mean)**2) * n * m / (n+m)
+
+        if cov is not None:
+            cov_bat = nd.dot(dx, dy, transpose_a=True)
+            cov += cov_bat + nd.dot((x_mean - x_bat_mean), (y_mean - y_bat_mean), transpose_a=True) * n * m / (n+m)
+
+        if not x_mean_skip:
+            x_mean = (n * x_mean + m * x_bat_mean) / (n+m)
+
+        if not y_mean_skip:
+            y_mean = (n * y_mean + m * y_bat_mean) / (n+m)
+
+        n += m
+
+        return n, x_mean, y_mean, x_var, y_var, cov
 
     def _signal_pattern(self, y, y_cond=None):
         if y_cond is None:
@@ -211,6 +273,7 @@ class PatternNet(Block):
             sum_xy = nd.dot(reg_y, x, transpose_a=True)
 
 
+            #TODO more stable running mean
             num_x_cur = num_n.sum()
             mean_x = (num_x * mean_x + wsum_x) / (num_x + num_x_cur + 1e-12)
 

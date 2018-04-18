@@ -295,6 +295,7 @@ def explain_pattern(args, config):
     model = models[config.model](ctx=ctx, logger=logger, config=config)
     model.load_pattern_params()
 
+    cmap = config.get('cmap', 'coldnhot')
 
     data_fp = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
@@ -323,7 +324,7 @@ def explain_pattern(args, config):
                          logger=logger,
                          i=i,
                          center=0.,
-                         cmap='coldnhot',
+                         cmap=cmap,
                         )
 
 @register_command

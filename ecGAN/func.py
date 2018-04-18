@@ -67,6 +67,37 @@ def linspace(start=0., stop=1., num=1, ctx=None, dtype=None):
 def randint(low=0., high=1., shape=(1, ), ctx=None, dtype='int32'):
     return nd.uniform(low=low, high=high, shape=shape, ctx=ctx).astype(dtype)
 
+def stats_batchwise(x_bat, y_bat, n, x_mean, y_mean, x_var=None, y_var=None, cov=None, x_mean_skip=False, y_mean_skip=False):
+    m = x.shape[0]
+
+    x_bat_mean = x.mean(axis=0, keepdims=True)
+    y_bat_mean = y.mean(axis=0, keepdims=True)
+
+    dx = x - x_bat_mean
+    dy = y - y_bat_mean
+
+    if x_var is not None:
+        x_bat_var = nd.sum(dx**2, axis=0)
+        x_var += x_bat_var + ((x_mean - x_bat_mean)**2) * n * m / (n+m)
+
+    if y_var is not None:
+        y_bat_var = nd.sum(dy**2, axis=0)
+        y_var += y_bat_var + ((y_mean - y_bat_mean)**2) * n * m / (n+m)
+
+    if cov is not None:
+        cov_bat = nd.dot(dx, dy, transpose_a=True)
+        cov += cov_bat + nd.dot((x_mean - x_bat_mean), (y_mean - y_bat_mean), transpose_a=True) * n * m / (n+m)
+
+    if not x_mean_skip:
+        x_mean = (n * x_mean + m * x_bat_mean) / (n+m)
+
+    if not y_mean_skip:
+        y_mean = (n * y_mean + m * y_bat_mean) / (n+m)
+
+    n += m
+
+    return n, x_mean, y_mean, x_var, y_var, cov
+
 def batchwise_covariance(X, Y):
         meanx = meany = vary = n = C = 0
         for x, y in zip(X, Y):

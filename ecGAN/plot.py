@@ -11,6 +11,10 @@ def register_cmap(func):
     return func
 
 @register_cmap
+def gray(x):
+    return np.stack([x]*3, axis=-1).clip(0., 1.)
+
+@register_cmap
 def hot(x):
     return np.stack([x*3, x*3-1, x*3-2], axis=-1).clip(0., 1.)
 
@@ -54,17 +58,20 @@ def save_explanation(relevance, data, config, output=None, image=None, source=No
                         config.nets[net].type, config.sub('nets.%s.param'%net), fpath)
     if image:
         rdat = relevance
-#        if config.explanation.method == 'sensitivity':
-#            rdat = relevance.abs()
-        if batchnorm:
-            lo, hi = rdat.min().asscalar(), rdat.max().asscalar()
+        if rdat.shape[1] == 1:
+            if batchnorm:
+                lo, hi = rdat.min().asscalar(), rdat.max().asscalar()
+            else:
+                lo = rdat.min(axis=(2, 3), keepdims=True).asnumpy()
+                hi = rdat.max(axis=(2, 3), keepdims=True).asnumpy()
+            if logger:
+                logger.debug('Explanation min %f, max %f', lo, hi)
+            fpath = config.exsub(image, iter=i, epoch=config.start_epoch, net=net, data_desc=data_desc)
+            rdat = (draw_heatmap(rdat, lo, hi, center=center, cmap=cmap)*255).astype(np.uint8)
+        elif rdat.shape[1] == 3:
+            rdat = rdat.transpose([0,2,3,1])
         else:
-            lo = rdat.min(axis=(2, 3), keepdims=True).asnumpy()
-            hi = rdat.max(axis=(2, 3), keepdims=True).asnumpy()
-        if logger:
-            logger.debug('Explanation min %f, max %f', lo, hi)
-        fpath = config.exsub(image, iter=i, epoch=config.start_epoch, net=net, data_desc=data_desc)
-        rdat = (draw_heatmap(rdat, lo, hi, center=center, cmap=cmap)*255).astype(np.uint8)
+            raise RuntimeError("Useless number of channels.")
         if net in ['classifier', 'discriminator']:
             rdat = align_images(rdat, 5, 6, 28, 28, 3)
         imwrite(fpath, rdat)

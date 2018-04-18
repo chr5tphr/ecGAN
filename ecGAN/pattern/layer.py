@@ -58,13 +58,13 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
             y = y.flatten().T
             self._learn_pattern(x, y)
 
-    def _forward_pattern(self, x, w):
+    def _forward_pattern(self, x, w, bias=None):
         kwargs = self._kwargs.copy()
         kwargs['no_bias'] = True
         w = w.reshape(self.weight.shape)
         return nd.Convolution(x, w, name='fwd', **kwargs)
 
-    def _backward_pattern(self, y, pattern):
+    def _backward_pattern(self, y, pattern, pias=None):
         kwargs = self._kwargs.copy()
         kwargs['no_bias'] = True
         kwargs['num_filter'] = self.weight.shape[1]

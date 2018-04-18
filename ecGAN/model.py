@@ -254,9 +254,9 @@ class Classifier(Model):
                 trainer.step(batch_size, ignore_stale_grad=True)
 
             if self.logger:
-                errs = str(self.netC._err)
+                errs = [err.mean().asscalar() for err in self.netC._err if isinstance(err, nd.NDArray)]
                 self.logger.info('pattern training epoch %04d , time: %.2f, errors: %s',
-                                 epoch, (time() - tic), errs)
+                                 epoch, (time() - tic), str(errs))
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
                 self.save_pattern_params(epoch+1)
 
