@@ -88,16 +88,17 @@ class Model(object):
             else:
                 net.collect_pparams().initialize(ctx=self.ctx)
 
-    def save_pattern_params(self, epoch):
+    def save_pattern_params(self, **kwargs):
         if self.config.pattern.get('save') is not None:
             for nrole, net in self.nets.items():
                 nname = self.config.nets.get(nrole, {}).get('name', '')
                 ntype = self.config.nets.get(nrole, {}).get('type', '')
                 fpath = self.config.sub('pattern.save', net_name=nname,
-                                        net_type=ntype, epoch=epoch)
+                                        net_type=ntype, **kwargs)
                 net.collect_pparams().save(fpath)
                 if self.logger:
-                    self.logger.info('Saved pattern of \'%s %s\' epoch %s in file \'%s\'.', ntype, nname, epoch, fpath)
+                    ktxt = ", ".join(['%s=%s'%(str(key), str(val)) for key,val in kwargs.items()])
+                    self.logger.info('Saved pattern of \'%s %s\' {%s} in file \'%s\'.', ntype, nname, ktxt, fpath)
         else:
             if self.logger:
                 self.logger.debug('Not saving pattern.')
@@ -205,15 +206,10 @@ class Classifier(Model):
         return R[-1]
 
     def learn_pattern(self, data, batch_size):
-        estimator = self.config.pattern.estimator
         if not isinstance(self.netC, PatternNet):
             raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets.classifier.type)
 
         data_iter = gluon.data.DataLoader(data, batch_size)
-        #self.netC.estimator = estimator
-
-        self.netC.init_pattern()
-        self.netC.collect_pparams().initialize(mx.initializer.Zero(), ctx=self.ctx)
 
         for i, (data, label) in enumerate(data_iter):
             data = data.as_in_context(self.ctx)
@@ -223,9 +219,8 @@ class Classifier(Model):
             self.netC.learn_pattern()
 
         self.netC.compute_pattern()
-        self.netC.collect_pparams().save(self.config.sub('pattern.save',
-                                                    net_name=self.config.nets.classifier.name,
-                                                    net_type=self.config.nets.classifier.type))
+        self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
+                                 ase_epoch=self.config.pattern.get('aepoch', 0))
 
         if self.logger:
             self.logger.info('Learned signal estimator %s for net %s', estimator, self.config.nets.classifier.type)
@@ -254,21 +249,77 @@ class Classifier(Model):
                 trainer.step(batch_size, ignore_stale_grad=True)
 
             if self.logger:
-                errs = [err.mean().asscalar() for err in self.netC._err if isinstance(err, nd.NDArray)]
+                etxt = ', '.join(['%.2e'%(err.mean().asscalar()) for err in self.netC._err if isinstance(err, nd.NDArray)])
                 self.logger.info('pattern training epoch %04d , time: %.2f, errors: %s',
-                                 epoch, (time() - tic), str(errs))
+                                 epoch, (time() - tic), etxt)
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
-                self.save_pattern_params(epoch+1)
+                self.save_pattern_params(fit_epoch=epoch+1,
+                                         ase_epoch=self.config.pattern.get('aepoch', 0))
 
         if self.logger:
             self.logger.info('Learned pattern for net %s',
                              self.config.nets.classifier.type)
+
+    def fit_assess_pattern(self, data, batch_size):
+        if not isinstance(self.netC, PatternNet):
+            raise NotImplementedError('\'%s\' is not a PatternNet!'%self.config.nets.classifier.type)
+
+        data_iter = gluon.data.DataLoader(data, batch_size)
+
+        trainer = gluon.Trainer(self.netC.collect_pparams(),
+            self.config.pattern.get('optimizer', 'SGD'),
+            self.config.pattern.get('optkwargs', {'learning_rate': 0.01}))
+
+        start_epoch = self.config.pattern.get('aepoch', 0)
+        nepochs = self.config.pattern.get('nepochs', 1)
+        save_freq = self.config.pattern.get('save_freq', 1)
+
+        for epoch in range(start_epoch, start_epoch + nepochs):
+            tic = time()
+            for i, (data, label) in enumerate(data_iter):
+                data = data.as_in_context(self.ctx)
+                label = label.as_in_context(self.ctx)
+
+                self.netC.fit_assess_pattern(data)
+                trainer.step(batch_size, ignore_stale_grad=True)
+
+            if self.logger:
+                etxt = ', '.join(['%.2e'%(err.mean().asscalar()) for err in self.netC._err if isinstance(err, nd.NDArray)])
+                self.logger.info('pattern assessment training epoch %04d , time: %.2f, errors: %s',
+                                 epoch, (time() - tic), str(errs))
+            if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
+                self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
+                                         ase_epoch=epoch+1)
+
+    def stats_assess_pattern(self, data, batch_size):
+        if not isinstance(self.netC, PatternNet):
+            raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets.classifier.type)
+
+        data_iter = gluon.data.DataLoader(data, batch_size)
+
+        for i, (data, label) in enumerate(data_iter):
+            data = data.as_in_context(self.ctx)
+            label = label.as_in_context(self.ctx)
+
+            self.netC.forward_logged(data)
+            self.netC.stats_assess_pattern()
+
+        self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
+                                 ase_epoch=self.config.pattern.get('aepoch', 0))
 
     def explain_pattern(self, data):
         if not isinstance(self.netC, PatternNet):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
 
         R = self.netC.explain_pattern(data)
+
+        return R
+
+    def assess_pattern(self, data):
+        if not isinstance(self.netC, PatternNet):
+            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+
+        R = self.netC.assess_pattern(data)
 
         return R
 

@@ -138,12 +138,13 @@ class PatternNet(Block):
         #computes only gradients for batch step!
         w_qual = self.w_qual.data(ctx=x.context)
         signal = self._signal_pattern(y)
-        distractor = x - signal
+        distractor = x - signal.reshape(x.shape)
         loss = mx.gluon.loss.L2Loss()
         with autograd.record():
             vtd = self._forward_pattern(distractor, w_qual)
             err = loss(vtd, y)
         err.backward()
+        self._err = err
         return y
 
     def _prepare_data_pattern(self):
@@ -154,7 +155,7 @@ class PatternNet(Block):
         s = self._signal_pattern(y)
         d = x - s
 
-        attrs = ['num_samples', 'mean_d', 'mean_y', None, 'var_y', 'cov_dd', None, 'cov_yd']
+        attrs = ['num_samples', 'mean_d', 'mean_y', None, 'var_y', 'cov_dd', None, 'cov_dy']
 
         args = [d, y] + [None if name is None else getattr(self, name).data(ctx=d.context) for name in attrs]
         retval = stats_batchwise(*args)
@@ -266,6 +267,15 @@ class ActPatternNet(PatternNet):
 
     def compute_pattern(self):
         pass
+
+    def fit_assess_pattern(self, x):
+        return self(x)
+
+    def stats_assess_pattern(self):
+        pass
+
+    def assess_pattern(self):
+        return None
 
     def forward_pattern(self, *args):
         x_neut, x_acc, x_regs = self._args_forward_pattern(*args)

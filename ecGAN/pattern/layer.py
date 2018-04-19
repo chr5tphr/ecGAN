@@ -155,6 +155,23 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
             self._err.append(block._err)
         return x
 
+    def fit_assess_pattern(self, x):
+        self._err = []
+        for block in self._children:
+            x = block.fit_assess_pattern(x)
+            self._err.append(block._err)
+        return x
+
+    def stats_assess_pattern(self):
+        for block in self._children:
+            block.stats_assess_pattern()
+
+    def assess_pattern(self, x):
+        quals = []
+        for block in self._children:
+            quals.append(block.assess_pattern(x))
+        return quals
+
     def compute_pattern(self):
         for block in self._children:
             block.compute_pattern()
