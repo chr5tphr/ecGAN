@@ -61,8 +61,8 @@ class PatternNet(Block):
                                           shape=(1, insize),
                                           init=mx.initializer.Zero(),
                                           grad_req='null')
-            self.var_d = self.pparams.get('var_d',
-                                          shape=(1, insize),
+            self.cov_dd = self.pparams.get('cov_dd',
+                                          shape=(insize, insize),
                                           init=mx.initializer.Zero(),
                                           grad_req='null')
             self.cov_dy = self.pparams.get('cov_dy',
@@ -122,9 +122,6 @@ class PatternNet(Block):
             pat = cov / var_y
             regime.pattern.set_data(pat)
 
-    def learn_pattern(self, *args, **kwargs):
-        raise NotImplementedError
-
     def fit_pattern(self, x):
         y = self(x)
         #computes only gradients for batch step!
@@ -149,89 +146,21 @@ class PatternNet(Block):
         err.backward()
         return y
 
-    def _compute_assess_pattern(self, x, y):
-        for regime in self._regimes:
-            mean_x = regime.mean_x.data()
-            mean_xy = regime.mean_xy.data()
-            num_y = regime.num_y.data()
-            num_x = num_y.sum()
+    def _prepare_data_pattern(self):
+        raise NotImplementedError
 
-            cond_y = regime(y)
-            # number of times each sample's x for w.t dot x was inside the regime
-            num_n = cond_y.sum(axis=1, keepdims=True)
-            # => weighted sum over x
-            wsum_x = nd.dot(num_n, x, transpose_a=True)
-
-            # y's in regime
-            reg_y = y * cond_y
-            # sum of xy's in regime
-            # sum_xy = (reg_y.expand_dims(axis=2) * x.expand_dims(axis=1)).sum(axis=0)
-            sum_xy = nd.dot(reg_y, x, transpose_a=True)
-
-
-            num_x_cur = num_n.sum()
-            mean_x = (num_x * mean_x + wsum_x) / (num_x + num_x_cur + 1e-12)
-
-            num_y_cur = cond_y.sum(axis=0)
-            mean_xy = (num_y.T * mean_xy + sum_xy) / (num_y + num_y_cur + 1e-12).T
-
-            num_y += num_y_cur
-
-            regime.num_y.set_data(num_y)
-            regime.mean_x.set_data(mean_x)
-            regime.mean_xy.set_data(mean_xy)
-
-        num = self.num_samples.data()
-        num_cur = x.shape[0]
-        mean_y = self.mean_y.data()
-        sum_y = y.sum(axis=0, keepdms=True)
-        mean_y = (num * mean_y + sum_y) / (num + num_cur + 1e-12)
-        num += num_cur
-        self.mean_y.set_data(mean_y)
-        self.num_samples.set_data(num)
-
-    def _stats_assess_pattern(self, x, y):
+    def stats_assess_pattern(self):
+        x, y = self._prepare_data_pattern()
         s = self._signal_pattern(y)
         d = x - s
 
-        attrs = ['num_samples', 'mean_d', 'mean_y', 'var_d', 'var_y', 'cov_yd']
+        attrs = ['num_samples', 'mean_d', 'mean_y', None, 'var_y', 'cov_dd', None, 'cov_yd']
 
-        args = [d, y] + [getattr(self, name).data(ctx=d.context) for name in attrs]
+        args = [d, y] + [None if name is None else getattr(self, name).data(ctx=d.context) for name in attrs]
         retval = stats_batchwise(*args)
         for name, val in zip(attrs, reval):
-            getattr(self, name).set_data(val)
-
-
-    def stats_batchwise(x_bat, y_bat, n, x_mean, y_mean, x_var=None, y_var=None, cov=None, x_mean_skip=False, y_mean_skip=False):
-        m = x.shape[0]
-
-        x_bat_mean = x.mean(axis=0, keepdims=True)
-        y_bat_mean = y.mean(axis=0, keepdims=True)
-
-        dx = x - x_bat_mean
-        dy = y - y_bat_mean
-
-        if x_var is not None:
-            x_bat_var = nd.sum(dx**2, axis=0)
-            x_var += x_bat_var + ((x_mean - x_bat_mean)**2) * n * m / (n+m)
-
-        if y_var is not None:
-            y_bat_var = nd.sum(dy**2, axis=0)
-            y_var += y_bat_var + ((y_mean - y_bat_mean)**2) * n * m / (n+m)
-
-        if cov is not None:
-            cov_bat = nd.dot(dx, dy, transpose_a=True)
-            cov += cov_bat + nd.dot((x_mean - x_bat_mean), (y_mean - y_bat_mean), transpose_a=True) * n * m / (n+m)
-
-        if not x_mean_skip:
-            x_mean = (n * x_mean + m * x_bat_mean) / (n+m)
-
-        if not y_mean_skip:
-            y_mean = (n * y_mean + m * y_bat_mean) / (n+m)
-
-        n += m
-
-        return n, x_mean, y_mean, x_var, y_var, cov
+            if name is not None:
+                getattr(self, name).set_data(val)
 
     def _signal_pattern(self, y, y_cond=None):
         if y_cond is None:
@@ -250,10 +179,17 @@ class PatternNet(Block):
     def explain_pattern(self, *args, **kwargs):
         raise NotImplementedError
 
-    def assess_pattern(self, *args, **kwargs):
-        raise NotImplementedError
+    def assess_pattern(self):
+        v = self.w_qual.data()
+        dd_cov = self.cov_dd.data(ctx=v.context)
+        dy_cov = self.cov_dy.data(ctx=v.context)
+        y_var = self.var_y.data(ctx=v.context)
+        vd_var = (v * nd.dot(v, dd_cov)).sum(axis=1)
+        corr = (dy_cov * v).sum(axis=1) / (vd_var * y_var)**0.5
+        return 1. - corr
 
-    def _learn_pattern(self, x, y):
+    def learn_pattern(self):
+        x, y = self._prepare_data_pattern()
         for regime in self._regimes:
             mean_x = regime.mean_x.data()
             mean_xy = regime.mean_xy.data()

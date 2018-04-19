@@ -67,14 +67,14 @@ def linspace(start=0., stop=1., num=1, ctx=None, dtype=None):
 def randint(low=0., high=1., shape=(1, ), ctx=None, dtype='int32'):
     return nd.uniform(low=low, high=high, shape=shape, ctx=ctx).astype(dtype)
 
-def stats_batchwise(x_bat, y_bat, n, x_mean, y_mean, x_var=None, y_var=None, cov=None, x_mean_skip=False, y_mean_skip=False):
-    m = x.shape[0]
+def stats_batchwise(x_bat, y_bat, n, x_mean, y_mean, x_var=None, y_var=None, xx_cov=None, yy_cov=None, xy_cov=None, x_mean_skip=False, y_mean_skip=False):
+    m = x_bat.shape[0]
 
-    x_bat_mean = x.mean(axis=0, keepdims=True)
-    y_bat_mean = y.mean(axis=0, keepdims=True)
+    x_bat_mean = x_bat.mean(axis=0, keepdims=True)
+    y_bat_mean = y_bat.mean(axis=0, keepdims=True)
 
-    dx = x - x_bat_mean
-    dy = y - y_bat_mean
+    dx = x_bat - x_bat_mean
+    dy = y_bat - y_bat_mean
 
     if x_var is not None:
         x_bat_var = nd.sum(dx**2, axis=0)
@@ -84,9 +84,17 @@ def stats_batchwise(x_bat, y_bat, n, x_mean, y_mean, x_var=None, y_var=None, cov
         y_bat_var = nd.sum(dy**2, axis=0)
         y_var += y_bat_var + ((y_mean - y_bat_mean)**2) * n * m / (n+m)
 
-    if cov is not None:
-        cov_bat = nd.dot(dx, dy, transpose_a=True)
-        cov += cov_bat + nd.dot((x_mean - x_bat_mean), (y_mean - y_bat_mean), transpose_a=True) * n * m / (n+m)
+    if xx_cov is not None:
+        xx_bat_cov = nd.dot(dx, dx, transpose_a=True)
+        xx_cov += xx_bat_cov + nd.dot((x_mean - x_bat_mean), (x_mean - x_bat_mean), transpose_a=True) * n * m / (n+m)
+
+    if yy_cov is not None:
+        yy_bat_cov = nd.dot(dy, dy, transpose_a=True)
+        yy_cov += yy_bat_cov + nd.dot((y_mean - y_bat_mean), (y_mean - y_bat_mean), transpose_a=True) * n * m / (n+m)
+
+    if xy_cov is not None:
+        xy_bat_cov = nd.dot(dy, dx, transpose_a=True)
+        xy_cov += xy_bat_cov + nd.dot((y_mean - y_bat_mean), (x_mean - x_bat_mean), transpose_a=True) * n * m / (n+m)
 
     if not x_mean_skip:
         x_mean = (n * x_mean + m * x_bat_mean) / (n+m)
@@ -96,7 +104,7 @@ def stats_batchwise(x_bat, y_bat, n, x_mean, y_mean, x_var=None, y_var=None, cov
 
     n += m
 
-    return n, x_mean, y_mean, x_var, y_var, cov
+    return n, x_mean, y_mean, x_var, y_var, xx_cov, yy_cov, xy_cov
 
 def batchwise_covariance(X, Y):
         meanx = meany = vary = n = C = 0

@@ -19,12 +19,12 @@ class DensePatternNet(PatternNet, nn.Dense):
     def _weight_pattern(self):
         return self.weight.data().flatten()
 
-    def learn_pattern(self):
+    def _prepare_data_pattern(self):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         x = self._in[0].flatten()
         y = self._out.flatten()
-        self._learn_pattern(x, y)
+        return x,y
 
     def _forward_pattern(self, x, w, bias=None):
         return nd.FullyConnected(x, w, bias, no_bias=(bias is None),
