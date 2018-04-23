@@ -159,7 +159,7 @@ class PatternNet(Block):
 
         args = [d, y] + [None if name is None else getattr(self, name).data(ctx=d.context) for name in attrs]
         retval = stats_batchwise(*args)
-        for name, val in zip(attrs, reval):
+        for name, val in zip(attrs, retval):
             if name is not None:
                 getattr(self, name).set_data(val)
 

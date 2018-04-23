@@ -286,7 +286,7 @@ class Classifier(Model):
             if self.logger:
                 etxt = ', '.join(['%.2e'%(err.mean().asscalar()) for err in self.netC._err if isinstance(err, nd.NDArray)])
                 self.logger.info('pattern assessment training epoch %04d , time: %.2f, errors: %s',
-                                 epoch, (time() - tic), str(errs))
+                                 epoch, (time() - tic), etxt)
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
                 self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                          ase_epoch=epoch+1)
@@ -315,11 +315,11 @@ class Classifier(Model):
 
         return R
 
-    def assess_pattern(self, data):
+    def assess_pattern(self):
         if not isinstance(self.netC, PatternNet):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
 
-        R = self.netC.assess_pattern(data)
+        R = self.netC.assess_pattern()
 
         return R
 

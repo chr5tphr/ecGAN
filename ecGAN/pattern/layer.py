@@ -166,10 +166,10 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         for block in self._children:
             block.stats_assess_pattern()
 
-    def assess_pattern(self, x):
+    def assess_pattern(self):
         quals = []
         for block in self._children:
-            quals.append(block.assess_pattern(x))
+            quals.append(block.assess_pattern())
         return quals
 
     def compute_pattern(self):

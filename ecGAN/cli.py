@@ -325,7 +325,7 @@ def assess_pattern(args, config):
     model.load_pattern_params()
     rho = model.assess_pattern()
 
-    txt = ' '.join([str(elem.mean().asscalar()) for elem in rho if rho is not None])
+    txt = ' '.join([str(elem.mean().asscalar()) for elem in rho if elem is not None])
     logger.info('Pattern Qualities rho(s) = %s'%txt)
 
 @register_command

@@ -140,6 +140,9 @@ def config_ctx(config):
         if isinstance(config.device_id, int):
             return mx.context.gpu(config.device_id)
         else:
+            devs = nvidia_idle()
+            if not len(devs):
+                raise RuntimeError("No GPUs available!")
             return mx.context.gpu(random.choice(nvidia_idle()))
 
 def mkfilelogger(lname, fname, level=logging.INFO):
