@@ -27,8 +27,8 @@ def main():
     parser = ArgumentParser()
 
     parser.add_argument('command', choices=commands.keys())
-    parser.add_argument('-f', '--config')
-    parser.add_argument('-u', '--update')
+    parser.add_argument('-f', '--config', action='append')
+    parser.add_argument('-u', '--update', action='append')
     parser.add_argument('--epoch_range', nargs=3, type=int)
     parser.add_argument('--iter', type=int, default=1)
     parser.add_argument('--seed', type=int)
@@ -37,9 +37,13 @@ def main():
 
     args = parser.parse_args(sys.argv[1:])
 
-    config = Config(fname=args.config)
-    if args.update:
-        config.update(yaml.safe_load(args.update))
+    config = Config()
+
+    for cpath in args.config:
+        config.update_from_file(cpath)
+
+    for ustr in args.update:
+        config.update(yaml.safe_load(ustr))
 
     if args.seed:
         random.seed(args.seed)
@@ -87,6 +91,10 @@ def main():
 #
 #     with open(os.path.join([config.sub('setup_path'), 'config.yaml']), 'w') as fp:
 #         yaml.safe_dump(fp, config)
+
+@register_command
+def print_config(args, config):
+    print(yaml.safe_dump(config.raw(), default_flow_style=False))
 
 @register_command
 def train(args, config):

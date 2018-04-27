@@ -54,6 +54,15 @@ class ConfigNode(dict):
         else:
             return X
 
+    def raw(self):
+        rdic = {}
+        for key, val in self.items():
+            if isinstance(val, ConfigNode):
+                rdic[key] = val.raw()
+            else:
+                rdic[key] = val
+        return rdic
+
     def __getattr__(self, name):
         errA = None
         try:
@@ -130,8 +139,12 @@ class Config(ConfigNode):
         self.update(defcfg)
 
         if fname is not None:
-            with open(fname, 'r') as fp:
-                self.update(yaml.safe_load(fp))
+            self.update_from_file(fname)
+
+    def update_from_file(self, fname):
+        with open(fname, 'r') as fp:
+            self.update(yaml.safe_load(fp))
+
 
 def config_ctx(config):
     if config.device == 'cpu' or not GPU_SUPPORT:

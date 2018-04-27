@@ -40,9 +40,10 @@ class Interpretable(Block):
             upper.attach_grad()
             lower.attach_grad()
             with autograd.record():
-                zlh =   self._forward_interpretable(a, weight)
+                zlh = ( self._forward_interpretable(a, weight)
                       - self._forward_interpretable(lower, wplus)
                       - self._forward_interpretable(upper, wminus)
+                      )
             zlh.backward(out_grad=R/zlh)
             return a*a.grad + upper*upper.grad + lower*lower.grad
         else: #z+
