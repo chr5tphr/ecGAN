@@ -97,16 +97,17 @@ class PatternNet(Block):
                                                grad_req='write')
 
     def forward_pattern(self, *args):
-        x_neut, x_acc, x_regs = self._args_forward_pattern(*args)
+        x_neut, x_pat = self._args_forward_pattern(*args)
 
         z_neut = self.forward(x_neut)
-        z_acc = x_acc
-        z_regs = {}
+        z_pat = 0.
         for regime in self._regimes:
-            a_reg = regime.pattern.data()
-            z_regs[regime.name] = self._forward_pattern(x_acc, a_reg)
+            a_reg = regime.pattern.data(ctx=x_pat.context)
+            z_reg = self._forward_pattern(x_acc, a_reg)
+            # regimes are assumed to be disjunct
+            z_pat = nd.where(regime, z_reg, z_pat)
 
-        return z_neut, z_acc, z_regs
+        return z_neut, z_pat
 
     def backward_pattern(self, y_sig):
         if self._out is None:
@@ -174,7 +175,7 @@ class PatternNet(Block):
             pias = regime.pias.data(ctx=y.context)
             s_reg = self._backward_pattern(y_reg, pattern, pias)
             # regimes are assumed to be disjunct
-            signal += s_reg
+            signal = signal + s_reg
         return signal
 
     def explain_pattern(self, *args, **kwargs):
@@ -244,10 +245,8 @@ class PatternNet(Block):
     @staticmethod
     def _args_forward_pattern(*args):
         if len(args) == 1:
-            return args[0], args[0], {}
+            return args[0], args[0]
         elif len(args) == 2:
-            return args[0], args[1], {}
-        elif len(args) == 3:
             return args
         else:
             raise RuntimeError('Number of input arguments not correct!')
@@ -278,16 +277,12 @@ class ActPatternNet(PatternNet):
         return None
 
     def forward_pattern(self, *args):
-        x_neut, x_acc, x_regs = self._args_forward_pattern(*args)
+        x_neut, x_pat = self._args_forward_pattern(*args)
 
         z_neut = self.forward(x_neut)
-        z_regs = {}
-        z_acc = nd.zeros_like(x_neut, ctx=x_neut.context)
-        for regime in self._regimes:
-            z_reg = self._forward_pattern(x_neut, x_regs[regime.name])
-            z_acc = nd.where(regime(z_neut), z_reg, z_acc)
+        z_pat = self._forward_pattern(x_neut, x_pat)
 
-        return z_neut, z_acc, z_regs
+        return z_neut, z_pat
 
     def backward_pattern(self, y_sig):
         raise NotImplementedError

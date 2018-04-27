@@ -8,76 +8,34 @@ from ..base import YSequentialBase
 from ..func import linspace
 
 class DenseInterpretable(Interpretable, nn.Dense):
-    def relevance_sensitivity(self, R):
-        if self._in is None:
-            raise RuntimeError('Block has not yet executed forward_logged!')
-        a = self._in[0]
-        a.attach_grad()
-        with autograd.record():
-            z = self(a)
-        return autograd.grad(z, a, head_grads=R)
+    def _forward_interpretable(self, x, w, bias=None):
+        return nd.FullyConnected(x, w, bias,
+                                 no_bias=(bias is None),
+                                 num_hidden=self._units,
+                                 flatten=self._flatten)
 
-    def relevance_lrp(self, R, alpha=1., beta=0.):
-        if self._in is None:
-            raise RuntimeError('Block has not yet executed forward_logged!')
-        a = self._in[0]
-        wplus = nd.maximum(0., self.weight.data())
-        wminus = nd.minimum(0., self.weight.data())
-        with autograd.record():
-            zplus = nd.FullyConnected(a, wplus, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
-            zminus = nd.FullyConnected(a, wminus, None, no_bias=True, num_hidden=self._units, flatten=self._flatten)
-        cplus = autograd.grad(zplus, a, head_grads=alpha*R/zplus)
-        cminus = autograd.grad(zminus, a, head_grads=beta*R/zminus)
-        return a*(cplus - cminus)
-
-    def relevance_dtd(self, R, lo=-1, hi=1):
-        if self._in is None:
-            raise RuntimeError('Block has not yet executed forward_logged!')
-        a = self._in[0]
-        if self._isinput: #zb
-            wplus = nd.maximum(0., self.weight.data())
-            wminus = nd.minimum(0., self.weight.data())
-            upper = nd.ones_like(a)*hi
-            lower = nd.ones_like(a)*lo
-            a.attach_grad()
-            upper.attach_grad()
-            lower.attach_grad()
-            with autograd.record():
-                zlh = (  self(a)
-                       - nd.FullyConnected(lower,
-                                           wplus,
-                                           None,
-                                           no_bias=True,
-                                           num_hidden=self._units,
-                                           flatten=self._flatten)
-                       - nd.FullyConnected(upper,
-                                           wminus,
-                                           None,
-                                           no_bias=True,
-                                           num_hidden=self._units,
-                                           flatten=self._flatten) )
-            zlh.backward(out_grad=R/zlh)
-            return a*a.grad + upper*upper.grad + lower*lower.grad
-        else: #z+
-            wplus = nd.maximum(0., self.weight.data())
-            a.attach_grad()
-            with autograd.record():
-                z = nd.FullyConnected(a,
-                                      wplus,
-                                      None,
-                                      no_bias=True,
-                                      num_hidden=self._units,
-                                      flatten=self._flatten)
-                if self.act is not None:
-                    z = self.act(z)
-            c = autograd.grad(z, a, head_grads=R/z)
-            return a*c
+    def _weight_interpretable(self):
+        return self.weight.data()
 
 class Conv2DInterpretable(Interpretable, nn.Conv2D):
-    pass
+    def _forward_interpretable(self, x, w, bias=None):
+        kwargs = self._kwargs.copy()
+        kwargs['no_bias'] = True
+        w = w.reshape(self.weight.shape)
+        return nd.Convolution(x, w, name='fwd', **kwargs)
+
+    def _weight_interpretable(self):
+        return self.weight.data()
 
 class Conv2DTransposeInterpretable(Interpretable, nn.Conv2DTranspose):
-    pass
+    def _forward_interpretable(self, x, w, bias=None):
+        kwargs = self._kwargs.copy()
+        kwargs['no_bias'] = True
+        w = w.reshape(self.weight.shape)
+        return nd.Deconvolution(x, w, name='fwd', **kwargs)
+
+    def _weight_interpretable(self):
+        return self.weight.data()
 
 class BatchNormInterpretable(Interpretable, nn.BatchNorm):
     pass
