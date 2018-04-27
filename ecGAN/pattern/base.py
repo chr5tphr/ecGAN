@@ -100,12 +100,12 @@ class PatternNet(Block):
         x_neut, x_pat = self._args_forward_pattern(*args)
 
         z_neut = self.forward(x_neut)
-        z_pat = 0.
+        z_pat = nd.zeros_like(z_neut)
         for regime in self._regimes:
             a_reg = regime.pattern.data(ctx=x_pat.context)
-            z_reg = self._forward_pattern(x_acc, a_reg)
+            z_reg = self._forward_pattern(x_pat, a_reg)
             # regimes are assumed to be disjunct
-            z_pat = nd.where(regime, z_reg, z_pat)
+            z_pat = nd.where(regime(z_neut), z_reg, z_pat)
 
         return z_neut, z_pat
 

@@ -195,7 +195,10 @@ class ReLUPatternNet(ActPatternNet, ReLUBase):
         return nd.where(x_neut>=0., x_reg, nd.zeros_like(x_neut, ctx=x_neut.context))
 
     def backward_pattern(self, y_sig):
-        return self(y_sig)
+        if self._out is None:
+            raise RuntimeError('Block has not yet executed forward_logged!')
+        y_neut = self._out
+        return self._forward_pattern(y_neut, y_sig)
 
 class IdentityPatternNet(ActPatternNet, IdentityBase):
     def _forward_pattern(self, x_neut, x_reg):
