@@ -126,13 +126,27 @@ class PatternNet(Block):
     def fit_pattern(self, x):
         y = self(x)
         #computes only gradients for batch step!
-        loss = mx.gluon.loss.L2Loss()
-        with autograd.record():
-            signal = self._signal_pattern(y)
-            err = loss(signal, x)
-        err.backward()
-        self._err = err
+        self._err = []
+        for regime in self._regimes:
+            loss = mx.gluon.loss.L2Loss()
+            with autograd.record():
+                y_reg = y * regime(y)
+                pattern = regime.pattern.data(ctx=y.context)
+                pias = regime.pias.data(ctx=y.context)
+                signal = self._backward_pattern(y_reg, pattern, pias)
+                err = loss(signal, x)
+            err.backward()
+            self._err.append(err)
         return y
+        #y = self(x)
+        ##computes only gradients for batch step!
+        #loss = mx.gluon.loss.L2Loss()
+        #with autograd.record():
+        #    signal = self._signal_pattern(y)
+        #    err = loss(signal, x)
+        #err.backward()
+        #self._err = err
+        #return y
 
     def fit_assess_pattern(self, x):
         y = self(x)

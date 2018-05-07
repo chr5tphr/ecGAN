@@ -181,8 +181,8 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         x.attach_grad()
         with autograd.record():
             y = self.forward_pattern(x)
-        #y[1].backward(out_grad=y[0])
-        y[1].backward()
+        y[1].backward(out_grad=y[0])
+        #y[1].backward()
         return x.grad
 
     def backward_pattern(self, y_sig):
