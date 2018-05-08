@@ -14,7 +14,7 @@ from mxnet import nd, gluon, autograd, random
 from .net import nets
 from .model import models
 from .data import data_funcs
-from .util import mkfilelogger, Config, config_ctx, make_ctx, load_module_file, ChainNode, RessourceManager
+from .util import mkfilelogger, Config, config_ctx, make_ctx, load_module_file, ChainConfig, RessourceManager
 from .plot import plot_data, save_explanation
 from .func import linspace
 
@@ -29,9 +29,9 @@ def main():
     parser = ArgumentParser()
 
     parser.add_argument('command', choices=commands.keys())
-    parser.add_argument('-f', '--config', action='append')
-    parser.add_argument('-c', '--chain', action='append')
-    parser.add_argument('-u', '--update', action='append')
+    parser.add_argument('-f', '--config', action='append', default=[])
+    parser.add_argument('-c', '--chain', action='append', default=[])
+    parser.add_argument('-u', '--update', action='append', default=[])
     parser.add_argument('--epoch_range', nargs=3, type=int)
     parser.add_argument('--iter', type=int, default=1)
     parser.add_argument('--seed', type=int)
@@ -40,18 +40,21 @@ def main():
 
     args = parser.parse_args(sys.argv[1:])
 
-    config = Config()
+    if len(args.config):
+        config = Config()
 
-    for cpath in args.config:
-        config.update_from_file(cpath)
+        for cpath in args.config:
+            config.update_from_file(cpath)
 
-    for ustr in args.update:
-        config.update(yaml.safe_load(ustr))
+        for ustr in args.update:
+            config.update(yaml.safe_load(ustr))
+
+        net_module = load_module_file(config.sub('net_file'), 'net_module')
+    else:
+        config = None
 
     if args.seed:
         random.seed(args.seed)
-
-    net_module = load_module_file(config.sub('net_file'), 'net_module')
 
     if args.debug:
         import ipdb; ipdb.set_trace()
@@ -97,13 +100,15 @@ def setup(args, config):
 
 @register_command
 def chain(args, config):
-    with open(args.chain,'r') as fp:
-        rawdict = yaml.safe_load(fp)
-    content = rawdict.pop('dict', {})
-    ctree = ChainNode(content, **rawdict)
+    for fname in args.chain:
+        with open(fname,'r') as fp:
+            rawdict = yaml.safe_load(fp)
+        content = rawdict.pop('dict', {})
+        ctree = ChainConfig(content, **rawdict)
 
-    for leaf in ctree.leaves():
-        commands[leaf._action](None, leaf)
+        for leaf in ctree.leaves():
+            print(yaml.safe_dump(leaf.raw(), default_flow_style=False))
+            commands[leaf._action](None, leaf)
 
 
 @register_command

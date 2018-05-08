@@ -44,10 +44,13 @@ class ConfigNode(dict):
 
     def update(self, new):
         for key, val in new.items():
-            if isinstance(val, dict) and isinstance(self.get(key), dict):
-                self[key].update(val)
+            if isinstance(val, dict):
+                if isinstance(self.get(key), dict):
+                    self[key].update(val)
+                else:
+                    self[key] = ConfigNode(val)
             else:
-                self[key] = self.parse(val)
+                self[key] = val
 
     def _parse(self):
         for key, val in self.items():
@@ -155,17 +158,31 @@ class ChainNode(ConfigNode):
     def __getitem__(self, key):
         try:
             val = super().__getitem__(key)
-        except KeyError:
-            val = self._parent.__getitem__(key)
+        except KeyError as e:
+            if self._parent is not None:
+                val = self._parent.__getitem__(key)
+            else:
+                raise e
         return val
 
     def get(self, k, d=None):
-        return super().get(k, self._parent.get(k, d))
+        return super().get(k, None if self._parent is None else self._parent.get(k, d))
 
-    def _parse(self, child):
+    def update(self, new):
+        print(self, new)
+        for key, val in new.items():
+            if isinstance(val, dict):
+                if isinstance(self.get(key), dict):
+                    self[key].update(val)
+                else:
+                    self[key] = ChainNode(val, parent=None if self._parent is None else self._parent.get(key, None))
+            else:
+                self[key] = val
+
+    def _parse(self):
         for key, val in self.items():
             if isinstance(val, dict):
-                self[key] = ChainNode(child, parent=self._parent.get(key, None) if self._parent is not None else None)
+                self[key] = ChainNode(val, parent=None if self._parent is None else self._parent.get(key, None))
             else:
                 self[key] = val
 
@@ -202,7 +219,7 @@ class ChainConfig(ChainNode):
 
     def _leaves(self):
         if len(self._tail):
-            return sum([child.leaves() for child in self._tail])
+            return sum([child.leaves() for child in self._tail], [])
         else:
             return [self]
 
@@ -218,9 +235,8 @@ class RessourceManager(dict):
 
     @staticmethod
     def dhash(*obj):
-        enc = HashEncoder(sort_keys=True, seperators=(',',':'))
+        enc = HashEncoder(sort_keys=True, separators=(',',':'))
         return hash(enc.encode(obj))
-
 
 def config_ctx(config):
     if config.device == 'cpu' or not GPU_SUPPORT:
