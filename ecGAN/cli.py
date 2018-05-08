@@ -14,7 +14,7 @@ from mxnet import nd, gluon, autograd, random
 from .net import nets
 from .model import models
 from .data import data_funcs
-from .util import mkfilelogger, Config, config_ctx, load_module_file
+from .util import mkfilelogger, Config, config_ctx, make_ctx, load_module_file, ChainNode, RessourceManager
 from .plot import plot_data, save_explanation
 from .func import linspace
 
@@ -23,11 +23,14 @@ def register_command(func):
     commands[func.__name__] = func
     return func
 
+ress = RessourceManager()
+
 def main():
     parser = ArgumentParser()
 
     parser.add_argument('command', choices=commands.keys())
     parser.add_argument('-f', '--config', action='append')
+    parser.add_argument('-c', '--chain', action='append')
     parser.add_argument('-u', '--update', action='append')
     parser.add_argument('--epoch_range', nargs=3, type=int)
     parser.add_argument('--iter', type=int, default=1)
@@ -55,42 +58,53 @@ def main():
 
     commands[args.command](args, config)
 
-# @register_command
-# def setup(args, config):
-#     # ctx = config_ctx(config)
-#
-#     setup_engine(config.db_engine)
-#     with session_scope() as session:
-#         setup = Setup(
-#             time_created = datetime.now(),
-#             time_modified = datetime.now(),
-#         )
-#         session.flush()
-#         config['setup_id'] = setup.id
-#         setup.storage_path = config.sub('setup_path')
-#         setup.config = config
-#
-#     explore = [
-#         'log',
-#         'genout',
-#         'explanation.input',
-#         'explanation.outout',
-#         'explanation.image',
-#         'nets.discriminator.params',
-#         'nets.discriminator.save',
-#         'nets.generator.params',
-#         'nets.generator.save',
-#         'nets.classifier.params',
-#         'nets.classifier.save',
-#         ]
-#     for key in explore:
-#         try:
-#             os.makedirs(os.path.dirname(config.sub(key)), exist_ok=True)
-#         except KeyError:
-#             pass
-#
-#     with open(os.path.join([config.sub('setup_path'), 'config.yaml']), 'w') as fp:
-#         yaml.safe_dump(fp, config)
+@register_command
+def setup(args, config):
+    # ctx = config_ctx(config)
+
+    # setup_engine(config.db_engine)
+    # with session_scope() as session:
+    #     setup = Setup(
+    #         time_created = datetime.now(),
+    #         time_modified = datetime.now(),
+    #     )
+    #     session.flush()
+    #     config['setup_id'] = setup.id
+    #     setup.storage_path = config.sub('setup_path')
+    #     setup.config = config
+
+    explore = [
+        'log',
+        'genout',
+        'explanation.input',
+        'explanation.outout',
+        'explanation.image',
+        'nets.discriminator.params',
+        'nets.discriminator.save',
+        'nets.generator.params',
+        'nets.generator.save',
+        'nets.classifier.params',
+        'nets.classifier.save',
+        ]
+    for key in explore:
+        try:
+            os.makedirs(os.path.dirname(config.sub(key)), exist_ok=True)
+        except KeyError:
+            pass
+
+    # with open(os.path.join([config.sub('setup_path'), 'config.yaml']), 'w') as fp:
+    #     yaml.safe_dump(fp, config)
+
+@register_command
+def chain(args, config):
+    with open(args.chain,'r') as fp:
+        rawdict = yaml.safe_load(fp)
+    content = rawdict.pop('dict', {})
+    ctree = ChainNode(content, **rawdict)
+
+    for leaf in ctree.leaves():
+        commands[leaf._action](None, leaf)
+
 
 @register_command
 def print_config(args, config):
@@ -98,12 +112,12 @@ def print_config(args, config):
 
 @register_command
 def train(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
 
     batch_size = config.batch_size
     nepochs = config.nepochs
 
-    data = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     logger = None
     if config.log:
@@ -115,10 +129,9 @@ def train(args, config):
 
 @register_command
 def generate(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
 
     netG = nets[config.nets.generator.type]()
-
 
     logger = None
     if config.log:
@@ -154,28 +167,28 @@ def generate(args, config):
 
 @register_command
 def test(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
 
     logger = None
     if config.log:
         logger = mkfilelogger('testing', config.sub('log'))
 
     batch_size = config.batch_size
-    data = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     model = models[config.model](ctx=ctx, logger=logger, config=config)
     model.test(data=data, batch_size=batch_size)
 
 @register_command
 def debug(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
 
     logger = None
     if config.log:
         logger = mkfilelogger('debugging', config.sub('log'))
 
     batch_size = config.batch_size
-    data = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     model = models[config.model](ctx=ctx, logger=logger, config=config)
 
@@ -183,7 +196,7 @@ def debug(args, config):
 
 @register_command
 def explain(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
 
     logger = None
     if config.log:
@@ -216,7 +229,7 @@ def explain(args, config):
 
 @register_command
 def explain_gan(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
 
     logger = None
     if config.log:
@@ -267,9 +280,9 @@ def explain_gan(args, config):
 
 @register_command
 def learn_pattern(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
     batch_size = config.batch_size
-    data = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     logger = None
     if config.log:
@@ -281,9 +294,9 @@ def learn_pattern(args, config):
 
 @register_command
 def fit_pattern(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
     batch_size = config.batch_size
-    data = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     logger = None
     if config.log:
@@ -295,9 +308,9 @@ def fit_pattern(args, config):
 
 @register_command
 def stats_assess_pattern(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
     batch_size = config.batch_size
-    data = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     logger = None
     if config.log:
@@ -309,9 +322,9 @@ def stats_assess_pattern(args, config):
 
 @register_command
 def fit_assess_pattern(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
     batch_size = config.batch_size
-    data = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     logger = None
     if config.log:
@@ -323,7 +336,7 @@ def fit_assess_pattern(args, config):
 
 @register_command
 def assess_pattern(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
 
     logger = None
     if config.log:
@@ -338,7 +351,7 @@ def assess_pattern(args, config):
 
 @register_command
 def explain_pattern(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
 
     logger = None
     if config.log:
@@ -349,7 +362,7 @@ def explain_pattern(args, config):
 
     cmap = config.get('cmap', 'coldnhot')
 
-    data_fp = data_funcs[config.data.func](*(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data_fp = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
 
     for i, (data, label) in enumerate(data_iter):
@@ -381,7 +394,7 @@ def explain_pattern(args, config):
 
 @register_command
 def predict(args, config):
-    ctx = config_ctx(config)
+    ctx = ress(make_ctx, config.device, config.device_id)
 
     logger = None
     if config.log:

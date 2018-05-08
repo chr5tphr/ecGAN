@@ -4,6 +4,9 @@ import yaml
 import random
 import h5py
 import importlib.util
+import json
+
+from types import FunctionType as function
 
 import mxnet as mx
 from mxnet import nd
@@ -21,8 +24,7 @@ class Template(STemplate):
 class ConfigNode(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for key, val in self.items():
-            self[key] = self.parse(val)
+        self._parse()
 
         self._flat = None
 
@@ -47,12 +49,12 @@ class ConfigNode(dict):
             else:
                 self[key] = self.parse(val)
 
-    @staticmethod
-    def parse(X):
-        if type(X) is dict:
-            return ConfigNode(X)
-        else:
-            return X
+    def _parse(self):
+        for key, val in self.items():
+            if isinstance(val, dict):
+                self[key] = ConfigNode(val)
+            else:
+                self[key] = val
 
     def raw(self):
         rdic = {}
@@ -77,6 +79,10 @@ class ConfigNode(dict):
 
     def exsub(self, param, **kwargs):
         return Template(param).safe_substitute(self.flat(), **kwargs)
+
+    def update_from_file(self, fname):
+        with open(fname, 'r') as fp:
+            self.update(yaml.safe_load(fp))
 
 class Config(ConfigNode):
 
@@ -141,9 +147,79 @@ class Config(ConfigNode):
         if fname is not None:
             self.update_from_file(fname)
 
-    def update_from_file(self, fname):
-        with open(fname, 'r') as fp:
-            self.update(yaml.safe_load(fp))
+class ChainNode(ConfigNode):
+    def __init__(self, *args, **kwargs):
+        self._parent = kwargs.pop('parent', None)
+        super().__init__(*args, **kwargs)
+
+    def __getitem__(self, key):
+        try:
+            val = super().__getitem__(key)
+        except KeyError:
+            val = self._parent.__getitem__(key)
+        return val
+
+    def get(self, k, d=None):
+        return super().get(k, self._parent.get(k, d))
+
+    def _parse(self, child):
+        for key, val in self.items():
+            if isinstance(val, dict):
+                self[key] = ChainNode(child, parent=self._parent.get(key, None) if self._parent is not None else None)
+            else:
+                self[key] = val
+
+    def dict(self):
+        if self._parent is not None:
+            tdic = self._parent.dict()
+        else:
+            tdic = {}
+        tdic.update(self)
+        return tdic
+
+    def items(self):
+        return self.dict().items()
+
+    def keys(self):
+        return self.dict().keys()
+
+    def values(self):
+        return self.dict().values()
+
+class ChainConfig(ChainNode):
+    def __init__(self, *args, **kwargs):
+        children = kwargs.pop('tail', [])
+        action = kwargs.pop('action', None)
+        fname = kwargs.pop('fname', None)
+        priority = kwargs.pop('priority', 0)
+        super().__init__(*args, **kwargs)
+        self._tail = [ChainConfig(child.pop('dict', {}), parent=self, **child) for child in children]
+        self._action = action
+        self._priority = priority
+
+        if fname is not None:
+            self.update_from_file(fname)
+
+    def _leaves(self):
+        if len(self._tail):
+            return sum([child.leaves() for child in self._tail])
+        else:
+            return [self]
+
+    def leaves(self):
+        return sorted(self._leaves(), key=lambda x: x._priority)
+
+class RessourceManager(dict):
+    def __call__(self, func, *args, **kwargs):
+        try:
+            return self[self.dhash(func, args, kwargs)]
+        except KeyError:
+            return func(*args, **kwargs)
+
+    @staticmethod
+    def dhash(*obj):
+        enc = HashEncoder(sort_keys=True, seperators=(',',':'))
+        return hash(enc.encode(obj))
 
 
 def config_ctx(config):
@@ -157,6 +233,33 @@ def config_ctx(config):
             if not len(devs):
                 raise RuntimeError("No GPUs available!")
             return mx.context.gpu(random.choice(nvidia_idle()))
+
+def make_ctx(device, device_id):
+    if device == 'cpu' or not GPU_SUPPORT:
+        return mx.context.cpu()
+    elif device == 'gpu':
+        if isinstance(device_id, int):
+            return mx.context.gpu(device_id)
+        else:
+            devs = nvidia_idle()
+            if not len(devs):
+                raise RuntimeError("No GPUs available!")
+            return mx.context.gpu(random.choice(nvidia_idle()))
+
+class HashEncoder(json.JSONEncoder):
+    _convs = {
+        function: lambda obj: obj.__name__,
+        ChainNode: lambda obj: obj.raw(),
+        ConfigNode: lambda obj: obj.raw(),
+        mx.context.Context: lambda obj: {'device': obj.device_type, 'device_id': obj.device_id},
+        nd.NDArray: lambda obj: obj.asnumpy(),
+        np.ndarray: lambda obj: obj.tolist(),
+    }
+    def default(self, obj):
+        for otype, conv in self._convs.items():
+            if isinstance(obj, otype):
+                return conv(obj)
+        return super().default(obj)
 
 def mkfilelogger(lname, fname, level=logging.INFO):
     logger = logging.getLogger(lname)
