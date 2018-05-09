@@ -24,7 +24,7 @@ class Template(STemplate):
 class ConfigNode(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._parse()
+        self._deepen()
 
         self._flat = None
 
@@ -52,7 +52,7 @@ class ConfigNode(dict):
             else:
                 self[key] = val
 
-    def _parse(self):
+    def _deepen(self):
         for key, val in self.items():
             if isinstance(val, dict):
                 self[key] = ConfigNode(val)
@@ -67,6 +67,9 @@ class ConfigNode(dict):
             else:
                 rdic[key] = val
         return rdic
+
+    def __getitem__(self, key):
+        return super().__getitem__(key)
 
     def __getattr__(self, name):
         errA = None
@@ -152,56 +155,79 @@ class Config(ConfigNode):
 
 class ChainNode(ConfigNode):
     def __init__(self, *args, **kwargs):
-        self._parent = kwargs.pop('parent', None)
+        self._root = kwargs.pop('root', None)
+        self._path = kwargs.pop('path', [])
         super().__init__(*args, **kwargs)
 
     def __getitem__(self, key):
         try:
-            val = super().__getitem__(key)
+            return super().__getitem__(key)
         except KeyError as e:
-            if self._parent is not None:
-                val = self._parent.__getitem__(key)
-            else:
+            try:
+                return self._parent()[key]
+            except KeyError:
                 raise e
-        return val
+
+    def _parent(self):
+        if self._root is None:
+            raise KeyError
+        cur = self._root
+        for item in self._path:
+            cur = cur[item]
+        return cur
 
     def get(self, k, d=None):
-        return super().get(k, None if self._parent is None else self._parent.get(k, d))
+        '''
+        get does not call __getitem__, so we need to define get as well
+        '''
+        try:
+            return super().__getitem__(k)
+        except KeyError:
+            try:
+                return self._parent()[k]
+            except KeyError:
+                return d
+
+    #def _get_own(self, k, d=None):
+    #    try:
+    #        return super().__getitem__(k)
+    #    except KeyError:
+    #        return d
 
     def update(self, new):
-        print(self, new)
         for key, val in new.items():
             if isinstance(val, dict):
-                if isinstance(self.get(key), dict):
+                # we can use super().get here, because get does not call __getitem__
+                if isinstance(super().get(key), dict):
                     self[key].update(val)
                 else:
-                    self[key] = ChainNode(val, parent=None if self._parent is None else self._parent.get(key, None))
+                    self[key] = ChainNode(val, root=self._root, path=self._path + [key])
             else:
                 self[key] = val
 
-    def _parse(self):
-        for key, val in self.items():
+    def _deepen(self):
+        for key, val in super().items():
             if isinstance(val, dict):
-                self[key] = ChainNode(val, parent=None if self._parent is None else self._parent.get(key, None))
+                self[key] = ChainNode(val, root=self._root, path=self._path + [key])
             else:
                 self[key] = val
 
-    def dict(self):
-        if self._parent is not None:
-            tdic = self._parent.dict()
-        else:
-            tdic = {}
-        tdic.update(self)
-        return tdic
+    def fuse(self):
+        try:
+            node = self._parent().fuse()
+        except KeyError:
+            node = ConfigNode()
+        node.update(self.copy())
+        return node
 
     def items(self):
-        return self.dict().items()
+        return self.fuse().items()
 
     def keys(self):
-        return self.dict().keys()
+        return self.fuse().keys()
 
     def values(self):
-        return self.dict().values()
+        return self.fuse().values()
 
 class ChainConfig(ChainNode):
     def __init__(self, *args, **kwargs):
@@ -210,9 +236,14 @@ class ChainConfig(ChainNode):
         fname = kwargs.pop('fname', None)
         priority = kwargs.pop('priority', 0)
         super().__init__(*args, **kwargs)
-        self._tail = [ChainConfig(child.pop('dict', {}), parent=self, **child) for child in children]
         self._action = action
         self._priority = priority
+        self._tail = []
+        for child in children:
+            nkwa = child.copy()
+            base = nkwa.pop('dict', {})
+            nkwa['root'] = self
+            self._tail.append(ChainConfig(base, **nkwa))
 
         if fname is not None:
             self.update_from_file(fname)

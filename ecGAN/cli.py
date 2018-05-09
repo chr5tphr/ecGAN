@@ -107,7 +107,7 @@ def chain(args, config):
         ctree = ChainConfig(content, **rawdict)
 
         for leaf in ctree.leaves():
-            print(yaml.safe_dump(leaf.raw(), default_flow_style=False))
+            net_module = ress(load_module_file, leaf.sub('net_file'), 'net_module')
             commands[leaf._action](None, leaf)
 
 
@@ -117,6 +117,7 @@ def print_config(args, config):
 
 @register_command
 def train(args, config):
+    # print(yaml.safe_dump(config.raw(), default_flow_style=False))
     ctx = ress(make_ctx, config.device, config.device_id)
 
     batch_size = config.batch_size
@@ -130,6 +131,9 @@ def train(args, config):
 
     model = models[config.model](ctx=ctx, logger=logger, config=config)
     model.train(data, batch_size, nepochs)
+
+    del logger
+    del model
 
 
 @register_command
@@ -311,6 +315,9 @@ def fit_pattern(args, config):
     model.load_pattern_params()
     model.fit_pattern(data, batch_size)
 
+    del logger
+    del model
+
 @register_command
 def stats_assess_pattern(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
@@ -396,6 +403,9 @@ def explain_pattern(args, config):
                          center=0.,
                          cmap=cmap,
                         )
+
+    del logger
+    del model
 
 @register_command
 def predict(args, config):
