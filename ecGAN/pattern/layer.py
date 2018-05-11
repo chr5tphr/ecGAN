@@ -144,6 +144,12 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
             x = block.forward_pattern(*x)
         return x
 
+    def forward_attribution_pattern(self, *args):
+        x = args
+        for block in self._children:
+            x = block.forward_attribution_pattern(*x)
+        return x
+
     def learn_pattern(self):
         for block in self._children:
             block.learn_pattern()
@@ -176,13 +182,20 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         for block in self._children:
             block.compute_pattern()
 
-    def explain_pattern(self, *args, num_reg=1):
+    def explain_pattern(self, *args):
         x = args[0]
         x.attach_grad()
         with autograd.record():
             y = self.forward_pattern(x)
         y[1].backward(out_grad=y[0])
-        #y[1].backward()
+        return x.grad
+
+    def explain_attribution_pattern(self, *args):
+        x = args[0]
+        x.attach_grad()
+        with autograd.record():
+            y = self.forward_attribution_pattern(x)
+        y[1].backward(out_grad=y[0])
         return x.grad
 
     def backward_pattern(self, y_sig):

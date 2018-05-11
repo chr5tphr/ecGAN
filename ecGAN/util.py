@@ -259,10 +259,13 @@ class ChainConfig(ChainNode):
 
 class RessourceManager(dict):
     def __call__(self, func, *args, **kwargs):
+        key = self.dhash(func, args, kwargs)
         try:
-            return self[self.dhash(func, args, kwargs)]
+            return self[key]
         except KeyError:
-            return func(*args, **kwargs)
+            val = func(*args, **kwargs)
+            self[key] = val
+            return val
 
     @staticmethod
     def dhash(*obj):
@@ -310,16 +313,17 @@ class HashEncoder(json.JSONEncoder):
 
 def mkfilelogger(lname, fname, level=logging.INFO):
     logger = logging.getLogger(lname)
-    logger.setLevel(level)
-    frmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    fhdl = logging.FileHandler(fname)
-    shdl = logging.StreamHandler()
-    fhdl.setLevel(level)
-    shdl.setLevel(level)
-    fhdl.setFormatter(frmt)
-    shdl.setFormatter(frmt)
-    logger.addHandler(shdl)
-    logger.addHandler(fhdl)
+    if not logger.hasHandlers():
+        logger.setLevel(level)
+        frmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        fhdl = logging.FileHandler(fname)
+        shdl = logging.StreamHandler()
+        fhdl.setLevel(level)
+        shdl.setLevel(level)
+        fhdl.setFormatter(frmt)
+        shdl.setFormatter(frmt)
+        logger.addHandler(shdl)
+        logger.addHandler(fhdl)
     return logger
 
 def load_module_file(fname, module_name):

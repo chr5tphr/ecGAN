@@ -108,7 +108,10 @@ def chain(args, config):
 
         for leaf in ctree.leaves():
             net_module = ress(load_module_file, leaf.sub('net_file'), 'net_module')
-            commands[leaf._action](None, leaf)
+            try:
+                commands[leaf._action](args, leaf)
+            except KeyError:
+                continue
 
 
 @register_command
@@ -132,7 +135,6 @@ def train(args, config):
     model = models[config.model](ctx=ctx, logger=logger, config=config)
     model.train(data, batch_size, nepochs)
 
-    del logger
     del model
 
 
@@ -315,7 +317,6 @@ def fit_pattern(args, config):
     model.load_pattern_params()
     model.fit_pattern(data, batch_size)
 
-    del logger
     del model
 
 @register_command
@@ -404,7 +405,48 @@ def explain_pattern(args, config):
                          cmap=cmap,
                         )
 
-    del logger
+    del model
+
+@register_command
+def explain_attribution_pattern(args, config):
+    ctx = ress(make_ctx, config.device, config.device_id)
+
+    logger = None
+    if config.log:
+        logger = mkfilelogger('explaining', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+
+    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model.load_pattern_params()
+
+    cmap = config.get('cmap', 'coldnhot')
+
+    data_fp = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
+
+    for i, (data, label) in enumerate(data_iter):
+        if i >= args.iter:
+            break
+        data = data.as_in_context(ctx)
+        label = label.as_in_context(ctx)
+
+        relevance = model.explain_attribution_pattern(data)
+
+        relevance = relevance.reshape(data.shape)
+        # print(relevance.sum())
+        save_explanation(relevance,
+                         data=data,
+                         config=config,
+                         image=config.pattern.image,
+                         output=config.pattern.output,
+                         source=config.pattern.input,
+                         data_desc=config.data.func,
+                         net=config.pattern.top_net,
+                         logger=logger,
+                         i=i,
+                         center=0.,
+                         cmap=cmap,
+                        )
+
     del model
 
 @register_command

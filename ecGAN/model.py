@@ -83,10 +83,11 @@ class Model(object):
             net.init_pattern()
             nname = self.config.nets.get(nrole, {}).get('name', '')
             ntype = self.config.nets.get(nrole, {}).get('type', '')
+            pparams = net.collect_pparams()
             if self.config.pattern.get('load') is not None and not self.config.pattern.get('init', False):
-                net.collect_pparams().load(self.config.sub('pattern.load', net_name=nname, net_type=ntype), ctx=self.ctx)
+                pparams.load(self.config.sub('pattern.load', net_name=nname, net_type=ntype), ctx=self.ctx, ignore_extra=True, restore_prefix=pparams.prefix)
             else:
-                net.collect_pparams().initialize(ctx=self.ctx)
+                pparams.initialize(ctx=self.ctx)
 
     def save_pattern_params(self, **kwargs):
         if self.config.pattern.get('save') is not None:
@@ -95,7 +96,8 @@ class Model(object):
                 ntype = self.config.nets.get(nrole, {}).get('type', '')
                 fpath = self.config.sub('pattern.save', net_name=nname,
                                         net_type=ntype, **kwargs)
-                net.collect_pparams().save(fpath)
+                pparams = net.collect_pparams()
+                pparams.save(fpath, pparams.prefix)
                 if self.logger:
                     ktxt = ", ".join(['%s=%s'%(str(key), str(val)) for key,val in kwargs.items()])
                     self.logger.info('Saved pattern of \'%s %s\' {%s} in file \'%s\'.', ntype, nname, ktxt, fpath)
@@ -249,7 +251,8 @@ class Classifier(Model):
                 trainer.step(batch_size, ignore_stale_grad=True)
 
             if self.logger:
-                etxt = ', '.join(['%.2e'%(err.mean().asscalar()) for err in self.netC._err if isinstance(err, nd.NDArray)])
+                etxt = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
+                                  for toperr in self.netC._err if isinstance(toperr, list)])
                 self.logger.info('pattern training epoch %04d , time: %.2f, errors: %s',
                                  epoch, (time() - tic), etxt)
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
@@ -312,6 +315,14 @@ class Classifier(Model):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
 
         R = self.netC.explain_pattern(data)
+
+        return R
+
+    def explain_attribution_pattern(self, data):
+        if not isinstance(self.netC, PatternNet):
+            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+
+        R = self.netC.explain_attribution_pattern(data)
 
         return R
 

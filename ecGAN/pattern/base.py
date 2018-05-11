@@ -109,6 +109,21 @@ class PatternNet(Block):
 
         return z_neut, z_pat
 
+    def forward_attribution_pattern(self, *args):
+        x_neut, x_pat = self._args_forward_pattern(*args)
+
+        z_neut = self.forward(x_neut)
+        z_pat = nd.zeros_like(z_neut)
+        weight = self._weight_pattern()
+        for regime in self._regimes:
+            a_reg = regime.pattern.data(ctx=x_pat.context)
+            a_reg = a_reg * weight
+            z_reg = self._forward_pattern(x_pat, a_reg)
+            # regimes are assumed to be disjunct
+            z_pat = nd.where(regime(z_neut), z_reg, z_pat)
+
+        return z_neut, z_pat
+
     def backward_pattern(self, y_sig):
         if self._out is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
@@ -192,7 +207,10 @@ class PatternNet(Block):
             signal = signal + s_reg
         return signal
 
-    def explain_pattern(self, *args, **kwargs):
+    def explain_pattern(self):
+        raise NotImplementedError
+
+    def explain_attribution_pattern(self):
         raise NotImplementedError
 
     def assess_pattern(self):
@@ -289,6 +307,9 @@ class ActPatternNet(PatternNet):
 
     def assess_pattern(self):
         return None
+
+    def forward_attribution_pattern(self, *args):
+        return self.forward_pattern(*args)
 
     def forward_pattern(self, *args):
         x_neut, x_pat = self._args_forward_pattern(*args)
