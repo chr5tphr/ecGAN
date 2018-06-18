@@ -24,7 +24,7 @@ class DensePatternNet(PatternNet, nn.Dense):
             raise RuntimeError('Block has not yet executed forward_logged!')
         x = self._in[0].flatten()
         y = self._out.flatten()
-        return x,y
+        yield x, y
 
     def _forward_pattern(self, x, w, bias=None):
         return nd.FullyConnected(x, w, bias, no_bias=(bias is None),
@@ -48,7 +48,7 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
     def _weight_pattern(self):
         return self.weight.data().flatten()
 
-    def learn_pattern(self):
+    def _prepare_data_pattern(self):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         for x,y in zip(self._in[0], self._out):
@@ -56,7 +56,7 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
             x = im2col_indices(nd.expand_dims(x, 0), self._kwargs['kernel'][0], self._kwargs['kernel'][1], self._kwargs['pad'][0], self._kwargs['stride'][0]).T
             # -> outsize x number_of_patches -> transposed
             y = y.flatten().T
-            self._learn_pattern(x, y)
+            yield x, y
 
     def _forward_pattern(self, x, w, bias=None):
         kwargs = self._kwargs.copy()
@@ -85,7 +85,7 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
     def _weight_pattern(self):
         return self.weight.data().flatten()
 
-    def learn_pattern_linear(self):
+    def _prepare_data_pattern(self):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         for x,y in zip(self._in[0], self._out):
@@ -93,7 +93,7 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
             x = x.flatten().T
             # -> outsize x number_of_patches -> transposed
             y = im2col_indices(nd.expand_dims(y, 0), self._kwargs['kernel'][0], self._kwargs['kernel'][1], self._kwargs['pad'][0], self._kwargs['stride'][0]).T
-            self._learn_pattern_linear(x, y)
+            yield x, y
 
     def _forward_pattern(self, x, w):
         kwargs = self._kwargs.copy()
@@ -135,51 +135,51 @@ class BatchNormPatternNet(PatternNet, nn.BatchNorm):
 
 class SequentialPatternNet(PatternNet, nn.Sequential):
     def init_pattern(self):
-        for block in self._children:
+        for block in self._children.values():
             block.init_pattern()
 
     def forward_pattern(self, *args):
         x = args
-        for block in self._children:
+        for block in self._children.values():
             x = block.forward_pattern(*x)
         return x
 
     def forward_attribution_pattern(self, *args):
         x = args
-        for block in self._children:
+        for block in self._children.values():
             x = block.forward_attribution_pattern(*x)
         return x
 
     def learn_pattern(self):
-        for block in self._children:
+        for block in self._children.values():
             block.learn_pattern()
 
     def fit_pattern(self, x):
         self._err = []
-        for block in self._children:
+        for block in self._children.values():
             x = block.fit_pattern(x)
             self._err.append(block._err)
         return x
 
     def fit_assess_pattern(self, x):
         self._err = []
-        for block in self._children:
+        for block in self._children.values():
             x = block.fit_assess_pattern(x)
             self._err.append(block._err)
         return x
 
     def stats_assess_pattern(self):
-        for block in self._children:
+        for block in self._children.values():
             block.stats_assess_pattern()
 
     def assess_pattern(self):
         quals = []
-        for block in self._children:
+        for block in self._children.values():
             quals.append(block.assess_pattern())
         return quals
 
     def compute_pattern(self):
-        for block in self._children:
+        for block in self._children.values():
             block.compute_pattern()
 
     def explain_pattern(self, *args):
@@ -199,7 +199,7 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         return x.grad
 
     def backward_pattern(self, y_sig):
-        for block in self._children[::-1]:
+        for block in self._children.values()[::-1]:
             y_sig = block.backward_pattern(y_sig)
         return y_sig
 

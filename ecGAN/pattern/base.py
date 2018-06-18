@@ -34,7 +34,7 @@ class PatternNet(Block):
         else:
             pattern = re.compile(select)
             ret.update({name:value for name, value in self.pparams.items() if pattern.match(name)})
-        for cld in self._children:
+        for cld in self._children.values():
             try:
                 ret.update(cld.collect_pparams(select=select))
             except AttributeError:
@@ -115,6 +115,8 @@ class PatternNet(Block):
         z_neut = self.forward(x_neut)
         z_pat = nd.zeros_like(z_neut)
         weight = self._weight_pattern()
+        # note that pattern attribution is actually only the positive regime,
+        # which hast to be defined by the user!
         for regime in self._regimes:
             a_reg = regime.pattern.data(ctx=x_pat.context)
             a_reg = a_reg * weight
@@ -181,17 +183,17 @@ class PatternNet(Block):
         raise NotImplementedError
 
     def stats_assess_pattern(self):
-        x, y = self._prepare_data_pattern()
-        s = self._signal_pattern(y)
-        d = x - s
+        for x, y in self._prepare_data_pattern():
+            s = self._signal_pattern(y)
+            d = x - s
 
-        attrs = ['num_samples', 'mean_d', 'mean_y', None, 'var_y', 'cov_dd', None, 'cov_dy']
+            attrs = ['num_samples', 'mean_d', 'mean_y', None, 'var_y', 'cov_dd', None, 'cov_dy']
 
-        args = [d, y] + [None if name is None else getattr(self, name).data(ctx=d.context) for name in attrs]
-        retval = stats_batchwise(*args)
-        for name, val in zip(attrs, retval):
-            if name is not None:
-                getattr(self, name).set_data(val)
+            args = [d, y] + [None if name is None else getattr(self, name).data(ctx=d.context) for name in attrs]
+            retval = stats_batchwise(*args)
+            for name, val in zip(attrs, retval):
+                if name is not None:
+                    getattr(self, name).set_data(val)
 
     def _signal_pattern(self, y, y_cond=None):
         if y_cond is None:
@@ -223,47 +225,47 @@ class PatternNet(Block):
         return 1. - corr
 
     def learn_pattern(self):
-        x, y = self._prepare_data_pattern()
-        for regime in self._regimes:
-            mean_x = regime.mean_x.data()
-            mean_xy = regime.mean_xy.data()
-            num_y = regime.num_y.data()
-            num_x = num_y.sum()
+        for x, y in self._prepare_data_pattern():
+            for regime in self._regimes:
+                mean_x = regime.mean_x.data()
+                mean_xy = regime.mean_xy.data()
+                num_y = regime.num_y.data()
+                num_x = num_y.sum()
 
-            cond_y = regime(y)
-            # number of times each sample's x for w.t dot x was inside the regime
-            num_n = cond_y.sum(axis=1, keepdims=True)
-            # => weighted sum over x
-            wsum_x = nd.dot(num_n, x, transpose_a=True)
+                cond_y = regime(y)
+                # number of times each sample's x for w.t dot x was inside the regime
+                num_n = cond_y.sum(axis=1, keepdims=True)
+                # => weighted sum over x
+                wsum_x = nd.dot(num_n, x, transpose_a=True)
 
-            # y's in regime
-            reg_y = y * cond_y
-            # sum of xy's in regime
-            # sum_xy = (reg_y.expand_dims(axis=2) * x.expand_dims(axis=1)).sum(axis=0)
-            sum_xy = nd.dot(reg_y, x, transpose_a=True)
+                # y's in regime
+                reg_y = y * cond_y
+                # sum of xy's in regime
+                # sum_xy = (reg_y.expand_dims(axis=2) * x.expand_dims(axis=1)).sum(axis=0)
+                sum_xy = nd.dot(reg_y, x, transpose_a=True)
 
 
-            #TODO more stable running mean
-            num_x_cur = num_n.sum()
-            mean_x = (num_x * mean_x + wsum_x) / (num_x + num_x_cur + 1e-12)
+                #TODO more stable running mean
+                num_x_cur = num_n.sum()
+                mean_x = (num_x * mean_x + wsum_x) / (num_x + num_x_cur + 1e-12)
 
-            num_y_cur = cond_y.sum(axis=0)
-            mean_xy = (num_y.T * mean_xy + sum_xy) / (num_y + num_y_cur + 1e-12).T
+                num_y_cur = cond_y.sum(axis=0)
+                mean_xy = (num_y.T * mean_xy + sum_xy) / (num_y + num_y_cur + 1e-12).T
 
-            num_y += num_y_cur
+                num_y += num_y_cur
 
-            regime.num_y.set_data(num_y)
-            regime.mean_x.set_data(mean_x)
-            regime.mean_xy.set_data(mean_xy)
+                regime.num_y.set_data(num_y)
+                regime.mean_x.set_data(mean_x)
+                regime.mean_xy.set_data(mean_xy)
 
-        num = self.num_samples.data()
-        num_cur = x.shape[0]
-        mean_y = self.mean_y.data()
-        sum_y = y.sum(axis=0, keepdims=True)
-        mean_y = (num * mean_y + sum_y) / (num + num_cur + 1e-12)
-        num += num_cur
-        self.mean_y.set_data(mean_y)
-        self.num_samples.set_data(num)
+            num = self.num_samples.data()
+            num_cur = x.shape[0]
+            mean_y = self.mean_y.data()
+            sum_y = y.sum(axis=0, keepdims=True)
+            mean_y = (num * mean_y + sum_y) / (num + num_cur + 1e-12)
+            num += num_cur
+            self.mean_y.set_data(mean_y)
+            self.num_samples.set_data(num)
 
     def _backward_pattern(self, y, pattern, pias=None):
         raise NotImplementedError

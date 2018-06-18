@@ -45,7 +45,7 @@ class SequentialInterpretable(Interpretable, nn.Sequential):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         R = [self._out if y is None else y]
-        for child in self._children[::-1]:
+        for child in self._children.values()[::-1]:
             R.append(child.relevance(R[-1], method=method))
         return R if ret_all else R[-1]
 
@@ -78,8 +78,8 @@ class SequentialInterpretable(Interpretable, nn.Sequential):
 
     def forward_logged(self, x, depth=-1):
         self._in = [x]
-        rdep = depth if depth > 0 else (len(self._children) + depth)
-        for i, block in enumerate(self._children):
+        rdep = depth if depth > 0 else (len(self._children.values()) + depth)
+        for i, block in enumerate(self._children.values()):
             x = block.forward_logged(x)
             if i == depth:
                 break

@@ -47,8 +47,8 @@ class ReLU(ReLUPatternNet):
 
 class SequentialIntermediate(Intermediate, nn.Sequential):
     def forward(self, x, depth=-1):
-        rdep = depth if depth > 0 else (len(self._children) + depth)
-        for i, block in enumerate(self._children):
+        rdep = depth if depth > 0 else (len(self._children.values()) + depth)
+        for i, block in enumerate(self._children.values()):
             x = block(x)
             if i == depth:
                 break

@@ -5,3 +5,7 @@ When updating means, the mean simply does not change anymore, which is not that 
 
 ### Pattern: Mean of Signal cannot be restored
 since noise-mean + signal-mean cannot be decomposed
+
+### Problem: Zero-corners in MNIST conv PatternNet
+because corners are always zero in dataset
+
