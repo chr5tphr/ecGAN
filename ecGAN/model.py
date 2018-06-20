@@ -16,30 +16,6 @@ def register_model(obj):
     models[obj.__name__] = obj
     return obj
 
-class TrainingRoutine(object):
-    def __init__(self):
-        self.data_iter = None
-        self.trainers = []
-        self.batch_size = None
-        self.start_epoch = None
-        self.nepochs = None
-        self.save_freq = None
-        self.logger = None
-
-    def __call__(data):
-        for epoch in range(start_epoch, start_epoch + nepochs):
-            try:
-                for i, (data, label) in enumerate(data_iter):
-                    self.step(data)
-                    for trainer in self.trainers:
-                        trainer.step(self.batch_size)
-
-                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or ((epoch + 1) >= (self.start_epoch + nepochs)) :
-                    self.save(epoch+1)
-            except KeyboardInterrupt:
-                self.save(epoch+1, intr=True)
-
-
 class Model(object):
     def __init__(self, **kwargs):
         self.logger = kwargs.get('logger')
@@ -128,7 +104,9 @@ class Classifier(Model):
 
         data_iter = gluon.data.DataLoader(data, batch_size, shuffle=True, last_batch='discard')
         loss = gluon.loss.SoftmaxCrossEntropyLoss()
-        trainer = gluon.Trainer(netC.collect_params(), 'adam', {'learning_rate': 0.01})
+        trainer = gluon.Trainer(netC.collect_params(),
+            config.nets.classifier.get('optimizer', 'adam'),
+            config.nets.classifier.get('optkwargs', {'learning_rate': 0.01}))
         epoch = self.start_epoch
 
         metric = mx.metric.Accuracy()
@@ -693,6 +671,295 @@ class GAN(Model):
         return output
 
 @register_model
+class CGAN(GAN):
+    def train(self, data, batch_size, nepochs):
+        config = self.config
+        netG = self.netG
+        netD = self.netD
+        ctx = self.ctx
+
+        if not isinstance(netD, Intermediate):
+            raise TypeError('Discriminator is not an Intermediate!')
+
+        K = len(data.classes)
+
+        data_iter = gluon.data.DataLoader(data, batch_size, shuffle=True, last_batch='discard')
+
+        # loss
+        loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
+
+        one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
+
+        # trainer for the generator and the discriminator
+        trainerG = gluon.Trainer(netG.collect_params(),
+            config.nets.generator.get('optimizer', 'adam'),
+            config.nets.generator.get('optkwargs', {'learning_rate': 0.01}))
+        trainerD = gluon.Trainer(netD.collect_params(),
+            config.nets.discriminator.get('optimizer', 'adam'),
+            config.nets.discriminator.get('optkwargs', {'learning_rate': 0.05}))
+
+        metric = mx.metric.Accuracy()
+
+        if not config.semi_supervised:
+            real_dense = nd.ones(batch_size, ctx=ctx)
+            fake_dense = nd.zeros(batch_size, ctx=ctx)
+
+            real_label = one_hot(real_dense, 2).reshape((batch_size, -1, 1, 1))
+            fake_label = one_hot(fake_dense, 2).reshape((batch_size, -1, 1, 1))
+
+        epoch = self.start_epoch
+
+        if self.logger:
+            self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
+                        config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
+
+        try:
+            for epoch in range(self.start_epoch, self.start_epoch + nepochs):
+                tic = time()
+                for i, (data, cond_dense) in enumerate(data_iter):
+
+                    num = data.shape[0]
+
+                    data = data.as_in_context(ctx)
+                    cond_dense = cond_dense.as_in_context(ctx).reshape((-1, ))
+                    cond = one_hot(cond_dense, K).reshape((num, -1, 1, 1))
+
+                    if config.semi_supervised:
+                        real_dense = cond_dense
+                        real_label = one_hot(cond_dense, 2*K).reshape((num, -1, 1, 1))
+
+                        # classes K to 2K are fake
+                        fake_dense = cond_dense + K
+                        fake_label = one_hot(fake_dense, 2*K).reshape((num, -1, 1, 1))
+
+                    noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+
+                    ############################
+                    # (1) Update D
+                    ###########################
+                    with autograd.record():
+                        real_output = netD(data)
+                        errD_real = loss(real_output, real_label)
+
+                        fake = netG(noise, cond)
+                        fake_output = netD(fake.detach())
+                        errD_fake = loss(fake_output, fake_label)
+                        errD = errD_real + errD_fake
+                    errD.backward()
+
+                    trainerD.step(batch_size)
+                    metric.update([real_dense, ], [real_output, ])
+                    metric.update([fake_dense, ], [fake_output, ])
+
+                    ############################
+                    # (2) Update G
+                    ###########################
+                    # real_intermed = netD.forward(data, cond, depth=-2)
+                    with autograd.record():
+                        # fake = netG(noise, cond)
+                        if config.feature_matching:
+                            # feature matching
+                            real_intermed = netD.forward(data, depth=-2)
+                            fake_intermed = netD.forward(fake, depth=-2)
+                            errG = ((real_intermed - fake_intermed)**2).sum()
+                        else:
+                            output = netD(fake)
+                            errG = loss(output, real_label)
+                    errG.backward()
+
+                    trainerG.step(batch_size)
+
+                name, acc = metric.get()
+                metric.reset()
+                if self.logger:
+                    self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
+                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
+                    self.checkpoint(epoch+1)
+                if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
+                    cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K).reshape((30, K, 1, 1))
+                    self.generate_sample(epoch+1, cond)
+        except KeyboardInterrupt:
+            if self.logger:
+                self.logger.info('Training interrupted by user.')
+            self.checkpoint('I%d'%epoch)
+            cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K).reshape((30, K, 1, 1))
+            self.generate_sample('I%d'%epoch, cond)
+
+    def fit_pattern(self, data, batch_size):
+        if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):
+            raise NotImplementedError('At least one net is not a PatternNet!')
+
+        data_iter = gluon.data.DataLoader(data, batch_size)
+        K = len(data.classes)
+
+        trainerD = gluon.Trainer(self.netD.collect_pparams(),
+            self.config.pattern.get('optimizer', 'SGD'),
+            self.config.pattern.get('optkwargs', {'learning_rate': 0.01}))
+        trainerG = gluon.Trainer(self.netG.collect_pparams(),
+            self.config.pattern.get('optimizer', 'SGD'),
+            self.config.pattern.get('optkwargs', {'learning_rate': 0.01}))
+
+        start_epoch = self.config.pattern.get('start_epoch', 0)
+        nepochs = self.config.pattern.get('nepochs', 1)
+        save_freq = self.config.pattern.get('save_freq', 1)
+
+        for epoch in range(start_epoch, start_epoch + nepochs):
+            tic = time()
+            for i, (data, label) in enumerate(data_iter):
+                data = data.as_in_context(self.ctx)
+                label = label.as_in_context(self.ctx)
+
+                num = data.shape[0]
+
+                # === Data Pass ===
+                noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+                cond = one_hot(label, K).reshape((num, -1, 1, 1))
+
+                self.netG.fit_pattern([noise, cond])
+                self.netD.fit_pattern(data)
+
+                trainerD.step(num, ignore_stale_grad=True)
+                trainerG.step(num, ignore_stale_grad=True)
+
+                # === Fake Pass ===
+                noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+                rand_cond = nd.random.uniform(0,K,shape=num).floor()
+                cond = one_hot(rand_cond, K).reshape((num, -1, 1, 1))
+
+                fake = self.netG.fit_pattern([noise, cond])
+                self.netD.fit_pattern(fake)
+
+                trainerD.step(num, ignore_stale_grad=True)
+                trainerG.step(num, ignore_stale_grad=True)
+
+            if self.logger:
+                etxtD = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
+                                  for toperr in self.netD._err if isinstance(toperr, list)])
+                etxtG = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
+                                  for toperr in self.netG._err if isinstance(toperr, list)])
+                self.logger.info('pattern training epoch %04d , time: %.2f, errors: %s | %s',
+                                 epoch, (time() - tic), etxtD, etxtG)
+            if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or ((epoch + 1) >= (start_epoch + nepochs)) :
+                self.save_pattern_params(fit_epoch=epoch+1,
+                                         ase_epoch=self.config.pattern.get('aepoch', 0))
+
+        if self.logger:
+            self.logger.info('Learned pattern')
+
+    def fit_assess_pattern(self, data, batch_size):
+        if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):
+            raise NotImplementedError('At least one net is not a PatternNet!')
+
+        data_iter = gluon.data.DataLoader(data, batch_size)
+
+        trainerD = gluon.Trainer(self.netD.collect_pparams(),
+            self.config.pattern.get('optimizer', 'SGD'),
+            self.config.pattern.get('optkwargs', {'learning_rate': 0.01}))
+        trainerG = gluon.Trainer(self.netG.collect_pparams(),
+            self.config.pattern.get('optimizer', 'SGD'),
+            self.config.pattern.get('optkwargs', {'learning_rate': 0.01}))
+
+        start_epoch = self.config.pattern.get('start_epoch', 0)
+        nepochs = self.config.pattern.get('nepochs', 1)
+        save_freq = self.config.pattern.get('save_freq', 1)
+
+        for epoch in range(start_epoch, start_epoch + nepochs):
+            tic = time()
+            for i, (data, label) in enumerate(data_iter):
+                data = data.as_in_context(self.ctx)
+                label = label.as_in_context(self.ctx)
+
+                self.netD.fit_assess_pattern(data)
+                self.netG.fit_assess_pattern(data)
+                trainerD.step(len(data), ignore_stale_grad=True)
+                trainerG.step(len(data), ignore_stale_grad=True)
+
+            if self.logger:
+                etxtD = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
+                                  for toperr in self.netD._err if isinstance(toperr, list)])
+                etxtG = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
+                                  for toperr in self.netG._err if isinstance(toperr, list)])
+                self.logger.info('pattern training epoch %04d , time: %.2f, errors: %s | %s',
+                                 epoch, (time() - tic), etxtD, etxtG)
+            if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
+                self.save_pattern_params(fit_epoch=epoch+1,
+                                         ase_epoch=self.config.pattern.get('aepoch', 0))
+
+        if self.logger:
+            self.logger.info('Learned pattern')
+
+    def stats_assess_pattern(self, data, batch_size):
+        if not isinstance(self.netC, PatternNet):
+            raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets.classifier.type)
+
+        data_iter = gluon.data.DataLoader(data, batch_size)
+
+        for i, (data, label) in enumerate(data_iter):
+            data = data.as_in_context(self.ctx)
+            label = label.as_in_context(self.ctx)
+
+            self.netC.forward_logged(data)
+            self.netC.stats_assess_pattern()
+
+        self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
+                                 ase_epoch=self.config.pattern.get('aepoch', 0))
+
+    def explain_pattern(self, K, noise=None, cond=None, num=None):
+        if not isinstance(self.netC, PatternNet):
+            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+
+        if num is None:
+            if noise is not None:
+                num = len(noise)
+            elif cond is not None:
+                num = len(cond)
+            else:
+                raise RuntimeError('At least one arg has to be supplied!')
+        if noise is None:
+            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+        if cond is None:
+            cond = nd.random.uniform(0,K,shape=num).floor()
+        cond = one_hot(cond, K).reshape((num, -1, 1, 1))
+
+        noise.attach_grad()
+        cond.attach_grad()
+        with autograd.record():
+            # TODO: check if args are correctly hanled by netG's forward_pattern
+            y_G = self.netG.forward_pattern(noise, cond)
+            y_D = self.netD.forward_pattern(*y_G)
+        y_D[1].backward(out_grad=y[0])
+        return x.grad
+        Rg = self.netG.explain_pattern(data)
+        Rd = self.netD.explain_pattern(data)
+
+        return Rg, Rd
+
+    def explain_attribution_pattern(self, data):
+        if not isinstance(self.netC, PatternNet):
+            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+
+        R = self.netC.explain_attribution_pattern(data)
+
+        return R
+
+    def assess_pattern(self):
+        if not isinstance(self.netC, PatternNet):
+            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+
+        R = self.netC.assess_pattern()
+
+        return R
+
+    def backward_pattern(self, data):
+        if not isinstance(self.netC, PatternNet):
+            raise NotImplementedError('\'%s\' is no PatternNet!'%self.config.nets.classifier.type)
+
+        y = self.netC.forward_logged(data)
+        R = self.netC.backward_pattern(y)
+
+        return R
+
+@register_model
 class WGAN(GAN):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -897,310 +1164,3 @@ class WCGAN(WGAN):
             cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K)
             self.generate_sample('I%d'%epoch, cond)
 
-
-@register_model
-class CCGAN(GAN):
-    def train(self, data, batch_size, nepochs):
-
-        config = self.config
-        netG = self.netG
-        netD = self.netD
-        ctx = self.ctx
-
-        if not isinstance(netD, Intermediate):
-            raise TypeError('Discriminator is not an Intermediate!')
-
-        K = len(data.classes)
-
-        data_iter = gluon.data.DataLoader(data, batch_size, shuffle=True, last_batch='discard')
-
-        # loss
-        loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
-
-        one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
-
-        # trainer for the generator and the discriminator
-        trainerG = gluon.Trainer(netG.collect_params(),
-            config.nets.generator.get('optimizer', 'adam'),
-            config.nets.generator.get('optkwargs', {'learning_rate': 0.01}))
-        trainerD = gluon.Trainer(netD.collect_params(),
-            config.nets.discriminator.get('optimizer', 'adam'),
-            config.nets.discriminator.get('optkwargs', {'learning_rate': 0.05}))
-
-        metric = mx.metric.Accuracy()
-
-        if not config.semi_supervised:
-            real_dense = nd.ones(batch_size, ctx=ctx)
-            fake_dense = nd.zeros(batch_size, ctx=ctx)
-
-            real_label = one_hot(real_dense, 2).reshape((batch_size, -1, 1, 1))
-            fake_label = one_hot(fake_dense, 2).reshape((batch_size, -1, 1, 1))
-
-        epoch = self.start_epoch
-
-        if self.logger:
-            self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
-                        config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
-
-        try:
-            for epoch in range(self.start_epoch, self.start_epoch + nepochs):
-                tic = time()
-                for i, (data, cond_dense) in enumerate(data_iter):
-
-                    num = data.shape[0]
-
-                    data = data.as_in_context(ctx)
-                    cond_dense = cond_dense.as_in_context(ctx).reshape((-1, ))
-                    cond = one_hot(cond_dense, K).reshape((num, -1, 1, 1))
-
-                    if config.semi_supervised:
-                        real_dense = cond_dense
-                        real_label = one_hot(cond_dense, 2*K).reshape((num, -1, 1, 1))
-
-                        # classes K to 2K are fake
-                        fake_dense = cond_dense + K
-                        fake_label = one_hot(fake_dense, 2*K).reshape((num, -1, 1, 1))
-
-                    noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-
-                    ############################
-                    # (1) Update D
-                    ###########################
-                    with autograd.record():
-                        real_output = netD(data)
-                        errD_real = loss(real_output, real_label)
-
-                        fake = netG(noise, cond)
-                        fake_output = netD(fake.detach())
-                        errD_fake = loss(fake_output, fake_label)
-                        errD = errD_real + errD_fake
-                    errD.backward()
-
-                    trainerD.step(batch_size)
-                    metric.update([real_dense, ], [real_output, ])
-                    metric.update([fake_dense, ], [fake_output, ])
-
-                    ############################
-                    # (2) Update G
-                    ###########################
-                    # real_intermed = netD.forward(data, cond, depth=-2)
-                    with autograd.record():
-                        # fake = netG(noise, cond)
-                        if config.feature_matching:
-                            # feature matching
-                            real_intermed = netD.forward(data, depth=-2)
-                            fake_intermed = netD.forward(fake, depth=-2)
-                            errG = ((real_intermed - fake_intermed)**2).sum()
-                        else:
-                            output = netD(fake)
-                            errG = loss(output, real_label)
-                    errG.backward()
-
-                    trainerG.step(batch_size)
-
-                name, acc = metric.get()
-                metric.reset()
-                if self.logger:
-                    self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
-                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
-                    self.checkpoint(epoch+1)
-                if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
-                    cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K).reshape((30, K, 1, 1))
-                    self.generate_sample(epoch+1, cond)
-        except KeyboardInterrupt:
-            if self.logger:
-                self.logger.info('Training interrupted by user.')
-            self.checkpoint('I%d'%epoch)
-            cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K).reshape((30, K, 1, 1))
-            self.generate_sample('I%d'%epoch, cond)
-
-
-@register_model
-class CSGAN(GAN):
-    def train(self, data, batch_size, nepochs):
-
-        config = self.config
-        netG = self.netG
-        netD = self.netD
-        ctx = self.ctx
-
-        if not isinstance(netD, Intermediate):
-            raise TypeError('Discriminator is not an Intermediate!')
-
-        K = len(data.classes)
-
-        data_iter = gluon.data.DataLoader(data, batch_size, shuffle=True, last_batch='discard')
-
-        # loss
-        loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
-
-        one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
-
-        # trainer for the generator and the discriminator
-        trainerG = gluon.Trainer(netG.collect_params(),
-            config.nets.generator.get('optimizer', 'adam'),
-            config.nets.generator.get('optkwargs', {'learning_rate': 0.01}))
-        trainerD = gluon.Trainer(netD.collect_params(),
-            config.nets.discriminator.get('optimizer', 'adam'),
-            config.nets.discriminator.get('optkwargs', {'learning_rate': 0.05}))
-
-        # real_label = nd.ones(batch_size, ctx=ctx)
-        # class K (0toK) is fake
-        fake_label_dense = nd.ones(batch_size, ctx=ctx)*K
-
-        # real_label_oh = one_hot(real_label, 2)
-        fake_label = one_hot(fake_label_dense, K+1)
-        metric = mx.metric.Accuracy()
-
-        epoch = self.start_epoch
-
-        if self.logger:
-            self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
-                        config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
-
-        try:
-            for epoch in range(self.start_epoch, self.start_epoch + nepochs):
-                tic = time()
-                for i, (data, cond_dense) in enumerate(data_iter):
-
-                    num = data.shape[0]
-
-                    data = data.as_in_context(ctx)
-                    cond_dense = cond_dense.as_in_context(ctx)
-                    cond = one_hot(cond_dense, K)
-                    real_label = one_hot(cond_dense, K+1)
-
-                    noise = nd.random_normal(shape=(num, 100), ctx=ctx)
-
-                    ############################
-                    # (1) Update D
-                    ###########################
-                    with autograd.record():
-                        real_output = netD(data, cond)
-                        errD_real = loss(real_output, real_label)
-
-                        fake = netG(noise, cond)
-                        fake_output = netD(fake.detach(), cond)
-                        errD_fake = loss(fake_output, fake_label)
-                        errD = errD_real + errD_fake
-                    errD.backward()
-
-                    trainerD.step(batch_size)
-                    metric.update([cond_dense, ], [real_output, ])
-                    metric.update([fake_label_dense, ], [fake_output, ])
-
-                    ############################
-                    # (2) Update G
-                    ###########################
-                    # real_intermed = netD.forward(data, cond, depth=-2)
-                    with autograd.record():
-                        fake = netG(noise, cond)
-                        if config.feature_matching:
-                            # feature matching
-                            real_intermed = netD.forward(data, cond, depth=-2)
-                            fake_intermed = netD.forward(fake, cond, depth=-2)
-                            errG = ((real_intermed - fake_intermed)**2).sum()
-                        else:
-                            output = netD(fake, cond)
-                            errG = loss(output, real_label)
-                    errG.backward()
-
-                    trainerG.step(batch_size)
-
-                name, acc = metric.get()
-                metric.reset()
-                if self.logger:
-                    self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
-                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
-                    self.checkpoint(epoch+1)
-                if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
-                    cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K)
-                    self.generate_sample(epoch+1, cond)
-        except KeyboardInterrupt:
-            if self.logger:
-                self.logger.info('Training interrupted by user.')
-            self.checkpoint('I%d'%epoch)
-            cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K)
-            self.generate_sample('I%d'%epoch, cond)
-
-@register_model
-class CGAN(GAN):
-    def train(self, data, batch_size, nepochs):
-
-        config = self.config
-        netG = self.netG
-        netD = self.netD
-        ctx = self.ctx
-
-        data_iter = gluon.data.DataLoader(data, batch_size, shuffle=True, last_batch='discard')
-
-        # loss
-        loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
-
-        # trainer for the generator and the discriminator
-        trainerG = gluon.Trainer(netG.collect_params(), 'adam', {'learning_rate': 0.01})
-        trainerD = gluon.Trainer(netD.collect_params(), 'adam', {'learning_rate': 0.05})
-
-        real_label = nd.ones(batch_size, ctx=ctx)
-        fake_label = nd.zeros(batch_size, ctx=ctx)
-
-        real_label_oh = fuzzy_one_hot(real_label, 2)
-        fake_label_oh = fuzzy_one_hot(fake_label, 2)
-        metric = mx.metric.Accuracy()
-
-        epoch = self.start_epoch
-
-        if self.logger:
-            self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
-                        config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
-
-        try:
-            for epoch in range(self.start_epoch, self.start_epoch + nepochs):
-                tic = time()
-                # train_data.reset()
-                for i, (data, cond_dense) in enumerate(data_iter):
-                    ############################
-                    # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-                    ###########################
-
-                    data = data.as_in_context(ctx).reshape((-1, 784))
-                    cond_dense = cond_dense.as_in_context(ctx)
-                    cond = nd.one_hot(cond_dense, 10)
-                    cond2 = nd.one_hot(cond_dense, 10)
-                    cond3 = nd.one_hot(cond_dense, 10)
-
-                    noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
-
-                    with autograd.record():
-                        real_output = netD(data, cond.detach())
-                        errD_real = loss(real_output, real_label_oh)
-
-                        fake = netG(noise, cond)
-                        fake_output = netD(fake.detach(), cond2.detach())
-                        errD_fake = loss(fake_output, fake_label_oh)
-                        errD = errD_real + errD_fake
-                        errD.backward()
-
-                    trainerD.step(batch_size)
-                    metric.update([real_label, ], [real_output, ])
-                    metric.update([fake_label, ], [fake_output, ])
-
-                    ############################
-                    # (2) Update G network: maximize log(D(G(z)))
-                    ###########################
-                    with autograd.record():
-                        output = netD(fake, cond3.detach())
-                        errG = loss(output, real_label_oh)
-                        errG.backward()
-
-                    trainerG.step(batch_size)
-
-                name, acc = metric.get()
-                metric.reset()
-                if self.logger:
-                    self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
-                if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)) :
-                    self.checkpoint(epoch+1)
-        except KeyboardInterrupt:
-            self.logger.info('Training interrupted by user.')
-            self.checkpoint('I%d'%epoch)

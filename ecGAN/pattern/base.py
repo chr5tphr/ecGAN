@@ -116,7 +116,7 @@ class PatternNet(Block):
         z_pat = nd.zeros_like(z_neut)
         weight = self._weight_pattern()
         # note that pattern attribution is actually only the positive regime,
-        # which hast to be defined by the user!
+        # which has to be defined by the user!
         for regime in self._regimes:
             a_reg = regime.pattern.data(ctx=x_pat.context)
             a_reg = a_reg * weight

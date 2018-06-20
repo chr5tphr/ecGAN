@@ -37,7 +37,13 @@ class YSequentialBase(Block):
         with self._main_net.name_scope():
             self._main_net.add(*args, **kwargs)
 
-    def forward(self, x, y):
+    def forward(self, *args):
+        # WARNING This is hacky and nowhere standardized
+        if len(args) == 1:
+            x,y = args[0]
+        else:
+            x,y = args
+
         data = self._data_net(x)
         cond = self._cond_net(y)
         combo = nd.concat(data, cond, dim=self._concat_dim)

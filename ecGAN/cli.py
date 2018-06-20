@@ -6,6 +6,7 @@ import sys
 import os
 import logging
 import h5py
+import traceback
 
 from argparse import ArgumentParser
 from imageio import imwrite
@@ -110,8 +111,8 @@ def chain(args, config):
             net_module = ress(load_module_file, leaf.sub('net_file'), 'net_module')
             try:
                 commands[leaf._action](args, leaf)
-            except KeyError:
-                continue
+            except:
+                print(traceback.format_exc(), file=sys.stderr)
 
 
 @register_command
@@ -401,7 +402,7 @@ def explain_pattern(args, config):
                          net=config.pattern.top_net,
                          logger=logger,
                          i=i,
-                         center=0.,
+                         center=0. if config.get('cmap_center') else None,
                          cmap=cmap,
                         )
 
@@ -443,7 +444,7 @@ def explain_attribution_pattern(args, config):
                          net=config.pattern.top_net,
                          logger=logger,
                          i=i,
-                         center=0.,
+                         center=0. if config.get('cmap_center') else None,
                          cmap=cmap,
                         )
 

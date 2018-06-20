@@ -1,0 +1,70 @@
+fname: '/home/chrstphr/projects/ecGAN/result/conv/CLASS.yaml'
+tail:
+    - #Model Training
+        priority: 0
+        action: 'train'
+        dict:
+            start_epoch: 0
+            init: True
+            data: {kwargs: {train: True}}
+    - # Fit PatternNet
+        dict:
+            start_epoch: 10
+            data: {kwargs: {train: True}}
+            pattern:
+                start_epoch: 0
+                init: True
+                aepoch: 0
+                nepochs: 10
+                optimizer: 'adam'
+                optkwargs:
+                    learning_rate: 0.0001
+                    wd: 0.99
+        tail:
+            -
+                priority: 1
+                action: 'fit_pattern'
+                dict: &linear_pattern
+                    nets: {classifier: {kwargs: {patest: 'linear'}}}
+                    pattern: {name: 'linear'}
+            -
+                priority: 1
+                action: 'fit_pattern'
+                dict: &relu_pattern
+                    nets: {classifier: {kwargs: {patest: 'relu'}}}
+                    pattern: {name: 'relu'}
+    - # Assess PatternNet Quality
+        dict:
+            start_epoch: 10
+            data: {kwargs: {train: False}}
+            pattern:
+                init: False
+                start_epoch: 10
+                aepoch: 0
+        tail:
+            -
+                dict: *linear_pattern
+                tail: &assess_epochs
+                    -
+                        dict:
+                            pattern: {start_epoch: 5}
+                        tail: &small_assess
+                            -
+                                priority: 2
+                                action: 'stats_assess_pattern'
+                            -
+                                priority: 3
+                                action: 'fit_assess_pattern'
+                            -
+                                priority: 4
+                                dict:
+                                    pattern: {aepoch: 10}
+                                action: 'assess_pattern'
+                    -
+                        dict:
+                            pattern: {start_epoch: 10}
+                        tail: *small_assess
+            -
+                dict: *relu_pattern
+                tail: *assess_epochs
+

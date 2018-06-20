@@ -4,7 +4,7 @@ from mxnet.gluon import nn
 import numpy as np
 
 from .base import PatternNet, ActPatternNet
-from ..base import ReLUBase, IdentityBase
+from ..base import ReLUBase, IdentityBase, YSequentialBase
 from ..func import im2col_indices
 
 class DensePatternNet(PatternNet, nn.Dense):
@@ -60,9 +60,9 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
 
     def _forward_pattern(self, x, w, bias=None):
         kwargs = self._kwargs.copy()
-        kwargs['no_bias'] = True
+        kwargs['no_bias'] = bias is None
         w = w.reshape(self.weight.shape)
-        return nd.Convolution(x, w, name='fwd', **kwargs)
+        return nd.Convolution(x, w, bias, name='fwd', **kwargs)
 
     def _backward_pattern(self, y, pattern, pias=None):
         kwargs = self._kwargs.copy()
@@ -202,6 +202,88 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         for block in self._children.values()[::-1]:
             y_sig = block.backward_pattern(y_sig)
         return y_sig
+
+class YSequentialPatternNet(PatternNet, YSequentialBase):
+    def init_pattern(self):
+        self._data_net.init_pattern()
+        self._cond_net.init_pattern()
+        self._main_net.init_pattern()
+
+    def forward_pattern(self, x, y):
+        data = self._data_net.forward_pattern(x)
+        cond = self._cond_net.forward_pattern(y)
+        combo = nd.concat(data, cond, dim=self._concat_dim)
+        return self._main_net.forward_pattern(combo)
+
+    def forward_attribution_pattern(self, x, y):
+        data = self._data_net.forward_attribution_pattern(x)
+        cond = self._cond_net.forward_attribution_pattern(y)
+        combo = nd.concat(data, cond, dim=self._concat_dim)
+        return self._main_net.forward_attribution_pattern(combo)
+
+    def learn_pattern(self):
+        self._data_net.learn_pattern()
+        self._cond_net.learn_pattern()
+        self._main_net.learn_pattern()
+
+    def fit_pattern(self, x, y):
+        data = self._data_net.fit_pattern(x)
+        cond = self._cond_net.fit_pattern(y)
+        combo = nd.concat(data, cond, dim=self._concat_dim)
+        out = self._main_net.fit_pattern(combo)
+        self._err = self._data_net._err + self._cond_net._err + self._main_net._err
+        return out
+
+    def fit_assess_pattern(self, x, y):
+        data = self._data_net.fit_assess_pattern(x)
+        cond = self._cond_net.fit_assess_pattern(y)
+        combo = nd.concat(data, cond, dim=self._concat_dim)
+        out = self._main_net.fit_assess_pattern(combo)
+        self._err = self._data_net._err + self._cond_net._err + self._main_net._err
+        return out
+
+    def stats_assess_pattern(self):
+        self._data_net.stats_assess_pattern()
+        self._cond_net.stats_assess_pattern()
+        self._main_net.stats_assess_pattern()
+
+    def assess_pattern(self):
+        quals = self._data_net.assess_pattern() \
+              + self._cond_net.assess_pattern() \
+              + self._main_net.assess_pattern()
+        return quals
+
+    def compute_pattern(self):
+        self._data_net.compute_pattern()
+        self._cond_net.compute_pattern()
+        self._main_net.compute_pattern()
+
+    def explain_pattern(self, x, y):
+        x.attach_grad()
+        with autograd.record():
+            z = self.forward_pattern(x, y)
+        z[1].backward(out_grad=z[0])
+        return x.grad
+
+    def explain_attribution_pattern(self, x, y):
+        x.attach_grad()
+        with autograd.record():
+            z = self.forward_attribution_pattern(x, y)
+        z[1].backward(out_grad=z[0])
+        return x.grad
+
+    def backward_pattern(self, y_sig):
+        y_sig_dc = self._main_net.backward_pattern(y_sig)
+
+        dim_d = self._data_net._out.shape[self._concat_dim]
+
+        y_sid_d = y_sig_dc.slice_axis(axis=self._concat_dim, begin=0, end=dim_d)
+        y_sid_c = y_sig_dc.slice_axis(axis=self._concat_dim, begin=dim_d, end=None)
+
+        x_sig_d = self._data_net.backward_pattern(y_sid_d)
+        x_sig_c = self._cond_net.backward_pattern(y_sid_c)
+
+        return x_sig_d, x_sig_c
 
 class ReLUPatternNet(ActPatternNet, ReLUBase):
     def _forward_pattern(self, x_neut, x_reg):

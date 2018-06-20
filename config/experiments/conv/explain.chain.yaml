@@ -1,0 +1,52 @@
+fname: '/home/chrstphr/projects/ecGAN/result/conv/CLASS.yaml'
+tail:
+    -
+        dict:
+            start_epoch: 10
+            data: {kwargs: {train: False}}
+            pattern:
+                init: False
+                start_epoch: 10
+                aepoch: 0
+        tail:
+            -
+                dict: &linear_pattern
+                    nets: {classifier: {kwargs: {patest: 'linear'}}}
+                    pattern: {name: 'linear'}
+                tail: &explain_epochs
+                    -
+                        dict:
+                            pattern: {start_epoch: 5}
+                        tail: &explain_types
+                            -
+                                priority: 2
+                                action: 'explain_pattern'
+                    -
+                        dict:
+                            pattern: {start_epoch: 10}
+                        tail: *explain_types
+            -
+                dict: &relu_pattern
+                    nets: {classifier: {kwargs: {patest: 'relu'}}}
+                    pattern: {name: 'relu'}
+                tail: *explain_epochs
+            -
+                # attribution only makes sense for relu
+                dict:
+                    nets: {classifier: {kwargs: {patest: 'positive'}}}
+                    pattern:
+                        type: 'attribution'
+                        name: 'relu'
+                    # cmap: 'gray'
+                tail:
+                    -
+                        dict:
+                            pattern: {start_epoch: 5}
+                        priority: 2
+                        action: 'explain_attribution_pattern'
+                    -
+                        dict:
+                            pattern: {start_epoch: 10}
+                        priority: 2
+                        action: 'explain_attribution_pattern'
+
