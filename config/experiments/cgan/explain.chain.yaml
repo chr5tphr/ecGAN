@@ -1,4 +1,4 @@
-fname: '/home/chrstphr/projects/ecGAN/result/classify/CLASS.yaml'
+fname: '/home/chrstphr/projects/ecGAN/result/cgan/CGAN.yaml'
 tail:
     -
         dict:
@@ -11,7 +11,9 @@ tail:
         tail:
             -
                 dict: &linear_pattern
-                    nets: {classifier: {kwargs: {patest: 'linear'}}}
+                    nets:
+                        generator:     {kwargs: {patest: 'linear'}}
+                        discriminator: {kwargs: {patest: 'linear'}}
                     pattern: {name: 'linear'}
                 tail: &explain_epochs
                     -
@@ -27,13 +29,17 @@ tail:
                         tail: *explain_types
             -
                 dict: &relu_pattern
-                    nets: {classifier: {kwargs: {patest: 'relu'}}}
+                    nets:
+                        generator:     {kwargs: {patest: 'relu'}}
+                        discriminator: {kwargs: {patest: 'relu'}}
                     pattern: {name: 'relu'}
                 tail: *explain_epochs
             -
                 # attribution only makes sense for relu
                 dict:
-                    nets: {classifier: {kwargs: {patest: 'positive'}}}
+                    nets:
+                        generator:     {kwargs: {patest: 'positive'}}
+                        discriminator: {kwargs: {patest: 'positive'}}
                     pattern:
                         type: 'attribution'
                         name: 'relu'

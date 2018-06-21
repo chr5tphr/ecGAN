@@ -791,6 +791,7 @@ class CGAN(GAN):
 
         data_iter = gluon.data.DataLoader(data, batch_size)
         K = len(data.classes)
+        one_hot = fuzzy_one_hot if self.config.fuzzy_labels else nd.one_hot
 
         trainerD = gluon.Trainer(self.netD.collect_pparams(),
             self.config.pattern.get('optimizer', 'SGD'),
@@ -812,21 +813,21 @@ class CGAN(GAN):
                 num = data.shape[0]
 
                 # === Data Pass ===
-                noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+                noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
                 cond = one_hot(label, K).reshape((num, -1, 1, 1))
 
-                self.netG.fit_pattern([noise, cond])
+                self.netG.fit_pattern(noise, cond)
                 self.netD.fit_pattern(data)
 
                 trainerD.step(num, ignore_stale_grad=True)
                 trainerG.step(num, ignore_stale_grad=True)
 
                 # === Fake Pass ===
-                noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+                noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
                 rand_cond = nd.random.uniform(0,K,shape=num).floor()
                 cond = one_hot(rand_cond, K).reshape((num, -1, 1, 1))
 
-                fake = self.netG.fit_pattern([noise, cond])
+                fake = self.netG.fit_pattern(noise, cond)
                 self.netD.fit_pattern(fake)
 
                 trainerD.step(num, ignore_stale_grad=True)

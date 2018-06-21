@@ -6,7 +6,7 @@ import numpy as np
 from .func import im2col_indices
 from .base import Block, Intermediate, YSequentialBase, ReLUBase
 from .pattern.base import PatternNet, ActPatternNet
-from .pattern.layer import SequentialPatternNet, BatchNormPatternNet, DensePatternNet, Conv2DPatternNet, Conv2DTransposePatternNet, ReLUPatternNet, IdentityPatternNet
+from .pattern.layer import SequentialPatternNet, YSequentialPatternNet, BatchNormPatternNet, DensePatternNet, Conv2DPatternNet, Conv2DTransposePatternNet, ReLUPatternNet, IdentityPatternNet
 from .explain.base import Interpretable
 from .explain.layer import SequentialInterpretable, YSequentialInterpretable, DenseInterpretable, Conv2DTransposeInterpretable, Conv2DInterpretable, BatchNormInterpretable
 
@@ -64,6 +64,6 @@ class YSequentialIntermediate(Intermediate, YSequentialBase):
         combo = nd.concat(data, cond, dim=self._concat_dim)
         return self._main_net.forward(combo, depth=depth)
 
-class YSequential(YSequentialInterpretable, YSequentialIntermediate):
-    pass
+class YSequential(YSequentialInterpretable, YSequentialPatternNet, YSequentialIntermediate):
+    _Subnet = Sequential
 

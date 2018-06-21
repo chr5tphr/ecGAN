@@ -101,7 +101,7 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
         w = w.reshape(self.weight.shape)
         return nd.Deconvolution(x, w, name='fwd', **kwargs)
 
-    def _backward_pattern(self, y, pattern):
+    def _backward_pattern(self, y, pattern, pias=None):
         kwargs = self._kwargs.copy()
         kwargs['no_bias'] = True
         kwargs['num_filter'] = self.weight.shape[0]
@@ -296,6 +296,13 @@ class ReLUPatternNet(ActPatternNet, ReLUBase):
         return self._forward_pattern(y_neut, y_sig)
 
 class IdentityPatternNet(ActPatternNet, IdentityBase):
+    def _forward_pattern(self, x_neut, x_reg):
+        return x_reg
+
+    def backward_pattern(self, y_sig):
+        return y_sig
+
+class TanhPatternNet(ActPatternNet, IdentityBase):
     def _forward_pattern(self, x_neut, x_reg):
         return x_reg
 

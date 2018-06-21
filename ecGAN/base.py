@@ -12,17 +12,18 @@ class Intermediate(Block):
         return self.forward(self, *args)
 
 class YSequentialBase(Block):
+    _Subnet = None
     def __init__(self, **kwargs):
         self._concat_dim = kwargs.pop('concat_dim', 1)
         super().__init__(**kwargs)
         with self.name_scope():
-            self._data_net = Sequential()
+            self._data_net = self._Subnet()
             self.register_child(self._data_net)
 
-            self._cond_net = Sequential()
+            self._cond_net = self._Subnet()
             self.register_child(self._cond_net)
 
-            self._main_net = Sequential()
+            self._main_net = self._Subnet()
             self.register_child(self._main_net)
 
     def addData(self, *args, **kwargs):
@@ -56,4 +57,8 @@ class ReLUBase(Block):
 class IdentityBase(Block):
     def forward(self, *args, **kwargs):
         return args[0]
+
+class TanhBase(Block):
+    def forward(self, x):
+        return nd.tanh(x)
 

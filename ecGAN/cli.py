@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--seed', type=int)
     parser.add_argument('--classnum', type=int, default=10)
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--pskip', action='append', type=int, default=[])
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -108,6 +109,8 @@ def chain(args, config):
         ctree = ChainConfig(content, **rawdict)
 
         for leaf in ctree.leaves():
+            if leaf._priority in args.pskip:
+                continue
             net_module = ress(load_module_file, leaf.sub('net_file'), 'net_module')
             try:
                 commands[leaf._action](args, leaf)
