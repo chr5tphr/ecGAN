@@ -412,6 +412,50 @@ def explain_pattern(args, config):
     del model
 
 @register_command
+def explain_pattern_cgan(args, config):
+    ctx = ress(make_ctx, config.device, config.device_id)
+
+    logger = None
+    if config.log:
+        logger = mkfilelogger('explaining', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+
+    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model.load_pattern_params()
+
+    num = 30
+    K = args.classnum
+    cond = nd.one_hot(linspace(0, K, num, ctx=ctx, dtype='int32'), K).reshape(num, K, 1, 1)
+
+    for i in range(args.iter):
+        noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+        s_noise, s_cond = model.explain_pattern(K, noise, cond)
+
+        s_noise = s_noise.reshape(30, 1, 100)
+        s_cond = s_cond.reshape(30, 1, K)
+
+        save_explanation(s_noise,
+                         data=noise,
+                         config=config,
+                         image=config.explanation.image,
+                         output=config.explanation.output,
+                         source=config.explanation.input,
+                         data_desc='cond',
+                         net='gen_noise',
+                         logger=logger,
+                         i=i)
+        save_explanation(s_cond,
+                         data=cond,
+                         config=config,
+                         image=config.explanation.image,
+                         output=config.explanation.output,
+                         source=config.explanation.input,
+                         data_desc='noise',
+                         net='gen_cond',
+                         logger=logger,
+                         i=i)
+
+
+@register_command
 def explain_attribution_pattern(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 

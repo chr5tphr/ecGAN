@@ -824,7 +824,7 @@ class CGAN(GAN):
 
                 # === Fake Pass ===
                 noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
-                rand_cond = nd.random.uniform(0,K,shape=num).floor()
+                rand_cond = nd.random.uniform(0,K,shape=num, ctx=self.ctx).floor()
                 cond = one_hot(rand_cond, K).reshape((num, -1, 1, 1))
 
                 fake = self.netG.fit_pattern(noise, cond)
@@ -906,8 +906,9 @@ class CGAN(GAN):
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
     def explain_pattern(self, K, noise=None, cond=None, num=None):
-        if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+        if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):
+            raise NotImplementedError('At least one net is not a PatternNet!')
+
 
         if num is None:
             if noise is not None:
@@ -919,25 +920,22 @@ class CGAN(GAN):
         if noise is None:
             noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
         if cond is None:
-            cond = nd.random.uniform(0,K,shape=num).floor()
-        cond = one_hot(cond, K).reshape((num, -1, 1, 1))
+            one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
+            cond = nd.random.uniform(0,K,shape=num, ctx=self.ctx).floor()
+            cond = one_hot(cond, K).reshape((num, -1, 1, 1))
 
         noise.attach_grad()
         cond.attach_grad()
         with autograd.record():
-            # TODO: check if args are correctly hanled by netG's forward_pattern
             y_G = self.netG.forward_pattern(noise, cond)
             y_D = self.netD.forward_pattern(*y_G)
-        y_D[1].backward(out_grad=y[0])
-        return x.grad
-        Rg = self.netG.explain_pattern(data)
-        Rd = self.netD.explain_pattern(data)
+        y_D[1].backward(out_grad=y_D[0])
 
-        return Rg, Rd
+        return noise.grad, cond.grad
 
     def explain_attribution_pattern(self, data):
-        if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+        if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):
+            raise NotImplementedError('At least one net is not a PatternNet!')
 
         R = self.netC.explain_attribution_pattern(data)
 

@@ -105,6 +105,7 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
         kwargs = self._kwargs.copy()
         kwargs['no_bias'] = True
         kwargs['num_filter'] = self.weight.shape[0]
+        kwargs.pop('adj')
         pattern = pattern.reshape(self.weight.shape)
         return nd.Convolution(y, pattern, name='fwd', **kwargs)
 
@@ -210,10 +211,11 @@ class YSequentialPatternNet(PatternNet, YSequentialBase):
         self._main_net.init_pattern()
 
     def forward_pattern(self, x, y):
-        data = self._data_net.forward_pattern(x)
-        cond = self._cond_net.forward_pattern(y)
-        combo = nd.concat(data, cond, dim=self._concat_dim)
-        return self._main_net.forward_pattern(combo)
+        data_neut, data_pat = self._data_net.forward_pattern(x)
+        cond_neut, cond_pat = self._cond_net.forward_pattern(y)
+        combo_neut = nd.concat(data_neut, cond_neut, dim=self._concat_dim)
+        combo_pat = nd.concat(data_pat, cond_pat, dim=self._concat_dim)
+        return self._main_net.forward_pattern(combo_neut, combo_pat)
 
     def forward_attribution_pattern(self, x, y):
         data = self._data_net.forward_attribution_pattern(x)
