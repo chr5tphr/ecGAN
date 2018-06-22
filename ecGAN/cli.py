@@ -16,8 +16,10 @@ from .net import nets
 from .model import models
 from .data import data_funcs
 from .util import mkfilelogger, Config, config_ctx, make_ctx, load_module_file, ChainConfig, RessourceManager
-from .plot import plot_data, save_explanation
+from .plot import plot_data, save_explanation_data, save_explanation_image, save_source_image, save_source_raw_image
 from .func import linspace
+
+getLogger = logging.getLogger
 
 commands = {}
 def register_command(func):
@@ -132,11 +134,10 @@ def train(args, config):
 
     data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('training', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
     model.train(data, batch_size, nepochs)
 
     del model
@@ -148,9 +149,8 @@ def generate(args, config):
 
     netG = nets[config.nets.generator.type]()
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('generation', config.sub('log'))
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
     for epoch in (range(*args.epoch_range) if args.epoch_range else [config.start_epoch]):
         if config.nets.generator.param:
@@ -173,9 +173,8 @@ def generate(args, config):
             # snum = int(len(gdat)**.5)
             # imwrite(fpath, gdat[:snum**2].reshape(snum, snum, 28, 28).transpose(0, 2, 1, 3).reshape(snum*28, snum*28))
             imwrite(fpath, gdat.reshape(5, 6, 28, 28).transpose(0, 2, 1, 3).reshape(5*28, 6*28))
-            if logger:
-                logger.info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',
-                            config.nets.generator.type, config.sub('nets.generator.param', start_epoch=epoch), fpath)
+            getLogger('ecGAN').info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',
+                                    config.nets.generator.type, config.sub('nets.generator.param', start_epoch=epoch), fpath)
         else:
             fig = plot_data(gdat)
             fig.show()
@@ -184,28 +183,26 @@ def generate(args, config):
 def test(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('testing', config.sub('log'))
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
     batch_size = config.batch_size
     data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
     model.test(data=data, batch_size=batch_size)
 
 @register_command
 def debug(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('debugging', config.sub('log'))
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
     batch_size = config.batch_size
     data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
 
     import ipdb; ipdb.set_trace()
 
@@ -213,11 +210,10 @@ def debug(args, config):
 def explain(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('explaining', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
 
     data_fp = data_funcs[config.data.func](*(config.data.args), **(config.data.kwargs))
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
@@ -239,18 +235,16 @@ def explain(args, config):
                          source=config.explanation.input,
                          data_desc=config.data.func,
                          net=config.explanation.top_net,
-                         logger=logger,
                          i=i)
 
 @register_command
 def explain_gan(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('explaining', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
 
     label = None
     if config.model in ['CCGAN', 'CGAN', 'WCGAN']:
@@ -268,7 +262,6 @@ def explain_gan(args, config):
                          source=config.explanation.input,
                          data_desc='%s.%s'%(config.nets.generator.type, config.start_epoch),
                          net=config.explanation.top_net,
-                         logger=logger,
                          i=i)
         save_explanation(relG,
                          data=noise,
@@ -278,7 +271,6 @@ def explain_gan(args, config):
                          source=config.explanation.input,
                          data_desc='noise',
                          net='generator',
-                         logger=logger,
                          i=i)
 
         if Rc is not None:
@@ -290,7 +282,6 @@ def explain_gan(args, config):
                              source=config.explanation.input,
                              data_desc='condition',
                              net='generator',
-                             logger=logger,
                              i=i)
 
 @register_command
@@ -299,11 +290,10 @@ def learn_pattern(args, config):
     batch_size = config.batch_size
     data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('learning', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
     model.load_pattern_params()
     model.learn_pattern(data, batch_size)
 
@@ -313,11 +303,10 @@ def fit_pattern(args, config):
     batch_size = config.batch_size
     data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('learning', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
     model.load_pattern_params()
     model.fit_pattern(data, batch_size)
 
@@ -329,11 +318,10 @@ def stats_assess_pattern(args, config):
     batch_size = config.batch_size
     data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('learning', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
     model.load_pattern_params()
     model.stats_assess_pattern(data, batch_size)
 
@@ -343,11 +331,10 @@ def fit_assess_pattern(args, config):
     batch_size = config.batch_size
     data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('learning', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
     model.load_pattern_params()
     model.fit_assess_pattern(data, batch_size)
 
@@ -355,26 +342,24 @@ def fit_assess_pattern(args, config):
 def assess_pattern(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('assessing', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
     model.load_pattern_params()
     rho = model.assess_pattern()
 
     txt = ' '.join([str(elem.mean().asscalar()) for elem in rho if elem is not None])
-    logger.info('Pattern Qualities rho(s) = %s'%txt)
+    getLogger('ecGAN').info('Pattern Qualities rho(s) = %s'%txt)
 
 @register_command
 def explain_pattern(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('explaining', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
     model.load_pattern_params()
 
     cmap = config.get('cmap', 'coldnhot')
@@ -403,7 +388,6 @@ def explain_pattern(args, config):
                          source=config.pattern.input,
                          data_desc=config.data.func,
                          net=config.pattern.top_net,
-                         logger=logger,
                          i=i,
                          center=0. if config.get('cmap_center') else None,
                          cmap=cmap,
@@ -415,55 +399,35 @@ def explain_pattern(args, config):
 def explain_pattern_cgan(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('explaining', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
     model.load_pattern_params()
 
     num = 30
     K = args.classnum
     cond = nd.one_hot(linspace(0, K, num, ctx=ctx, dtype='int32'), K).reshape(num, K, 1, 1)
+    save_source_raw_image(cond.squeeze(), config.sub('pattern.input', iter=0, data_desc='cond'))
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
         s_noise, s_cond = model.explain_pattern(K, noise, cond)
 
-        s_noise = s_noise.reshape(30, 1, 100)
-        s_cond = s_cond.reshape(30, 1, K)
+        save_source_raw_image(noise.squeeze(), config.sub('pattern.input', iter=i, data_desc='noise'))
 
-        save_explanation(s_noise,
-                         data=noise,
-                         config=config,
-                         image=config.explanation.image,
-                         output=config.explanation.output,
-                         source=config.explanation.input,
-                         data_desc='cond',
-                         net='gen_noise',
-                         logger=logger,
-                         i=i)
-        save_explanation(s_cond,
-                         data=cond,
-                         config=config,
-                         image=config.explanation.image,
-                         output=config.explanation.output,
-                         source=config.explanation.input,
-                         data_desc='noise',
-                         net='gen_cond',
-                         logger=logger,
-                         i=i)
+        save_explanation_data(s_noise.squeeze(), config.sub('pattern.output', iter=i, data_desc='noise'))
+        save_explanation_data(s_cond.squeeze(), config.sub('pattern.output', iter=i, data_desc='cond'))
 
 
 @register_command
 def explain_attribution_pattern(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('explaining', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
     model.load_pattern_params()
 
     cmap = config.get('cmap', 'coldnhot')
@@ -489,7 +453,6 @@ def explain_attribution_pattern(args, config):
                          source=config.pattern.input,
                          data_desc=config.data.func,
                          net=config.pattern.top_net,
-                         logger=logger,
                          i=i,
                          center=0. if config.get('cmap_center') else None,
                          cmap=cmap,
@@ -501,18 +464,16 @@ def explain_attribution_pattern(args, config):
 def predict(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
-    logger = None
     if config.log:
-        logger = mkfilelogger('predicting', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, logger=logger, config=config)
+    model = models[config.model](ctx=ctx, config=config)
 
     for i in range(args.iter):
         output = model.predict().asnumpy()
         txt = '\n'.join([' '.join(['%.02f'%val for val in line]) for line in output])
 
-        if logger:
-            logger.info('Prediction for \'%s\':\n%s', config.nets[config.explanation.top_net].param, txt)
+        getLogger('ecGAN').info('Prediction for \'%s\':\n%s', config.nets[config.explanation.top_net].param, txt)
 
 if __name__ == '__main__':
     main()

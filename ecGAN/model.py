@@ -3,6 +3,7 @@ import numpy as np
 from time import time
 from mxnet import gluon, autograd, nd
 from imageio import imwrite
+from logging import getLogger
 
 from .func import fuzzy_one_hot, linspace, randint
 from .explain.base import Interpretable
@@ -18,7 +19,6 @@ def register_model(obj):
 
 class Model(object):
     def __init__(self, **kwargs):
-        self.logger = kwargs.get('logger')
         self.config = kwargs.get('config', Config())
         self.ctx = kwargs.get('ctx')
         if not self.ctx:
@@ -35,24 +35,20 @@ class Model(object):
             if not self.config.init and desc.get('param'):
                 fpath = self.config.sub('nets.%s.param'%(key))
                 self.nets[key].load_params(fpath, ctx=self.ctx)
-                if self.logger:
-                    self.logger.debug('Loading parameters for %s \'%s\' from %s.', key, desc.type, fpath)
+                getLogger('ecGAN').debug('Loading parameters for %s \'%s\' from %s.', key, desc.type, fpath)
             else:
                 self.nets[key].initialize(mx.init.Xavier(rnd_type='gaussian', magnitude=2.24), ctx=self.ctx)
-                if self.logger:
-                    self.logger.debug('Initializing %s \'%s\'.', key, desc.type)
+                getLogger('ecGAN').debug('Initializing %s \'%s\'.', key, desc.type)
 
     def checkpoint(self, epoch):
         for key, tnet in self.nets.items():
             if self.config.nets[key].get('save'):
                 fpath = self.config.sub('nets.%s.save'%(key), epoch=epoch)
                 tnet.save_params(fpath)
-                if self.logger:
-                    self.logger.info('Saved %s \'%s\' checkpoint epoch %s in file \'%s\'.', key, self.config.nets[key].type, epoch, fpath)
+                getLogger('ecGAN').info('Saved %s \'%s\' checkpoint epoch %s in file \'%s\'.', key, self.config.nets[key].type, epoch, fpath)
             else:
-                if self.logger:
-                    fpath = self.config.sub('nets.%s.save'%(key), epoch=epoch)
-                    self.logger.debug('Not saving %s \'%s\' epoch %s.', key, self.config.nets[key].type, epoch, fpath)
+                fpath = self.config.sub('nets.%s.save'%(key), epoch=epoch)
+                getLogger('ecGAN').debug('Not saving %s \'%s\' epoch %s.', key, self.config.nets[key].type, epoch, fpath)
 
     def load_pattern_params(self):
         for nrole, net in self.nets.items():
@@ -74,12 +70,10 @@ class Model(object):
                                         net_type=ntype, **kwargs)
                 pparams = net.collect_pparams()
                 pparams.save(fpath, pparams.prefix)
-                if self.logger:
-                    ktxt = ", ".join(['%s=%s'%(str(key), str(val)) for key,val in kwargs.items()])
-                    self.logger.info('Saved pattern of \'%s %s\' {%s} in file \'%s\'.', ntype, nname, ktxt, fpath)
+                ktxt = ", ".join(['%s=%s'%(str(key), str(val)) for key,val in kwargs.items()])
+                getLogger('ecGAN').info('Saved pattern of \'%s %s\' {%s} in file \'%s\'.', ntype, nname, ktxt, fpath)
         else:
-            if self.logger:
-                self.logger.debug('Not saving pattern.')
+            getLogger('ecGAN').debug('Not saving pattern.')
 
     def generate_sample(self, epoch):
         raise NotImplementedError('Not supported for class %s'%self.__class__)
@@ -111,8 +105,7 @@ class Classifier(Model):
 
         metric = mx.metric.Accuracy()
 
-        if self.logger:
-            self.logger.info('Starting training of model %s, classifier %s at epoch %d',
+        getLogger('ecGAN').info('Starting training of model %s, classifier %s at epoch %d',
                             config.model, config.nets.classifier.type, epoch)
 
         try:
@@ -134,12 +127,11 @@ class Classifier(Model):
 
                 name, acc = metric.get()
                 metric.reset()
-                if self.logger:
-                    self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
+                getLogger('ecGAN').info('netD training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
                 if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)) :
                     self.checkpoint(epoch+1)
         except KeyboardInterrupt:
-            self.logger.info('Training interrupted by user.')
+            getLogger('ecGAN').info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
 
     def test(self, data, batch_size):
@@ -155,8 +147,7 @@ class Classifier(Model):
 
         name, acc = metric.get()
 
-        if self.logger:
-            self.logger.info('%s test acc: %s=%.4f', self.config.nets.classifier.type, name, acc)
+        getLogger('ecGAN').info('%s test acc: %s=%.4f', self.config.nets.classifier.type, name, acc)
 
     def explain(self, data, label=None):
         method = self.config.explanation.method
@@ -180,8 +171,7 @@ class Classifier(Model):
             Rsums = []
             for rel in R:
                 Rsums.append(rel.sum().asscalar())
-            if self.logger:
-                self.logger.debug('Explanation sums: %s', ', '.join([str(fl) for fl in Rsums]))
+            getLogger('ecGAN').debug('Explanation sums: %s', ', '.join([str(fl) for fl in Rsums]))
 
         return R[-1]
 
@@ -202,8 +192,7 @@ class Classifier(Model):
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-        if self.logger:
-            self.logger.info('Learned signal estimator %s for net %s', estimator, self.config.nets.classifier.type)
+        getLogger('ecGAN').info('Learned signal estimator %s for net %s', estimator, self.config.nets.classifier.type)
 
     def fit_pattern(self, data, batch_size):
         if not isinstance(self.netC, PatternNet):
@@ -228,17 +217,15 @@ class Classifier(Model):
                 self.netC.fit_pattern(data)
                 trainer.step(batch_size, ignore_stale_grad=True)
 
-            if self.logger:
-                etxt = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
-                                  for toperr in self.netC._err if isinstance(toperr, list)])
-                self.logger.info('pattern training epoch %04d , time: %.2f, errors: %s',
-                                 epoch, (time() - tic), etxt)
+            etxt = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
+                              for toperr in self.netC._err if isinstance(toperr, list)])
+            getLogger('ecGAN').info('pattern training epoch %04d , time: %.2f, errors: %s',
+                             epoch, (time() - tic), etxt)
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
                 self.save_pattern_params(fit_epoch=epoch+1,
                                          ase_epoch=self.config.pattern.get('aepoch', 0))
 
-        if self.logger:
-            self.logger.info('Learned pattern for net %s',
+        getLogger('ecGAN').info('Learned pattern for net %s',
                              self.config.nets.classifier.type)
 
     def fit_assess_pattern(self, data, batch_size):
@@ -264,10 +251,9 @@ class Classifier(Model):
                 self.netC.fit_assess_pattern(data)
                 trainer.step(batch_size, ignore_stale_grad=True)
 
-            if self.logger:
-                etxt = ', '.join(['%.2e'%(err.mean().asscalar()) for err in self.netC._err if isinstance(err, nd.NDArray)])
-                self.logger.info('pattern assessment training epoch %04d , time: %.2f, errors: %s',
-                                 epoch, (time() - tic), etxt)
+            etxt = ', '.join(['%.2e'%(err.mean().asscalar()) for err in self.netC._err if isinstance(err, nd.NDArray)])
+            getLogger('ecGAN').info('pattern assessment training epoch %04d , time: %.2f, errors: %s',
+                             epoch, (time() - tic), etxt)
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
                 self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                          ase_epoch=epoch+1)
@@ -340,8 +326,7 @@ class Regressor(Model):
 
         metric = mx.metric.Loss()
 
-        if self.logger:
-            self.logger.info('Starting training of model %s, regressor %s at epoch %d',
+        getLogger('ecGAN').info('Starting training of model %s, regressor %s at epoch %d',
                             config.model, config.nets.regressor.type, epoch)
 
         try:
@@ -363,12 +348,11 @@ class Regressor(Model):
 
                 name, acc = metric.get()
                 metric.reset()
-                if self.logger:
-                    self.logger.info('netR training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
+                getLogger('ecGAN').info('netR training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
                 if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)) :
                     self.checkpoint(epoch+1)
         except KeyboardInterrupt:
-            self.logger.info('Training interrupted by user.')
+            getLogger('ecGAN').info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
 
     def test(self, data, batch_size):
@@ -384,8 +368,7 @@ class Regressor(Model):
 
         name, acc = metric.get()
 
-        if self.logger:
-            self.logger.info('%s test acc: %s=%.4f', self.config.nets.regressor.type, name, acc)
+        getLogger('ecGAN').info('%s test acc: %s=%.4f', self.config.nets.regressor.type, name, acc)
 
     def learn_pattern(self, data, batch_size):
         estimator = self.config.pattern.estimator
@@ -410,8 +393,7 @@ class Regressor(Model):
                                                     net_name=self.config.nets.regressor.name,
                                                     net_type=self.config.nets.regressor.type))
 
-        if self.logger:
-            self.logger.info('Learned signal estimator %s for net %s', estimator, self.config.nets.regressor.type)
+        getLogger('ecGAN').info('Learned signal estimator %s for net %s', estimator, self.config.nets.regressor.type)
 
     def fit_pattern(self, data, batch_size):
         if not isinstance(self.netR, PatternNet):
@@ -436,13 +418,11 @@ class Regressor(Model):
                 self.netR.fit_pattern(data)
                 trainer.step(batch_size, ignore_stale_grad=True)
 
-            if self.logger:
-                self.logger.info('pattern training epoch %04d , time: %.2f', epoch, (time() - tic))
+            getLogger('ecGAN').info('pattern training epoch %04d , time: %.2f', epoch, (time() - tic))
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
                 self.save_pattern_params(epoch+1)
 
-        if self.logger:
-            self.logger.info('Learned pattern for net %s',
+        getLogger('ecGAN').info('Learned pattern for net %s',
                              self.config.nets.regressor.type)
 
     def explain_pattern(self, data):
@@ -503,8 +483,7 @@ class GAN(Model):
         epoch = self.start_epoch
         K = len(data.classes)
 
-        if self.logger:
-            self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
+        getLogger('ecGAN').info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
                         config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
 
         try:
@@ -560,14 +539,13 @@ class GAN(Model):
 
                 name, acc = metric.get()
                 metric.reset()
-                if self.logger:
-                    self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
+                getLogger('ecGAN').info('netD training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
                 if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.checkpoint(epoch+1)
                 if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.generate_sample(epoch+1)
         except KeyboardInterrupt:
-            self.logger.info('Training interrupted by user.')
+            getLogger('ecGAN').info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
             self.generate_sample('I%d'%epoch)
 
@@ -579,11 +557,8 @@ class GAN(Model):
             fpath = self.config.sub('genout', epoch=epoch)
             gdat = ((gdat - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0, 255).astype(np.uint8)
             imwrite(fpath, gdat.reshape(5, 6, 28, 28).transpose(0, 2, 1, 3).reshape(5*28, 6*28))
-            if self.logger:
-                # if label is not None:
-                #     self.logger.debug('Generated using labels: %s', str(label))
-                self.logger.info('Saved data generated by \'%s\' epoch %s in \'%s\'.',
-                                 self.config.nets.generator.type, epoch, fpath)
+            getLogger('ecGAN').info('Saved data generated by \'%s\' epoch %s in \'%s\'.',
+                             self.config.nets.generator.type, epoch, fpath)
 
     # def generated_sensitivity(self, epoch):
     #     if self.config.genout:
@@ -596,9 +571,8 @@ class GAN(Model):
     #         img = draw_heatmap(gdat.grad.asnumpy().reshape(5, 6, 28, 28).transpose(0, 2, 1, 3).reshape(5*28, 6*28))
     #         fpath = self.config.sub('relout', method='sensitivity', epoch=epoch)
     #         imwrite(fpath, img)
-    #         if self.logger:
-    #             self.logger.info('Saved generated sensitivity by \'%s\' epoch %s in \'%s\'.',
-    #                              self.config.nets.generator.type, epoch, fpath)
+    #         getLogger('ecGAN').info('Saved generated sensitivity by \'%s\' epoch %s in \'%s\'.',
+    #                          self.config.nets.generator.type, epoch, fpath)
 
     def explain(self, data=None, label=None):
         netTop = self.nets.get(self.config.explanation.top_net, self.netD)
@@ -649,8 +623,7 @@ class GAN(Model):
             Rsums = []
             for rel in R:
                 Rsums.append(rel.sum().asscalar())
-            if self.logger:
-                self.logger.debug('Explanation sums: %s', ', '.join([str(fl) for fl in Rsums]))
+            getLogger('ecGAN').debug('Explanation sums: %s', ', '.join([str(fl) for fl in Rsums]))
 
         if data is None:
             return (Rt, Rtc[-1], R[-1], Rc[-1], noise, gdata)
@@ -709,8 +682,7 @@ class CGAN(GAN):
 
         epoch = self.start_epoch
 
-        if self.logger:
-            self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
+        getLogger('ecGAN').info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
                         config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
 
         try:
@@ -771,16 +743,14 @@ class CGAN(GAN):
 
                 name, acc = metric.get()
                 metric.reset()
-                if self.logger:
-                    self.logger.info('netD training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
+                getLogger('ecGAN').info('netD training acc epoch %04d: %s=%.4f , time: %.2f', epoch, name, acc, (time() - tic))
                 if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.checkpoint(epoch+1)
                 if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K).reshape((30, K, 1, 1))
                     self.generate_sample(epoch+1, cond)
         except KeyboardInterrupt:
-            if self.logger:
-                self.logger.info('Training interrupted by user.')
+            getLogger('ecGAN').info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
             cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K).reshape((30, K, 1, 1))
             self.generate_sample('I%d'%epoch, cond)
@@ -833,19 +803,17 @@ class CGAN(GAN):
                 trainerD.step(num, ignore_stale_grad=True)
                 trainerG.step(num, ignore_stale_grad=True)
 
-            if self.logger:
-                etxtD = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
-                                  for toperr in self.netD._err if isinstance(toperr, list)])
-                etxtG = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
-                                  for toperr in self.netG._err if isinstance(toperr, list)])
-                self.logger.info('pattern training epoch %04d , time: %.2f, errors: %s | %s',
-                                 epoch, (time() - tic), etxtD, etxtG)
+            etxtD = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
+                              for toperr in self.netD._err if isinstance(toperr, list)])
+            etxtG = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
+                              for toperr in self.netG._err if isinstance(toperr, list)])
+            getLogger('ecGAN').info('pattern training epoch %04d , time: %.2f, errors: %s | %s',
+                             epoch, (time() - tic), etxtD, etxtG)
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or ((epoch + 1) >= (start_epoch + nepochs)) :
                 self.save_pattern_params(fit_epoch=epoch+1,
                                          ase_epoch=self.config.pattern.get('aepoch', 0))
 
-        if self.logger:
-            self.logger.info('Learned pattern')
+        getLogger('ecGAN').info('Learned pattern')
 
     def fit_assess_pattern(self, data, batch_size):
         if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):
@@ -875,19 +843,17 @@ class CGAN(GAN):
                 trainerD.step(len(data), ignore_stale_grad=True)
                 trainerG.step(len(data), ignore_stale_grad=True)
 
-            if self.logger:
-                etxtD = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
-                                  for toperr in self.netD._err if isinstance(toperr, list)])
-                etxtG = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
-                                  for toperr in self.netG._err if isinstance(toperr, list)])
-                self.logger.info('pattern training epoch %04d , time: %.2f, errors: %s | %s',
-                                 epoch, (time() - tic), etxtD, etxtG)
+            etxtD = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
+                              for toperr in self.netD._err if isinstance(toperr, list)])
+            etxtG = ', '.join([" & ".join(['%.2e'%(err.mean().asscalar()) for err in toperr if isinstance(err, nd.NDArray)])
+                              for toperr in self.netG._err if isinstance(toperr, list)])
+            getLogger('ecGAN').info('pattern training epoch %04d , time: %.2f, errors: %s | %s',
+                             epoch, (time() - tic), etxtD, etxtG)
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
                 self.save_pattern_params(fit_epoch=epoch+1,
                                          ase_epoch=self.config.pattern.get('aepoch', 0))
 
-        if self.logger:
-            self.logger.info('Learned pattern')
+        getLogger('ecGAN').info('Learned pattern')
 
     def stats_assess_pattern(self, data, batch_size):
         if not isinstance(self.netC, PatternNet):
@@ -986,8 +952,7 @@ class WGAN(GAN):
 
         epoch = self.start_epoch
 
-        if self.logger:
-            self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
+        getLogger('ecGAN').info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
                         config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
 
         iter_g = 0
@@ -1041,15 +1006,13 @@ class WGAN(GAN):
 
                 name, est = metric.get()
                 metric.reset()
-                if self.logger:
-                    self.logger.info('netD training est epoch %04d: %s=%.4f , time: %.2f', epoch, name, est, (time() - tic))
+                getLogger('ecGAN').info('netD training est epoch %04d: %s=%.4f , time: %.2f', epoch, name, est, (time() - tic))
                 if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.checkpoint(epoch+1)
                 if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.generate_sample(epoch+1)
         except KeyboardInterrupt:
-            if self.logger:
-                self.logger.info('Training interrupted by user.')
+            getLogger('ecGAN').info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
             self.generate_sample('I%d'%epoch)
 
@@ -1081,8 +1044,7 @@ class WCGAN(WGAN):
 
         epoch = self.start_epoch
 
-        if self.logger:
-            self.logger.info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
+        getLogger('ecGAN').info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
                         config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
 
         iter_g = 0
@@ -1149,16 +1111,14 @@ class WCGAN(WGAN):
 
                 name, est = metric.get()
                 metric.reset()
-                if self.logger:
-                    self.logger.info('netD training est epoch %04d: %s=%.4f , time: %.2f', epoch, name, est, (time() - tic))
+                getLogger('ecGAN').info('netD training est epoch %04d: %s=%.4f , time: %.2f', epoch, name, est, (time() - tic))
                 if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.checkpoint(epoch+1)
                 if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K)
                     self.generate_sample(epoch+1, cond)
         except KeyboardInterrupt:
-            if self.logger:
-                self.logger.info('Training interrupted by user.')
+            getLogger('ecGAN').info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
             cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K)
             self.generate_sample('I%d'%epoch, cond)
