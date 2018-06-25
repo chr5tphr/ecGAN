@@ -7,6 +7,12 @@ tail:
             start_epoch: 0
             init: True
             data: {kwargs: {train: True}}
+    - #Model Testing
+        priority: 0
+        action: 'test'
+        dict:
+            start_epoch: 10
+            data: {kwargs: {train: False}}
     - # Fit PatternNet
         dict:
             start_epoch: 10

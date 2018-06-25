@@ -64,9 +64,7 @@ pattern:
   name: 'linear'
   save: '${root_dir}/${exp_dir}/params/${model}.${net_type}.${net_name}.${pattern.name}.${fit_epoch}.${ase_epoch}.pattern.params'
   load: '${root_dir}/${exp_dir}/params/${model}.${net_type}.${net_name}.${pattern.name}.${pattern.start_epoch}.${pattern.aepoch}.pattern.params'
-  output:  '${root_dir}/${exp_dir}/rel/${pattern.type}/${model}.${nets.generator.type}.${start_epoch}.${pattern.name}.${pattern.start_epoch}.${data_desc}.${iter}.h5'
-  image:  '${root_dir}/${exp_dir}/rel/${pattern.type}/${model}.${nets.generator.type}.${start_epoch}.${pattern.name}.${pattern.start_epoch}.${data_desc}.${cmap}.${iter}.png'
-  input:  '${root_dir}/${exp_dir}/rel/${pattern.type}/${model}.${data_desc}.${iter}.png'
+  output: '${root_dir}/${exp_dir}/rel/${pattern.type}/${model}.${nets.generator.type}.${start_epoch}.${pattern.name}.${pattern.start_epoch}.${data_desc}.${iter}.${ftype}'
   start_epoch: 0
   aepoch: 0
   nepochs: 10

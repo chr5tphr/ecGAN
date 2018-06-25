@@ -36,3 +36,33 @@ class MSCN28(Sequential):
             self.add(Dense(self._outnum, regimes=estimators[self._outest]()))
             self.add(Identity(regimes=estimators[self._outest]()))
 
+@register_net
+class M1SCN28(Sequential):
+    def __init__(self, **kwargs):
+        self._numhid = kwargs.pop('numhid', 64)
+        self._outnum = kwargs.pop('outnum', 10)
+        self._patest = kwargs.pop('patest', 'linear')
+        self._outest = kwargs.pop('outest', self._patest)
+        super().__init__(**kwargs)
+        with self.name_scope():
+            # _numhid x 28 x 28
+            self.add(Conv2D(self._numhid, 3, strides=2, padding=0, use_bias=True, regimes=estimators[self._patest]()))
+            self.add(ReLU(regimes=estimators[self._patest]()))
+            # _numhid x 14 x 14
+
+            self.add(Conv2D(self._numhid * 2, 3, strides=2, padding=0, use_bias=True, regimes=estimators[self._patest]()))
+            self.add(ReLU(regimes=estimators[self._patest]()))
+            # _numhid x 7 x 7
+
+            self.add(Conv2D(self._numhid * 4, 3, strides=1, padding=0, use_bias=True, regimes=estimators[self._patest]()))
+            self.add(ReLU(regimes=estimators[self._patest]()))
+            # _numhid x 4 x 4
+
+            self.add(Conv2D(self._numhid * 8, 3, strides=1, padding=0, use_bias=True, regimes=estimators[self._patest]()))
+            self.add(ReLU(regimes=estimators[self._patest]()))
+            # filters x 1 x 1
+
+            self.add(Dense(self._numhid * 8, regimes=estimators[self._patest]()))
+            self.add(Dense(self._outnum, regimes=estimators[self._outest]()))
+            self.add(Identity(regimes=estimators[self._outest]()))
+

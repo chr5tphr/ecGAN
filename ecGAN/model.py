@@ -755,6 +755,21 @@ class CGAN(GAN):
             cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K).reshape((30, K, 1, 1))
             self.generate_sample('I%d'%epoch, cond)
 
+    def test(self, data, batch_size):
+        data_iter = gluon.data.DataLoader(data, batch_size, last_batch='discard')
+
+        metric = mx.metric.Accuracy()
+        for i, (data, label) in enumerate(data_iter):
+            data = data.as_in_context(self.ctx).reshape((-1, 784))
+            label = label.as_in_context(self.ctx)
+
+            output = self.netC(data)
+            metric.update([label, ], [output, ])
+
+        name, acc = metric.get()
+
+        getLogger('ecGAN').info('%s test acc: %s=%.4f', self.config.nets.classifier.type, name, acc)
+
     def fit_pattern(self, data, batch_size):
         if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):
             raise NotImplementedError('At least one net is not a PatternNet!')

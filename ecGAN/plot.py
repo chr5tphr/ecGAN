@@ -2,6 +2,7 @@ import numpy as np
 import h5py
 from imageio import imwrite
 import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from logging import getLogger
 
@@ -74,6 +75,25 @@ def save_explanation_data(relevance, fpath):
     with h5py.File(fpath, 'w') as fp:
         fp['heatmap'] = relevance.asnumpy()
     getLogger('ecGAN').info('Saved explanation in \'%s\'.', fpath)
+
+def save_cgan_visualization(noise, cond, fpath):
+    fig = plt.figure(figsize=(16, 9))
+    #combo = np.concatenate([noise, cond], axis=1)
+    #amin = combo.min()
+    #amax = combo.max()
+    num, nlen = noise.shape
+    _, clen = cond.shape
+    for i, (noi, con) in enumerate(zip(noise, cond)):
+        ax = fig.add_subplot(num//3, 3, i+1)
+        ax.bar(np.arange(nlen), noi, color='b')
+        ax.bar(np.arange(nlen, nlen + clen), con, color='r')
+        ax.set_xlim(-1, nlen + clen)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        #plt.ylim(amin, amax)
+    fig.tight_layout()
+    fig.savefig(fpath)
+    getLogger('ecGAN').info('Saved visualization in \'%s\'.', fpath)
 
 def save_source_image(data, fpath, bbox):
     indat = ((data - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0, 255).astype(np.uint8)

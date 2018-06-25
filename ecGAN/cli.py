@@ -16,7 +16,7 @@ from .net import nets
 from .model import models
 from .data import data_funcs
 from .util import mkfilelogger, Config, config_ctx, make_ctx, load_module_file, ChainConfig, RessourceManager
-from .plot import plot_data, save_explanation_data, save_explanation_image, save_source_image, save_source_raw_image
+from .plot import plot_data, save_explanation_data, save_explanation_image, save_source_image, save_source_raw_image, save_cgan_visualization
 from .func import linspace
 
 getLogger = logging.getLogger
@@ -379,19 +379,13 @@ def explain_pattern(args, config):
             relevance = model.explain_pattern(data)
 
         relevance = relevance.reshape(data.shape)
-        # print(relevance.sum())
-        save_explanation(relevance,
-                         data=data,
-                         config=config,
-                         image=config.pattern.image,
-                         output=config.pattern.output,
-                         source=config.pattern.input,
-                         data_desc=config.data.func,
-                         net=config.pattern.top_net,
-                         i=i,
-                         center=0. if config.get('cmap_center') else None,
-                         cmap=cmap,
-                        )
+
+        save_source_image(data, config.sub('pattern.input', data_desc=config.data.func, iter=i))
+        save_explanation_image(relevance,
+                               config.sub('pattern.image', data_desc=config.data.func, iter=i),
+                               center=0. if config.get('cmap_center') else None,
+                               align=True,
+                               cmap='hot')
 
     del model
 
@@ -408,16 +402,19 @@ def explain_pattern_cgan(args, config):
     num = 30
     K = args.classnum
     cond = nd.one_hot(linspace(0, K, num, ctx=ctx, dtype='int32'), K).reshape(num, K, 1, 1)
-    save_source_raw_image(cond.squeeze(), config.sub('pattern.input', iter=0, data_desc='cond'))
+    # save_source_raw_image(cond.squeeze(), config.sub('pattern.output', iter=0, data_desc='input.cond', ftype='png'))
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
         s_noise, s_cond = model.explain_pattern(K, noise, cond)
 
-        save_source_raw_image(noise.squeeze(), config.sub('pattern.input', iter=i, data_desc='noise'))
+        #save_source_raw_image(noise.squeeze(), config.sub('pattern.output', iter=i, data_desc='input.noise', ftype='png'))
+        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.sub('pattern.output', iter=0, data_desc='input.bar', ftype='pdf'))
 
-        save_explanation_data(s_noise.squeeze(), config.sub('pattern.output', iter=i, data_desc='noise'))
-        save_explanation_data(s_cond.squeeze(), config.sub('pattern.output', iter=i, data_desc='cond'))
+        save_explanation_data(s_noise.squeeze(), config.sub('pattern.output', iter=i, data_desc='noise', ftype='h5'))
+        save_explanation_data(s_cond.squeeze(), config.sub('pattern.output', iter=i, data_desc='cond', ftype='h5'))
+
+        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.sub('pattern.output', iter=i, data_desc='bar', ftype='pdf'))
 
 
 @register_command
@@ -444,19 +441,13 @@ def explain_attribution_pattern(args, config):
         relevance = model.explain_attribution_pattern(data)
 
         relevance = relevance.reshape(data.shape)
-        # print(relevance.sum())
-        save_explanation(relevance,
-                         data=data,
-                         config=config,
-                         image=config.pattern.image,
-                         output=config.pattern.output,
-                         source=config.pattern.input,
-                         data_desc=config.data.func,
-                         net=config.pattern.top_net,
-                         i=i,
-                         center=0. if config.get('cmap_center') else None,
-                         cmap=cmap,
-                        )
+
+        save_source_image(data, config.sub('pattern.input', data_desc=config.data.func, iter=i))
+        save_explanation_image(relevance,
+                               config.sub('pattern.image', data_desc=config.data.func, iter=i),
+                               center=0. if config.get('cmap_center') else None,
+                               align=True,
+                               cmap='hot')
 
     del model
 
