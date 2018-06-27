@@ -4,9 +4,9 @@ from mxnet.gluon import nn
 import numpy as np
 
 from .func import im2col_indices
-from .base import Block, Intermediate, YSequentialBase, ReLUBase
+from .base import Block, Intermediate, YSequentialBase, ReLUBase, TanhBase
 from .pattern.base import PatternNet, ActPatternNet
-from .pattern.layer import SequentialPatternNet, YSequentialPatternNet, BatchNormPatternNet, DensePatternNet, Conv2DPatternNet, Conv2DTransposePatternNet, ReLUPatternNet, IdentityPatternNet
+from .pattern.layer import SequentialPatternNet, YSequentialPatternNet, DensePatternNet, Conv2DPatternNet, Conv2DTransposePatternNet, ReLUPatternNet, IdentityPatternNet
 from .explain.base import Interpretable
 from .explain.layer import SequentialInterpretable, YSequentialInterpretable, DenseInterpretable, Conv2DTransposeInterpretable, Conv2DInterpretable, BatchNormInterpretable
 
@@ -20,9 +20,8 @@ class Conv2D(Conv2DInterpretable, Conv2DPatternNet):
 class Conv2DTranspose(Conv2DTransposePatternNet, Conv2DTransposeInterpretable):
     pass
 
-class BatchNorm(BatchNormInterpretable, BatchNormPatternNet):
+class BatchNorm(ActPatternNet, BatchNormInterpretable):
     pass
-
 
 class Identity(IdentityPatternNet):
     pass
@@ -43,6 +42,12 @@ class MaxOut(Block):
     pass
 
 class ReLU(ReLUPatternNet):
+    pass
+
+class Tanh(ActPatternNet, TanhBase):
+    pass
+
+class MaxPool2D(ActPatternNet, nn.MaxPool2D):
     pass
 
 class SequentialIntermediate(Intermediate, nn.Sequential):

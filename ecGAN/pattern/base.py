@@ -96,35 +96,26 @@ class PatternNet(Block):
                                                init=mx.initializer.Zero(),
                                                grad_req='write')
 
-    def forward_pattern(self, *args):
-        x_neut, x_pat = self._args_forward_pattern(*args)
-
-        z_neut = self.forward(x_neut)
-        z_pat = nd.zeros_like(z_neut)
+    def forward_pattern(self, x):
+        z = None
         for regime in self._regimes:
-            a_reg = regime.pattern.data(ctx=x_pat.context)
-            z_reg = self._forward_pattern(x_pat, a_reg)
+            regime.pattern_ref = self._weight_pattern().copy()
+            a_reg = regime.pattern_ref
+            z_reg = self._forward_pattern(x, a_reg)
             # regimes are assumed to be disjunct
-            z_pat = nd.where(regime(z_neut), z_reg, z_pat)
+            if z is None:
+                z = nd.zeros_like(z_reg)
+            z = nd.where(regime(z_reg), z_reg, z)
+        assert z is None, self._regimes
+        return z
 
-        return z_neut, z_pat
-
-    def forward_attribution_pattern(self, *args):
-        x_neut, x_pat = self._args_forward_pattern(*args)
-
-        z_neut = self.forward(x_neut)
-        z_pat = nd.zeros_like(z_neut)
-        weight = self._weight_pattern()
-        # note that pattern attribution is actually only the positive regime,
-        # which has to be defined by the user!
+    def overload_weight_pattern(self):
         for regime in self._regimes:
-            a_reg = regime.pattern.data(ctx=x_pat.context)
-            a_reg = a_reg * weight
-            z_reg = self._forward_pattern(x_pat, a_reg)
-            # regimes are assumed to be disjunct
-            z_pat = nd.where(regime(z_neut), z_reg, z_pat)
+            regime.pattern_ref[:] = regime.pattern.data(ctx=regime.pattern_ref.context)
 
-        return z_neut, z_pat
+    def overload_weight_attribution_pattern(self):
+        for regime in self._regimes:
+            regime.pattern_ref *= regime.pattern.data(ctx=regime.pattern_ref.context)
 
     def backward_pattern(self, y_sig):
         if self._out is None:
@@ -292,6 +283,9 @@ class ActPatternNet(PatternNet):
     def init_pattern(self, *args):
         pass
 
+    def forward_pattern(self, *args):
+        self.forward(*args)
+
     def learn_pattern(self, *args):
         pass
 
@@ -310,16 +304,11 @@ class ActPatternNet(PatternNet):
     def assess_pattern(self):
         return None
 
-    def forward_attribution_pattern(self, *args):
-        return self.forward_pattern(*args)
+    def overload_weight_pattern(self):
+        pass
 
-    def forward_pattern(self, *args):
-        x_neut, x_pat = self._args_forward_pattern(*args)
-
-        z_neut = self.forward(x_neut)
-        z_pat = self._forward_pattern(x_neut, x_pat)
-
-        return z_neut, z_pat
+    def overload_weight_attribution_pattern(self):
+        pass
 
     def backward_pattern(self, y_sig):
         raise NotImplementedError
@@ -333,6 +322,7 @@ class PatternRegime(object):
         self.mean_xy = None
         self.num_y = None
         self.pattern = None
+        self.pattern_ref = None
 
     def __str__(self):
         return self.name

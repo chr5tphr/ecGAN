@@ -40,7 +40,7 @@ def main():
     parser.add_argument('--seed', type=int)
     parser.add_argument('--classnum', type=int, default=10)
     parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--pskip', action='append', type=int, default=[])
+    parser.add_argument('-k', '--pskip', action='append', type=int, default=[])
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -227,6 +227,7 @@ def explain(args, config):
 
         relevance = model.explain(data, label=label)
 
+        # TODO FIX
         save_explanation(relevance,
                          data=data,
                          config=config,
@@ -254,6 +255,7 @@ def explain_gan(args, config):
     for i in range(args.iter):
         relTop, Rtc, relG, Rc, noise, gen = model.explain(label=label)
 
+        # TODO FIX
         save_explanation(relTop,
                          data=gen,
                          config=config,
@@ -263,6 +265,7 @@ def explain_gan(args, config):
                          data_desc='%s.%s'%(config.nets.generator.type, config.start_epoch),
                          net=config.explanation.top_net,
                          i=i)
+        # TODO FIX
         save_explanation(relG,
                          data=noise,
                          config=config,
@@ -380,7 +383,7 @@ def explain_pattern(args, config):
 
         relevance = relevance.reshape(data.shape)
 
-        save_source_image(data, config.sub('pattern.input', data_desc=config.data.func, iter=i))
+        save_source_image(data, config.sub('pattern.input', data_desc=config.data.func, iter=i), config.data.bbox)
         save_explanation_image(relevance,
                                config.sub('pattern.image', data_desc=config.data.func, iter=i),
                                center=0. if config.get('cmap_center') else None,
@@ -442,7 +445,7 @@ def explain_attribution_pattern(args, config):
 
         relevance = relevance.reshape(data.shape)
 
-        save_source_image(data, config.sub('pattern.input', data_desc=config.data.func, iter=i))
+        save_source_image(data, config.sub('pattern.input', data_desc=config.data.func, iter=i), config.data.bbox)
         save_explanation_image(relevance,
                                config.sub('pattern.image', data_desc=config.data.func, iter=i),
                                center=0. if config.get('cmap_center') else None,

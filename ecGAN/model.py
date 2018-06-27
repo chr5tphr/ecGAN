@@ -139,7 +139,7 @@ class Classifier(Model):
 
         metric = mx.metric.Accuracy()
         for i, (data, label) in enumerate(data_iter):
-            data = data.as_in_context(self.ctx).reshape((-1, 784))
+            data = data.as_in_context(self.ctx)
             label = label.as_in_context(self.ctx)
 
             output = self.netC(data)

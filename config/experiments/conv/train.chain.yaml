@@ -8,7 +8,7 @@ tail:
             init: True
             data: {kwargs: {train: True}}
     - #Model Testing
-        priority: 0
+        priority: 1
         action: 'test'
         dict:
             start_epoch: 10
@@ -28,13 +28,13 @@ tail:
                     wd: 0.99
         tail:
             -
-                priority: 1
+                priority: 2
                 action: 'fit_pattern'
                 dict: &linear_pattern
                     nets: {classifier: {kwargs: {patest: 'linear'}}}
                     pattern: {name: 'linear'}
             -
-                priority: 1
+                priority: 2
                 action: 'fit_pattern'
                 dict: &relu_pattern
                     nets: {classifier: {kwargs: {patest: 'relu'}}}
@@ -56,13 +56,13 @@ tail:
                             pattern: {start_epoch: 5}
                         tail: &small_assess
                             -
-                                priority: 2
+                                priority: 3
                                 action: 'stats_assess_pattern'
                             -
-                                priority: 3
+                                priority: 4
                                 action: 'fit_assess_pattern'
                             -
-                                priority: 4
+                                priority: 5
                                 dict:
                                     pattern: {aepoch: 10}
                                 action: 'assess_pattern'

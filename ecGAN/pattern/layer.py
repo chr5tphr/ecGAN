@@ -109,47 +109,24 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
         pattern = pattern.reshape(self.weight.shape)
         return nd.Convolution(y, pattern, name='fwd', **kwargs)
 
-class BatchNormPatternNet(PatternNet, nn.BatchNorm):
-    def init_pattern(self, *args):
-        pass
-
-    def learn_pattern(self, *args):
-        pass
-
-    def compute_pattern(self):
-        pass
-
-    def fit_pattern(self, x):
-        return self(x)
-
-    # TODO: do this correctly
-    def forward_pattern(self, *args):
-        x_neut, x_acc, x_regs = self._args_forward_pattern(*args)
-
-        z_neut = self.forward(x_neut)
-        z_acc = self.forward(x_acc)
-        z_regs = {}
-        for reg_name, x_reg in x_regs.items():
-            z_regs[reg_name] = self.forward(x_reg)
-
-        return z_neut, z_acc, z_regs
 
 class SequentialPatternNet(PatternNet, nn.Sequential):
     def init_pattern(self):
         for block in self._children.values():
             block.init_pattern()
 
-    def forward_pattern(self, *args):
-        x = args
+    def forward_pattern(self, x):
         for block in self._children.values():
-            x = block.forward_pattern(*x)
+            x = block.forward_pattern(x)
         return x
 
-    def forward_attribution_pattern(self, *args):
-        x = args
+    def overload_weight_pattern(self):
         for block in self._children.values():
-            x = block.forward_attribution_pattern(*x)
-        return x
+            block.overload_weight_pattern()
+
+    def overload_weight_attribution_pattern(self):
+        for block in self._children.values():
+            block.overload_weight_attribution_pattern()
 
     def learn_pattern(self):
         for block in self._children.values():
@@ -188,6 +165,7 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         x.attach_grad()
         with autograd.record():
             y = self.forward_pattern(x)
+        self.overload_weight_pattern()
         y[1].backward(out_grad=y[0])
         return x.grad
 
@@ -195,7 +173,8 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         x = args[0]
         x.attach_grad()
         with autograd.record():
-            y = self.forward_attribution_pattern(x)
+            y = self.forward_pattern(x)
+        self.overload_weight_attribution_pattern()
         y[1].backward(out_grad=y[0])
         return x.grad
 
@@ -217,11 +196,15 @@ class YSequentialPatternNet(PatternNet, YSequentialBase):
         combo_pat = nd.concat(data_pat, cond_pat, dim=self._concat_dim)
         return self._main_net.forward_pattern(combo_neut, combo_pat)
 
-    def forward_attribution_pattern(self, x, y):
-        data = self._data_net.forward_attribution_pattern(x)
-        cond = self._cond_net.forward_attribution_pattern(y)
-        combo = nd.concat(data, cond, dim=self._concat_dim)
-        return self._main_net.forward_attribution_pattern(combo)
+    def overload_weight_pattern(self):
+        self._data_net.overload_weight_pattern()
+        self._cond_net.overload_weight_pattern()
+        self._main_net.overload_weight_pattern()
+
+    def overload_weight_attribution_pattern(self):
+        self._data_net.overload_weight_attribution_pattern()
+        self._cond_net.overload_weight_attribution_pattern()
+        self._main_net.overload_weight_attribution_pattern()
 
     def learn_pattern(self):
         self._data_net.learn_pattern()
@@ -264,13 +247,15 @@ class YSequentialPatternNet(PatternNet, YSequentialBase):
         x.attach_grad()
         with autograd.record():
             z = self.forward_pattern(x, y)
+        self.overload_weight_pattern()
         z[1].backward(out_grad=z[0])
         return x.grad
 
     def explain_attribution_pattern(self, x, y):
         x.attach_grad()
         with autograd.record():
-            z = self.forward_attribution_pattern(x, y)
+            z = self.forward_pattern(x, y)
+        self.overload_weight_attribution_pattern()
         z[1].backward(out_grad=z[0])
         return x.grad
 
@@ -288,26 +273,13 @@ class YSequentialPatternNet(PatternNet, YSequentialBase):
         return x_sig_d, x_sig_c
 
 class ReLUPatternNet(ActPatternNet, ReLUBase):
-    def _forward_pattern(self, x_neut, x_reg):
-        return nd.where(x_neut>=0., x_reg, nd.zeros_like(x_neut, ctx=x_neut.context))
-
     def backward_pattern(self, y_sig):
         if self._out is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         y_neut = self._out
-        return self._forward_pattern(y_neut, y_sig)
+        return nd.where(y_neut>=0., y_sig, nd.zeros_like(y_neut, ctx=y_neut.context))
 
 class IdentityPatternNet(ActPatternNet, IdentityBase):
-    def _forward_pattern(self, x_neut, x_reg):
-        return x_reg
-
-    def backward_pattern(self, y_sig):
-        return y_sig
-
-class TanhPatternNet(ActPatternNet, IdentityBase):
-    def _forward_pattern(self, x_neut, x_reg):
-        return x_reg
-
     def backward_pattern(self, y_sig):
         return y_sig
 
