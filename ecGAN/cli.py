@@ -365,8 +365,6 @@ def explain_pattern(args, config):
     model = models[config.model](ctx=ctx, config=config)
     model.load_pattern_params()
 
-    cmap = config.get('cmap', 'coldnhot')
-
     data_fp = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
 
@@ -376,10 +374,7 @@ def explain_pattern(args, config):
         data = data.as_in_context(ctx)
         label = label.as_in_context(ctx)
 
-        if config.pattern.get('manual', False):
-            relevance = model.backward_pattern(data)
-        else:
-            relevance = model.explain_pattern(data)
+        relevance = model.explain_pattern(data, attribution=config.pattern.get('type') == 'attribution')
 
         relevance = relevance.reshape(data.shape)
 
@@ -388,7 +383,7 @@ def explain_pattern(args, config):
                                config.sub('pattern.image', data_desc=config.data.func, iter=i),
                                center=0. if config.get('cmap_center') else None,
                                align=True,
-                               cmap='hot')
+                               cmap=config.get('cmap', 'hot'))
 
     del model
 
@@ -409,7 +404,7 @@ def explain_pattern_cgan(args, config):
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        s_noise, s_cond = model.explain_pattern(K, noise, cond)
+        s_noise, s_cond = model.explain_pattern(K, noise, cond, attribution=config.pattern.get('type') == 'attribution')
 
         #save_source_raw_image(noise.squeeze(), config.sub('pattern.output', iter=i, data_desc='input.noise', ftype='png'))
         save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.sub('pattern.output', iter=0, data_desc='input.bar', ftype='pdf'))
@@ -418,41 +413,6 @@ def explain_pattern_cgan(args, config):
         save_explanation_data(s_cond.squeeze(), config.sub('pattern.output', iter=i, data_desc='cond', ftype='h5'))
 
         save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.sub('pattern.output', iter=i, data_desc='bar', ftype='pdf'))
-
-
-@register_command
-def explain_attribution_pattern(args, config):
-    ctx = ress(make_ctx, config.device, config.device_id)
-
-    if config.log:
-        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
-
-    model = models[config.model](ctx=ctx, config=config)
-    model.load_pattern_params()
-
-    cmap = config.get('cmap', 'coldnhot')
-
-    data_fp = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
-    data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
-
-    for i, (data, label) in enumerate(data_iter):
-        if i >= args.iter:
-            break
-        data = data.as_in_context(ctx)
-        label = label.as_in_context(ctx)
-
-        relevance = model.explain_attribution_pattern(data)
-
-        relevance = relevance.reshape(data.shape)
-
-        save_source_image(data, config.sub('pattern.input', data_desc=config.data.func, iter=i), config.data.bbox)
-        save_explanation_image(relevance,
-                               config.sub('pattern.image', data_desc=config.data.func, iter=i),
-                               center=0. if config.get('cmap_center') else None,
-                               align=True,
-                               cmap='hot')
-
-    del model
 
 @register_command
 def predict(args, config):

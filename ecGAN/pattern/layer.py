@@ -160,22 +160,18 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         for block in self._children.values():
             block.compute_pattern()
 
-    def explain_pattern(self, *args):
+    def explain_pattern(self, *args, attribution=False):
         x = args[0]
         x.attach_grad()
         with autograd.record():
             y = self.forward_pattern(x)
-        self.overload_weight_pattern()
-        y[1].backward(out_grad=y[0])
-        return x.grad
 
-    def explain_attribution_pattern(self, *args):
-        x = args[0]
-        x.attach_grad()
-        with autograd.record():
-            y = self.forward_pattern(x)
-        self.overload_weight_attribution_pattern()
-        y[1].backward(out_grad=y[0])
+        if attribution:
+            self.overload_weight_attribution_pattern()
+        else:
+            self.overload_weight_pattern()
+
+        y.backward(out_grad=y)
         return x.grad
 
     def backward_pattern(self, y_sig):

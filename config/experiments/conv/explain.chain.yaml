@@ -43,10 +43,10 @@ tail:
                         dict:
                             pattern: {start_epoch: 5}
                         priority: 2
-                        action: 'explain_attribution_pattern'
+                        action: 'explain_pattern'
                     -
                         dict:
                             pattern: {start_epoch: 10}
                         priority: 2
-                        action: 'explain_attribution_pattern'
+                        action: 'explain_pattern'
 

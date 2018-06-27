@@ -106,7 +106,6 @@ class PatternNet(Block):
             if z is None:
                 z = nd.zeros_like(z_reg)
             z = nd.where(regime(z_reg), z_reg, z)
-        assert z is None, self._regimes
         return z
 
     def overload_weight_pattern(self):
@@ -284,7 +283,7 @@ class ActPatternNet(PatternNet):
         pass
 
     def forward_pattern(self, *args):
-        self.forward(*args)
+        return self.forward(*args)
 
     def learn_pattern(self, *args):
         pass

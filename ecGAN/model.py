@@ -274,19 +274,11 @@ class Classifier(Model):
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-    def explain_pattern(self, data):
+    def explain_pattern(self, data, attribution=False):
         if not isinstance(self.netC, PatternNet):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
 
-        R = self.netC.explain_pattern(data)
-
-        return R
-
-    def explain_attribution_pattern(self, data):
-        if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
-
-        R = self.netC.explain_attribution_pattern(data)
+        R = self.netC.explain_pattern(data, attribution=attribution)
 
         return R
 
@@ -886,10 +878,9 @@ class CGAN(GAN):
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-    def explain_pattern(self, K, noise=None, cond=None, num=None):
+    def explain_pattern(self, K, noise=None, cond=None, num=None, attribution=False):
         if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):
             raise NotImplementedError('At least one net is not a PatternNet!')
-
 
         if num is None:
             if noise is not None:
@@ -909,18 +900,18 @@ class CGAN(GAN):
         cond.attach_grad()
         with autograd.record():
             y_G = self.netG.forward_pattern(noise, cond)
-            y_D = self.netD.forward_pattern(*y_G)
-        y_D[1].backward(out_grad=y_D[0])
+            y_D = self.netD.forward_pattern(y_G)
+
+        if attribution:
+            y_G.overload_weight_attribution_pattern()
+            y_D.overload_weight_attribution_pattern()
+        else:
+            y_G.overload_weight_pattern()
+            y_D.overload_weight_pattern()
+
+        y_D.backward(out_grad=y_D)
 
         return noise.grad, cond.grad
-
-    def explain_attribution_pattern(self, data):
-        if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):
-            raise NotImplementedError('At least one net is not a PatternNet!')
-
-        R = self.netC.explain_attribution_pattern(data)
-
-        return R
 
     def assess_pattern(self):
         if not isinstance(self.netC, PatternNet):

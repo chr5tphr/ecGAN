@@ -34,25 +34,25 @@ tail:
                         discriminator: {kwargs: {patest: 'relu'}}
                     pattern: {name: 'relu'}
                 tail: *explain_epochs
-#            -
-#                # attribution only makes sense for relu
-#                dict:
-#                    nets:
-#                        generator:     {kwargs: {patest: 'positive'}}
-#                        discriminator: {kwargs: {patest: 'positive'}}
-#                    pattern:
-#                        type: 'attribution'
-#                        name: 'relu'
-#                    # cmap: 'gray'
-#                tail:
-#                    -
-#                        dict:
-#                            pattern: {start_epoch: 5}
-#                        priority: 2
-#                        action: 'explain_attribution_pattern'
-#                    -
-#                        dict:
-#                            pattern: {start_epoch: 10}
-#                        priority: 2
-#                        action: 'explain_attribution_pattern'
-#
+            -
+                # attribution only makes sense for relu
+                dict:
+                    nets:
+                        generator:     {kwargs: {patest: 'positive'}}
+                        discriminator: {kwargs: {patest: 'positive'}}
+                    pattern:
+                        type: 'attribution'
+                        name: 'relu'
+                    # cmap: 'gray'
+                tail:
+                    -
+                        dict:
+                            pattern: {start_epoch: 5}
+                        priority: 2
+                        action: 'explain_pattern'
+                    -
+                        dict:
+                            pattern: {start_epoch: 10}
+                        priority: 2
+                        action: 'explain_pattern'
+
