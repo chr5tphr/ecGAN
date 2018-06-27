@@ -49,10 +49,10 @@ tail:
                         dict:
                             pattern: {start_epoch: 5}
                         priority: 2
-                        action: 'explain_pattern'
+                        action: 'explain_pattern_cgan'
                     -
                         dict:
                             pattern: {start_epoch: 10}
                         priority: 2
-                        action: 'explain_pattern'
+                        action: 'explain_pattern_cgan'
 

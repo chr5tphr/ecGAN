@@ -903,11 +903,11 @@ class CGAN(GAN):
             y_D = self.netD.forward_pattern(y_G)
 
         if attribution:
-            y_G.overload_weight_attribution_pattern()
-            y_D.overload_weight_attribution_pattern()
+            self.netG.overload_weight_attribution_pattern()
+            self.netD.overload_weight_attribution_pattern()
         else:
-            y_G.overload_weight_pattern()
-            y_D.overload_weight_pattern()
+            self.netG.overload_weight_pattern()
+            self.netD.overload_weight_pattern()
 
         y_D.backward(out_grad=y_D)
 

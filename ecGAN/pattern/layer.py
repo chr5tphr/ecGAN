@@ -186,11 +186,10 @@ class YSequentialPatternNet(PatternNet, YSequentialBase):
         self._main_net.init_pattern()
 
     def forward_pattern(self, x, y):
-        data_neut, data_pat = self._data_net.forward_pattern(x)
-        cond_neut, cond_pat = self._cond_net.forward_pattern(y)
-        combo_neut = nd.concat(data_neut, cond_neut, dim=self._concat_dim)
+        data_pat = self._data_net.forward_pattern(x)
+        cond_pat = self._cond_net.forward_pattern(y)
         combo_pat = nd.concat(data_pat, cond_pat, dim=self._concat_dim)
-        return self._main_net.forward_pattern(combo_neut, combo_pat)
+        return self._main_net.forward_pattern(combo_pat)
 
     def overload_weight_pattern(self):
         self._data_net.overload_weight_pattern()

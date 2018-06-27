@@ -41,8 +41,8 @@ nets:
 
 log: '${root_dir}/${exp_dir}/log/${model}.log'
 
-#cmap: 'coldnhot'
-cmap: 'gray'
+cmap: 'coldnhot'
+#cmap: 'gray'
 
 pattern:
   top_net: 'classifier'
