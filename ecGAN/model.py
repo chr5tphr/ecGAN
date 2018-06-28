@@ -152,7 +152,6 @@ class Classifier(Model):
     def explain(self, data, label=None, mkwargs={}):
         if not isinstance(self.netC, Interpretable):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
-        method = mkwargs.get('method')
 
         R = self.netC.relevance(data=data, out=None, **mkwargs)
 
@@ -867,7 +866,7 @@ class CGAN(GAN):
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-    def explain(self, K, noise=None, cond=None, num=None, method=None):
+    def explain(self, K, noise=None, cond=None, num=None, mkwargs={}):
         if not all([isinstance(net, Interpretable) for net in [self.netD, self.netG]]):
             raise NotImplementedError('At least one net is not an Interpretable!')
 
@@ -885,19 +884,11 @@ class CGAN(GAN):
             cond = nd.random.uniform(0,K,shape=num, ctx=self.ctx).floor()
             cond = one_hot(cond, K).reshape((num, -1, 1, 1))
 
-        gdat = self.netG.forward_logged(noise, cond)
-        self.netD.forward_logged(gdat)
+        outG = self.netG.forward_logged(noise, cond)
+        R = self.netD.relevance(data=outG, out=None, **mkwargs)
+        Rn, Rc = self.netG.relevance(data=noise, cond=cond, out=R, **mkwargs)
 
-        if method == 'sensitivity':
-            dEdy = nd.ones((30, self.netD._outnum), ctx=self.ctx)
-        else:
-            dEdy = None
-
-        R, Rtc = self.netD.relevance(dEdy, method=method, ret_all=True)
-
-        Rn, Rc = self.netG.relevance(R[-1], method=method, ret_all=True)
-
-        return Rn[-1], Rc[-1]
+        return Rn, Rc
 
     def explain_pattern(self, K, noise=None, cond=None, num=None, attribution=False):
         if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):

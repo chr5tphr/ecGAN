@@ -224,13 +224,38 @@ def explain(args, config):
         data = data.as_in_context(ctx)
         label = label.as_in_context(ctx)
 
-        relevance = model.explain(data, label=label, mkwargs=config.explanation.get('kwargs', {}))
+        relevance = model.explain(data, mkwargs=config.explanation.get('kwargs', {}))
 
         save_source_image(data, config.sub('explanation.output', data_desc='input.%s'%config.data.func, iter=i, ftype='png'), config.data.bbox)
         save_explanation_image(relevance,
                                config.sub('explanation.output', data_desc=config.data.func, iter=i, ftype='png'),
                                center=config.get('cmap_center'),
                                cmap=config.get('cmap', 'hot'))
+
+@register_command
+def explain_cgan(args, config):
+    ctx = ress(make_ctx, config.device, config.device_id)
+
+    if config.log:
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+
+    model = models[config.model](ctx=ctx, config=config)
+
+    num = 30
+    K = args.classnum
+    cond = nd.one_hot(linspace(0, K, num, ctx=ctx, dtype='int32'), K).reshape(num, K, 1, 1)
+
+    for i in range(args.iter):
+        noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+        s_noise, s_cond = model.explain(K, noise, cond, mkwargs=config.explanation.get('kwargs', {}))
+
+        #save_source_raw_image(noise.squeeze(), config.sub('pattern.output', iter=i, data_desc='input.noise', ftype='png'))
+        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.sub('pattern.output', iter=0, data_desc='input.bar', ftype='pdf'))
+
+        save_explanation_data(s_noise.squeeze(), config.sub('pattern.output', iter=i, data_desc='noise', ftype='h5'))
+        save_explanation_data(s_cond.squeeze(), config.sub('pattern.output', iter=i, data_desc='cond', ftype='h5'))
+
+        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.sub('pattern.output', iter=i, data_desc='bar', ftype='pdf'))
 
 @register_command
 def explain_gan(args, config):

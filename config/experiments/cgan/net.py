@@ -7,6 +7,7 @@ from ecGAN.pattern.estimator import estimators
 class MYTCN28(YSequential):
     def __init__(self, **kwargs):
         self._outnum = kwargs.pop('outnum', 1)
+        self._outact = kwargs.pop('outact', None)
         self._numhid = kwargs.pop('numhid', 64)
         self._patest = kwargs.pop('patest', 'linear')
         self._outest = kwargs.pop('outest', self._patest)
@@ -29,13 +30,17 @@ class MYTCN28(YSequential):
             # _numhid x 14 x 14
 
             self.add(Conv2DTranspose(self._outnum, 4, strides=2, padding=1, use_bias=False, regimes=estimators[self._outest]()))
-            self.add(Identity(regimes=estimators[self._outest]()))
+            if self._outact == 'relu':
+                self.add(ReLU(regimes=estimators[self._outest]()))
+            else:
+                self.add(Identity(regimes=estimators[self._outest]()))
             # _numhid x 28 x 28
 
 @register_net
 class MSCN28(Sequential):
     def __init__(self, **kwargs):
         self._outnum = kwargs.pop('outnum', 1)
+        self._outact = kwargs.pop('outact', None)
         self._numhid = kwargs.pop('numhid', 64)
         self._patest = kwargs.pop('patest', 'linear')
         self._outest = kwargs.pop('outest', self._patest)
@@ -59,7 +64,10 @@ class MSCN28(Sequential):
             # filters x 1 x 1
 
             self.add(Dense(self._outnum, regimes=estimators[self._outest]()))
-            self.add(Identity(regimes=estimators[self._outest]()))
+            if self._outact == 'relu':
+                self.add(ReLU(regimes=estimators[self._outest]()))
+            else:
+                self.add(Identity(regimes=estimators[self._outest]()))
 
 @register_net
 class MSFC(Sequential):
