@@ -17,6 +17,14 @@ def gray(x):
     return np.stack([x]*3, axis=-1).clip(0., 1.)
 
 @register_cmap
+def wred(x):
+    return np.stack([0.*x+1., 1.-x, 1.-x], axis=-1).clip(0., 1.)
+
+@register_cmap
+def wblue(x):
+    return np.stack([1.-x, 1.-x, 0*x+1.], axis=-1).clip(0., 1.)
+
+@register_cmap
 def hot(x):
     return np.stack([x*3, x*3-1, x*3-2], axis=-1).clip(0., 1.)
 
@@ -28,6 +36,12 @@ def cold(x):
 def coldnhot(x):
     hpos = hot((2*x-1.).clip(0., 1.))
     hneg = cold(-(2*x-1.).clip(-1., 0.))
+    return hpos + hneg
+
+@register_cmap
+def bwr(x):
+    hpos = wred((2*x-1.).clip(0., 1.))
+    hneg = wblue(-(2*x-1.).clip(-1., 0.))
     return hpos + hneg
 
 def draw_heatmap(data, lo=0., hi=1., center=None, cmap='hot'):
@@ -50,7 +64,7 @@ def draw_heatmap(data, lo=0., hi=1., center=None, cmap='hot'):
 def align_images(im, H, W, h, w, C=1):
     return im.reshape(H, W, h, w, C).transpose(0, 2, 1, 3, 4).reshape(H*h, W*w, C)
 
-def save_explanation_image(relevance, fpath, center=None, align=False, cmap='hot', batchnorm=False):
+def save_explanation_image(relevance, fpath, center=None, cmap='hot', batchnorm=False, fullcmap=False):
     rdat = relevance
     if rdat.shape[1] == 1:
         if batchnorm:
@@ -58,6 +72,9 @@ def save_explanation_image(relevance, fpath, center=None, align=False, cmap='hot
         else:
             lo = rdat.min(axis=(2, 3), keepdims=True).asnumpy()
             hi = rdat.max(axis=(2, 3), keepdims=True).asnumpy()
+        if not fullcmap:
+            hi = np.maximum(np.abs(lo), np.abs(hi))
+            lo = -hi
         getLogger('ecGAN').debug('Explanation min %f, max %f', lo, hi)
         rdat = (draw_heatmap(rdat, lo, hi, center=center, cmap=cmap)*255).astype(np.uint8)
     elif rdat.shape[1] == 3:
@@ -65,9 +82,7 @@ def save_explanation_image(relevance, fpath, center=None, align=False, cmap='hot
     else:
         raise RuntimeError("Useless number of channels.")
 
-    if align:
-        # rdat = align_images(rdat, *align)
-        rdat = align_images(rdat, 5, 6, 28, 28, 3)
+    rdat = align_images(rdat, 5, 6, 28, 28, 3)
     imwrite(fpath, rdat)
     getLogger('ecGAN').info('Saved explanation image in \'%s\'.', fpath)
 

@@ -215,28 +215,22 @@ def explain(args, config):
 
     model = models[config.model](ctx=ctx, config=config)
 
-    data_fp = data_funcs[config.data.func](*(config.data.args), **(config.data.kwargs))
+    data_fp = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
 
-    loss = gluon.loss.SoftmaxCrossEntropyLoss()
     for i, (data, label) in enumerate(data_iter):
         if i >= args.iter:
             break
-        data = data.as_in_context(ctx).reshape((-1, 784))
+        data = data.as_in_context(ctx)
         label = label.as_in_context(ctx)
 
-        relevance = model.explain(data, label=label)
+        relevance = model.explain(data, label=label, mkwargs=config.explanation.get('kwargs', {}))
 
-        # TODO FIX
-        save_explanation(relevance,
-                         data=data,
-                         config=config,
-                         image=config.explanation.image,
-                         output=config.explanation.output,
-                         source=config.explanation.input,
-                         data_desc=config.data.func,
-                         net=config.explanation.top_net,
-                         i=i)
+        save_source_image(data, config.sub('explanation.output', data_desc='input.%s'%config.data.func, iter=i, ftype='png'), config.data.bbox)
+        save_explanation_image(relevance,
+                               config.sub('explanation.output', data_desc=config.data.func, iter=i, ftype='png'),
+                               center=config.get('cmap_center'),
+                               cmap=config.get('cmap', 'hot'))
 
 @register_command
 def explain_gan(args, config):
@@ -378,11 +372,10 @@ def explain_pattern(args, config):
 
         relevance = relevance.reshape(data.shape)
 
-        save_source_image(data, config.sub('pattern.input', data_desc=config.data.func, iter=i), config.data.bbox)
+        save_source_image(data, config.sub('pattern.output', data_desc='input.%s'%config.data.func, iter=i, ftype='png'), config.data.bbox)
         save_explanation_image(relevance,
-                               config.sub('pattern.image', data_desc=config.data.func, iter=i),
-                               center=0. if config.get('cmap_center') else None,
-                               align=True,
+                               config.sub('pattern.output', data_desc=config.data.func, iter=i, ftype='png'),
+                               center=config.get('cmap_center'),
                                cmap=config.get('cmap', 'hot'))
 
     del model

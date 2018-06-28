@@ -13,11 +13,11 @@ class Interpretable(Block):
         self._out = None
 
     def relevance(self, *args, **kwargs):
-        method = kwargs.pop('method', 'dtd')
+        method = kwargs.get('method', 'dtd')
         func = getattr(self, 'relevance_'+method)
         return func(*args, **kwargs)
 
-    def relevance_sensitivity(self, R):
+    def relevance_sensitivity(self, R, **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         a = self._in[0]
@@ -26,7 +26,7 @@ class Interpretable(Block):
             z = self(a)
         return autograd.grad(z, a, head_grads=R)
 
-    def relevance_dtd(self, R, lo=-1, hi=1):
+    def relevance_dtd(self, R, lo=-1, hi=1, **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         a = self._in[0]
@@ -44,7 +44,7 @@ class Interpretable(Block):
                       - self._forward_interpretable(lower, wplus)
                       - self._forward_interpretable(upper, wminus)
                       )
-            zlh.backward(out_grad=R/zlh)
+            zlh.backward(out_grad=R/(zlh + (zlh == 0.)))
             return a*a.grad + upper*upper.grad + lower*lower.grad
         else: #z+
             weight = self._weight_interpretable()
@@ -52,21 +52,26 @@ class Interpretable(Block):
             a.attach_grad()
             with autograd.record():
                 z = self._forward_interpretable(a, wplus)
-            c = autograd.grad(z, a, head_grads=R/z)
+            c, = autograd.grad(z, a, head_grads=R/(z + (z == 0.)))
             return a*c
 
-    def relevance_lrp(self, R, alpha=1., beta=0.):
+    def relevance_lrp(self, R, alpha=1., beta=0., **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         a = self._in[0]
         weight = self._weight_interpretable()
         wplus = nd.maximum(0., weight)
         wminus = nd.minimum(0., weight)
+
+        a.attach_grad()
         with autograd.record():
             zplus = self._forward_interpretable(a, wplus)
+        cplus, = autograd.grad(zplus, a, head_grads=alpha*R/(zplus + (zplus == 0.)))
+
+        with autograd.record():
             zminus = self._forward_interpretable(a, wminus)
-        cplus = autograd.grad(zplus, a, head_grads=alpha*R/zplus)
-        cminus = autograd.grad(zminus, a, head_grads=beta*R/zminus)
+        cminus, = autograd.grad(zminus, a, head_grads=beta*R/(zminus + (zminus == 0.)))
+
         return a*(cplus - cminus)
 
     def _forward_interpretable(self, *args, **kwargs):

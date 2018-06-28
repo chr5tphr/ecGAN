@@ -1,6 +1,45 @@
 fname: '/home/chrstphr/projects/ecGAN/result/conv/CLASS.yaml'
 tail:
-    -
+    - # Layerwise
+        dict:
+            start_epoch: 10
+            data: {kwargs: {train: False}}
+        tail:
+            -
+                dict:
+                    explanation:
+                        kwargs:
+                            method: 'lrp'
+                            alpha: 1.0
+                            beta:  0.0
+                priority: 0
+                action: 'explain'
+            -
+                dict:
+                    nets: {classifier: {kwargs: {outact: 'relu'}}}
+                    explanation:
+                        kwargs:
+                            method: 'dtd'
+                            lo: -1.0
+                            hi: 1.0
+                priority: 0
+                action: 'explain'
+            -
+                dict:
+                    explanation:
+                        kwargs:
+                            method: 'sensitivity'
+                priority: 1
+                action: 'explain'
+            -
+                dict:
+                    explanation:
+                        kwargs:
+                            method: 'intgrads'
+                            num: 1000
+                priority: 1
+                action: 'explain'
+    - # PatternNet
         dict:
             start_epoch: 10
             data: {kwargs: {train: False}}

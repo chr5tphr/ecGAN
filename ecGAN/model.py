@@ -149,31 +149,20 @@ class Classifier(Model):
 
         getLogger('ecGAN').info('%s test acc: %s=%.4f', self.config.nets.classifier.type, name, acc)
 
-    def explain(self, data, label=None):
-        method = self.config.explanation.method
+    def explain(self, data, label=None, mkwargs={}):
         if not isinstance(self.netC, Interpretable):
             raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+        method = mkwargs.get('method')
 
-        if method == 'sensitivity':
-            # loss = gluon.loss.SoftmaxCrossEntropyLoss()
-            # output = self.netC(data)
-            # output.attach_grad()
-            # with autograd.record():
-            #     err = loss(output, label)
-            # dEdy = autograd.grad(err, output)
-            dEdy = nd.ones(300, ctx=self.ctx)
-        else:
-            dEdy = None
+        R = self.netC.relevance(data=data, out=None, **mkwargs)
 
-        R = self.netC.relevance(data, dEdy, method=method, ret_all=True)
+#        if self.config.debug:
+#            Rsums = []
+#            for rel in R:
+#                Rsums.append(rel.sum().asscalar())
+#            getLogger('ecGAN').debug('Explanation sums: %s', ', '.join([str(fl) for fl in Rsums]))
 
-        if self.config.debug:
-            Rsums = []
-            for rel in R:
-                Rsums.append(rel.sum().asscalar())
-            getLogger('ecGAN').debug('Explanation sums: %s', ', '.join([str(fl) for fl in Rsums]))
-
-        return R[-1]
+        return R
 
     def learn_pattern(self, data, batch_size):
         if not isinstance(self.netC, PatternNet):
@@ -877,6 +866,38 @@ class CGAN(GAN):
 
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
+
+    def explain(self, K, noise=None, cond=None, num=None, method=None):
+        if not all([isinstance(net, Interpretable) for net in [self.netD, self.netG]]):
+            raise NotImplementedError('At least one net is not an Interpretable!')
+
+        if num is None:
+            if noise is not None:
+                num = len(noise)
+            elif cond is not None:
+                num = len(cond)
+            else:
+                raise RuntimeError('At least one arg has to be supplied!')
+        if noise is None:
+            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+        if cond is None:
+            one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
+            cond = nd.random.uniform(0,K,shape=num, ctx=self.ctx).floor()
+            cond = one_hot(cond, K).reshape((num, -1, 1, 1))
+
+        gdat = self.netG.forward_logged(noise, cond)
+        self.netD.forward_logged(gdat)
+
+        if method == 'sensitivity':
+            dEdy = nd.ones((30, self.netD._outnum), ctx=self.ctx)
+        else:
+            dEdy = None
+
+        R, Rtc = self.netD.relevance(dEdy, method=method, ret_all=True)
+
+        Rn, Rc = self.netG.relevance(R[-1], method=method, ret_all=True)
+
+        return Rn[-1], Rc[-1]
 
     def explain_pattern(self, K, noise=None, cond=None, num=None, attribution=False):
         if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):

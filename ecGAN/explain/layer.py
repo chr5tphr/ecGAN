@@ -41,40 +41,42 @@ class BatchNormInterpretable(Interpretable, nn.BatchNorm):
     pass
 
 class SequentialInterpretable(Interpretable, nn.Sequential):
-    def relevance_layerwise(self, y=None, method='dtd', ret_all=False, **kwargs):
-        if self._in is None:
+    def relevance_layerwise(self, data=None, out=None, ret_all=False, **kwargs):
+        if data is not None:
+            self.forward_logged(data)
+        elif self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
-        R = [self._out if y is None else y]
-        for child in self._children.values()[::-1]:
-            R.append(child.relevance(R[-1], method=method))
+        method = kwargs.get('method', 'dtd')
+        R = [self._out if out is None else out]
+        for child in list(self._children.values())[::-1]:
+            R.append(child.relevance(R[-1], **kwargs))
         return R if ret_all else R[-1]
 
-    def relevance_sensitivity(self, *args, **kwargs):
-        a = args[0]
-        a.attach_grad()
+    def relevance_sensitivity(self, data, out=None, **kwargs):
+        data.attach_grad()
         with autograd.record():
-            y = self.forward(a)
-        y.backward()
-        return a.grad
+            y = self.forward(data)
+        y.backward(out_grad=out)
+        return data.grad
 
-    def relevance_intgrads(self, x, *args, num=50, base=None, **kwargs):
+    def relevance_intgrads(self, data, out=None, num=50, base=None, **kwargs):
         if base is None:
-            base = nd.zeros_like(x)
+            base = nd.zeros_like(data)
 
-        alpha = linspace(0., 1., num)
-        diff = x - base
+        alpha = linspace(0., 1., num, ctx=data.context)
+        diff = data - base
 
-        res = nd.zeros_like(x)
+        res = nd.zeros_like(data)
         for a in alpha:
-            res += self.relevance_sensitivity(base + a*diff)
+            res += self.relevance_sensitivity(data=base + a*diff, out=out)
 
         return res
 
     def relevance_dtd(self, *args, **kwargs):
-        return self.relevance_layerwise(*args, method='dtd', **kwargs)
+        return self.relevance_layerwise(*args, **kwargs)
 
     def relevance_lrp(self, *args, **kwargs):
-        return self.relevance_layerwise(*args, method='lrp', **kwargs)
+        return self.relevance_layerwise(*args, **kwargs)
 
     def forward_logged(self, x, depth=-1):
         self._in = [x]
@@ -95,19 +97,19 @@ class YSequentialInterpretable(Interpretable, YSequentialBase):
         self._out = self._main_net.forward_logged(combo, depth=depth)
         return self._out
 
-    def relevance_layerwise(self, y=None, method='dtd', ret_all=False):
+    def relevance_layerwise(self, y=None, method='dtd', ret_all=False, **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         Rout = self._out if y is None else y
-        R = self._main_net.relevance(Rout, method=method, ret_all=True)
+        R = self._main_net.relevance(Rout, method=method, ret_all=True, **kwargs)
 
         dim_d = self._data_net._out.shape[self._concat_dim]
 
         Rtd = R[-1].slice_axis(axis=self._concat_dim, begin=0, end=dim_d)
         Rtc = R[-1].slice_axis(axis=self._concat_dim, begin=dim_d, end=None)
 
-        Rd = self._data_net.relevance(Rtd, method=method, ret_all=True)
-        Rc = self._cond_net.relevance(Rtc, method=method, ret_all=True)
+        Rd = self._data_net.relevance(Rtd, method=method, ret_all=True, **kwargs)
+        Rc = self._cond_net.relevance(Rtc, method=method, ret_all=True, **kwargs)
 
         R += Rd
 

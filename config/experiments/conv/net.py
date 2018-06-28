@@ -11,12 +11,13 @@ class MSCN28(Sequential):
     def __init__(self, **kwargs):
         self._numhid = kwargs.pop('numhid', 64)
         self._outnum = kwargs.pop('outnum', 10)
+        self._outact = kwargs.pop('outact', None)
         self._patest = kwargs.pop('patest', 'linear')
         self._outest = kwargs.pop('outest', self._patest)
         super().__init__(**kwargs)
         with self.name_scope():
             # _numhid x 28 x 28
-            self.add(Conv2D(self._numhid, 4, strides=2, padding=1, use_bias=False, regimes=estimators[self._patest]()))
+            self.add(Conv2D(self._numhid, 4, strides=2, padding=1, use_bias=False, regimes=estimators[self._patest](), isinput=True))
             self.add(ReLU(regimes=estimators[self._patest]()))
             # _numhid x 14 x 14
 
@@ -33,7 +34,11 @@ class MSCN28(Sequential):
             # filters x 1 x 1
 
             self.add(Dense(self._outnum, regimes=estimators[self._outest]()))
-            self.add(Identity(regimes=estimators[self._outest]()))
+            if self._outact == 'relu':
+                self.add(ReLU(regimes=estimators[self._outest]()))
+            else:
+                self.add(Identity(regimes=estimators[self._outest]()))
+
 
 @register_net
 class M1SCN28(Sequential):
