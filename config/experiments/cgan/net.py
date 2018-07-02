@@ -1,10 +1,10 @@
 from ecGAN.net import register_net
-from ecGAN.layer import Sequential, YSequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, Activation, ReLU
+from ecGAN.layer import Sequential, YSequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, Activation, ReLU, Concat
 from ecGAN.pattern.regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime
 from ecGAN.pattern.estimator import estimators
 
 @register_net
-class MYTCN28(YSequential):
+class MYTCN28(Sequential):
     def __init__(self, **kwargs):
         self._outnum = kwargs.pop('outnum', 1)
         self._outact = kwargs.pop('outact', None)
@@ -14,8 +14,7 @@ class MYTCN28(YSequential):
         super().__init__(**kwargs)
         with self.name_scope():
 
-            self.addData(Identity())
-            self.addCond(Identity())
+            self.add(Concat())
 
             self.add(Conv2DTranspose(self._numhid * 8, 4, strides=1, padding=0, use_bias=False, isinput=True, regimes=estimators[self._patest]()))
             self.add(ReLU(regimes=estimators[self._patest]()))

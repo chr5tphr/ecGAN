@@ -2,6 +2,32 @@ import re
 from mxnet import nd, autograd
 from mxnet.gluon import nn, ParameterDict
 
+class Mlist(list):
+    '''
+        Access elements of list as if accessing only a single element.
+    '''
+
+    def __new__(cls, *args):
+        if len(args) == 1:
+            if isinstance(args[0], list):
+                return super().__new__(cls, args[0])
+            else:
+                return args[0]
+        else:
+            return super().__new__(cls, args)
+
+    def __getattr__(self, name):
+        ret = Mlist()
+        for obj in self:
+            ret.append(getattr(obj, name))
+        return ret
+
+    def __call__(self, *args, **kwargs):
+        ret = Mlist()
+        for obj in self:
+            ret.append(obj(*args, **kwargs))
+        return ret
+
 def get_im2col_indices(x_shape, field_height, field_width, padding=1, stride=1, ctx=None):
     # First figure out what the size of the output should be
     N, C, H, W = x_shape

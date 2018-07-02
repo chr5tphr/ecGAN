@@ -249,13 +249,13 @@ def explain_cgan(args, config):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
         s_noise, s_cond = model.explain(K, noise, cond, mkwargs=config.explanation.get('kwargs', {}))
 
-        #save_source_raw_image(noise.squeeze(), config.sub('pattern.output', iter=i, data_desc='input.noise', ftype='png'))
-        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.sub('pattern.output', iter=0, data_desc='input.bar', ftype='pdf'))
+        #save_source_raw_image(noise.squeeze(), config.sub('explanation.output', iter=i, data_desc='input.noise', ftype='png'))
+        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.sub('explanation.output', iter=0, data_desc='input.bar', ftype='pdf'))
 
-        save_explanation_data(s_noise.squeeze(), config.sub('pattern.output', iter=i, data_desc='noise', ftype='h5'))
-        save_explanation_data(s_cond.squeeze(), config.sub('pattern.output', iter=i, data_desc='cond', ftype='h5'))
+        save_explanation_data(s_noise.squeeze(), config.sub('explanation.output', iter=i, data_desc='noise', ftype='h5'))
+        save_explanation_data(s_cond.squeeze(), config.sub('explanation.output', iter=i, data_desc='cond', ftype='h5'))
 
-        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.sub('pattern.output', iter=i, data_desc='bar', ftype='pdf'))
+        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.sub('explanation.output', iter=i, data_desc='bar', ftype='pdf'))
 
 @register_command
 def explain_gan(args, config):

@@ -4,12 +4,44 @@ from mxnet import nd
 class Block(nn.Block):
     def forward_logged(self, *args, **kwargs):
         self._in = args
-        self._out = self.forward(*args)
+        self._out = self.forward(*args, **kwargs)
         return self._out
 
 class Intermediate(Block):
     def forward(self, *args, depth=-1):
         return self.forward(self, *args)
+
+class SequentialBase(Block, nn.Sequential):
+    def forward_logged(self, x):
+        self._in = x
+        for child in self._children.values():
+            x = child.forward_logged(x)
+        self._out = x
+        return x
+
+class ParallelBase(Block):
+    def forward(self, X):
+        Y = []
+        for child, x in zip(self._children.values(), X):
+            Y.append(child.forward(x))
+        return Y
+
+    def forward_logged(self, X):
+        self._in = X
+        Y = []
+        for child, x in zip(self._children.values(), X):
+            Y.append(child.forward_logged(x))
+        self._out = Y
+        return Y
+
+class ConcatBase(Block):
+    def __init__(self, **kwargs):
+        self._concat_dim = kwargs.pop('concat_dim', 1)
+        super().__init__(**kwargs)
+
+    def forward(self, X):
+        return nd.concat(*X, dim=self._concat_dim)
+
 
 class YSequentialBase(Block):
     _Subnet = None
@@ -49,6 +81,15 @@ class YSequentialBase(Block):
         cond = self._cond_net(y)
         combo = nd.concat(data, cond, dim=self._concat_dim)
         return self._main_net.forward(combo)
+
+    def forward_logged(self, x, y):
+        self._in = [x, y]
+
+        data = self._data_net.forward_logged(x)
+        cond = self._cond_net.forward_logged(y)
+        combo = nd.concat(data, cond, dim=self._concat_dim)
+        self._out = self._main_net.forward_logged(combo)
+        return self._out
 
 class ReLUBase(Block):
     def forward(self, x):

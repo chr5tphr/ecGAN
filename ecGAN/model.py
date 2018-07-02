@@ -8,7 +8,7 @@ from logging import getLogger
 from .func import fuzzy_one_hot, linspace, randint
 from .explain.base import Interpretable
 from .pattern.base import PatternNet
-from .layer import Intermediate, YSequential
+from .layer import Intermediate, Sequential
 from .util import Config, config_ctx
 from .net import nets
 
@@ -48,7 +48,7 @@ class Model(object):
                 getLogger('ecGAN').info('Saved %s \'%s\' checkpoint epoch %s in file \'%s\'.', key, self.config.nets[key].type, epoch, fpath)
             else:
                 fpath = self.config.sub('nets.%s.save'%(key), epoch=epoch)
-                getLogger('ecGAN').debug('Not saving %s \'%s\' epoch %s.', key, self.config.nets[key].type, epoch, fpath)
+                getLogger('ecGAN').debug('Not saving %s \'%s\' epoch %s.', key, self.config.nets[key].type, epoch)
 
     def load_pattern_params(self):
         for nrole, net in self.nets.items():
@@ -180,7 +180,7 @@ class Classifier(Model):
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-        getLogger('ecGAN').info('Learned signal estimator %s for net %s', estimator, self.config.nets.classifier.type)
+        getLogger('ecGAN').info('Learned pattern for net %s', self.config.nets.classifier.type)
 
     def fit_pattern(self, data, batch_size):
         if not isinstance(self.netC, PatternNet):
@@ -400,7 +400,7 @@ class Regressor(Model):
 
             getLogger('ecGAN').info('pattern training epoch %04d , time: %.2f', epoch, (time() - tic))
             if ( (save_freq > 0) and not ( (epoch + 1) % save_freq) ) or  ((epoch + 1) >= (start_epoch + nepochs)) :
-                self.save_pattern_params(epoch+1)
+                self.save_pattern_params(epoch=epoch+1)
 
         getLogger('ecGAN').info('Learned pattern for net %s',
                              self.config.nets.regressor.type)
@@ -533,7 +533,7 @@ class GAN(Model):
         if self.config.genout:
             bbox = self.data_bbox
             noise = nd.random_normal(shape=(30, 100, 1, 1), ctx=self.ctx)
-            gdat = self.netG(*([noise] + ([] if label is None else [label])))
+            gdat = self.netG([noise] + ([] if label is None else [label]))
             fpath = self.config.sub('genout', epoch=epoch)
             gdat = ((gdat - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0, 255).astype(np.uint8)
             imwrite(fpath, gdat.reshape(5, 6, 28, 28).transpose(0, 2, 1, 3).reshape(5*28, 6*28))
@@ -554,61 +554,23 @@ class GAN(Model):
     #         getLogger('ecGAN').info('Saved generated sensitivity by \'%s\' epoch %s in \'%s\'.',
     #                          self.config.nets.generator.type, epoch, fpath)
 
-    def explain(self, data=None, label=None):
-        netTop = self.nets.get(self.config.explanation.top_net, self.netD)
-        method = self.config.explanation.method
+    def explain(self, K, noise=None, num=None, mkwargs={}, ctx=None):
+        if not all([isinstance(net, Interpretable) for net in [self.netD, self.netG]]):
+            raise NotImplementedError('At least one net is not an Interpretable!')
 
-        if not isinstance(netTop, Interpretable):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%
-                (self.config.nets.get(self.config.explanation.top_net, self.config.nets.discriminator).type))
-
-        if data is None:
-            noise = nd.random_normal(shape=(30, 100, 1, 1), ctx=self.ctx)
-            targs = [noise]
-            if (isinstance(self.netG, YSequential)) and (label is not None):
-                targs += [label]
-            gdata = self.netG.forward_logged(*targs)
-        else:
-            gdata = data
-
-        targs = [gdata]
-        if (isinstance(netTop, YSequential)) and (label is not None):
-            targs += [label]
-        netTop.forward_logged(*targs)
-
-        if method == 'sensitivity':
-            dEdy = nd.ones((30, netTop._outnum), ctx=self.ctx)
-        else:
-            dEdy = None
-
-        Rtc = [None]
-        Rc = [None]
-
-        Rret = netTop.relevance(dEdy, method=method, ret_all=True)
-        if isinstance(Rret, tuple):
-            R, Rtc = Rret
-        else:
-            R = Rret
-        Rt = R[-1]
-
-        if data is None:
-            Rret = self.netG.relevance(R[-1], method=method, ret_all=True)
-            if isinstance(Rret, tuple):
-                Rg, Rc = Rret
+        if num is None:
+            if noise is not None:
+                num = len(noise)
             else:
-                Rg = Rret
-            R += Rg
+                raise RuntimeError('At least one arg has to be supplied!')
+        if noise is None:
+            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
 
-        if self.config.debug:
-            Rsums = []
-            for rel in R:
-                Rsums.append(rel.sum().asscalar())
-            getLogger('ecGAN').debug('Explanation sums: %s', ', '.join([str(fl) for fl in Rsums]))
+        net = Sequential()
+        net.add(self.netG, self.netD)
+        Rn, Rc = net.relevance(data=noise, out=None, **mkwargs)
 
-        if data is None:
-            return (Rt, Rtc[-1], R[-1], Rc[-1], noise, gdata)
-        else:
-            return (R[-1], Rc[-1])
+        return Rn, Rc
 
     def predict(self, data=None, label=None):
         netTop = self.nets.get(self.config.explanation.top_net, self.netD)
@@ -693,7 +655,7 @@ class CGAN(GAN):
                         real_output = netD(data)
                         errD_real = loss(real_output, real_label)
 
-                        fake = netG(noise, cond)
+                        fake = netG([noise, cond])
                         fake_output = netD(fake.detach())
                         errD_fake = loss(fake_output, fake_label)
                         errD = errD_real + errD_fake
@@ -781,7 +743,7 @@ class CGAN(GAN):
                 noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
                 cond = one_hot(label, K).reshape((num, -1, 1, 1))
 
-                self.netG.fit_pattern(noise, cond)
+                self.netG.fit_pattern([noise, cond])
                 self.netD.fit_pattern(data)
 
                 trainerD.step(num, ignore_stale_grad=True)
@@ -792,7 +754,7 @@ class CGAN(GAN):
                 rand_cond = nd.random.uniform(0,K,shape=num, ctx=self.ctx).floor()
                 cond = one_hot(rand_cond, K).reshape((num, -1, 1, 1))
 
-                fake = self.netG.fit_pattern(noise, cond)
+                fake = self.netG.fit_pattern([noise, cond])
                 self.netD.fit_pattern(fake)
 
                 trainerD.step(num, ignore_stale_grad=True)
@@ -851,22 +813,24 @@ class CGAN(GAN):
         getLogger('ecGAN').info('Learned pattern')
 
     def stats_assess_pattern(self, data, batch_size):
-        if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets.classifier.type)
+        # if not isinstance(self.netD, PatternNet):
+        #     raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets.classifier.type)
 
         data_iter = gluon.data.DataLoader(data, batch_size)
 
+        net = Sequential()
+        net.add(self.netG, self.netD)
         for i, (data, label) in enumerate(data_iter):
             data = data.as_in_context(self.ctx)
             label = label.as_in_context(self.ctx)
 
-            self.netC.forward_logged(data)
-            self.netC.stats_assess_pattern()
+            net.forward_logged(data)
+            net.stats_assess_pattern()
 
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-    def explain(self, K, noise=None, cond=None, num=None, mkwargs={}):
+    def explain(self, K, noise=None, cond=None, num=None, mkwargs={}, ctx=None):
         if not all([isinstance(net, Interpretable) for net in [self.netD, self.netG]]):
             raise NotImplementedError('At least one net is not an Interpretable!')
 
@@ -880,20 +844,17 @@ class CGAN(GAN):
         if noise is None:
             noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
         if cond is None:
-            one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
-            cond = nd.random.uniform(0,K,shape=num, ctx=self.ctx).floor()
-            cond = one_hot(cond, K).reshape((num, -1, 1, 1))
+            cond = nd.random.uniform(0, K, shape=num, ctx=self.ctx).floor()
+            cond = nd.one_hot(cond, K).reshape((num, -1, 1, 1))
 
-        outG = self.netG.forward_logged(noise, cond)
-        R = self.netD.relevance(data=outG, out=None, **mkwargs)
-        Rn, Rc = self.netG.relevance(data=noise, cond=cond, out=R, **mkwargs)
+        net = Sequential()
+        net.add(self.netG, self.netD)
+        # Rn, Rc = self.netG.relevance(data=noise, cond=cond, out=None, **mkwargs)
+        Rn, Rc = net.relevance(data=[noise, cond], out=None, **mkwargs)
 
         return Rn, Rc
 
-    def explain_pattern(self, K, noise=None, cond=None, num=None, attribution=False):
-        if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):
-            raise NotImplementedError('At least one net is not a PatternNet!')
-
+    def explain_pattern(self, K, noise=None, cond=None, num=None, attribution=False, ctx=None):
         if num is None:
             if noise is not None:
                 num = len(noise)
@@ -904,41 +865,26 @@ class CGAN(GAN):
         if noise is None:
             noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
         if cond is None:
-            one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
             cond = nd.random.uniform(0,K,shape=num, ctx=self.ctx).floor()
-            cond = one_hot(cond, K).reshape((num, -1, 1, 1))
+            cond = nd.one_hot(cond, K).reshape((num, -1, 1, 1))
 
-        noise.attach_grad()
-        cond.attach_grad()
-        with autograd.record():
-            y_G = self.netG.forward_pattern(noise, cond)
-            y_D = self.netD.forward_pattern(y_G)
-
-        if attribution:
-            self.netG.overload_weight_attribution_pattern()
-            self.netD.overload_weight_attribution_pattern()
-        else:
-            self.netG.overload_weight_pattern()
-            self.netD.overload_weight_pattern()
-
-        y_D.backward(out_grad=y_D)
-
-        return noise.grad, cond.grad
+        net = Sequential()
+        net.add(self.netG, self.netD)
+        data = [noise, cond]
+        return net.explain_pattern(data, attribution=attribution)
 
     def assess_pattern(self):
-        if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
-
-        R = self.netC.assess_pattern()
+        net = Sequential()
+        net.add(self.netG, self.netD)
+        R = net.assess_pattern()
 
         return R
 
     def backward_pattern(self, data):
-        if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is no PatternNet!'%self.config.nets.classifier.type)
-
-        y = self.netC.forward_logged(data)
-        R = self.netC.backward_pattern(y)
+        net = Sequential()
+        net.add(self.netG, self.netD)
+        y = net.forward_logged(data)
+        R = net.backward_pattern(y)
 
         return R
 

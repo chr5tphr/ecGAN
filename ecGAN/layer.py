@@ -4,11 +4,14 @@ from mxnet.gluon import nn
 import numpy as np
 
 from .func import im2col_indices
-from .base import Block, Intermediate, YSequentialBase, ReLUBase, TanhBase
+from .base import Block, Intermediate, YSequentialBase, SequentialBase, ReLUBase, TanhBase
 from .pattern.base import PatternNet, ActPatternNet
-from .pattern.layer import SequentialPatternNet, YSequentialPatternNet, DensePatternNet, Conv2DPatternNet, Conv2DTransposePatternNet, ReLUPatternNet, IdentityPatternNet
+from .pattern.layer import SequentialPatternNet, YSequentialPatternNet, DensePatternNet, Conv2DPatternNet,\
+                           Conv2DTransposePatternNet, ReLUPatternNet, IdentityPatternNet, ParallelPatternNet
 from .explain.base import Interpretable, ActInterpretable
-from .explain.layer import SequentialInterpretable, YSequentialInterpretable, DenseInterpretable, Conv2DTransposeInterpretable, Conv2DInterpretable, BatchNormInterpretable
+from .explain.layer import SequentialInterpretable, YSequentialInterpretable, DenseInterpretable,\
+                           Conv2DTransposeInterpretable, Conv2DInterpretable, BatchNormInterpretable,\
+                           ParallelInterpretable, ConcatInterpretable
 
 
 class Dense(DenseInterpretable, DensePatternNet):
@@ -50,14 +53,30 @@ class Tanh(ActPatternNet, TanhBase):
 class MaxPool2D(ActPatternNet, nn.MaxPool2D):
     pass
 
-class SequentialIntermediate(Intermediate, nn.Sequential):
+class Concat(ConcatInterpretable, ActPatternNet):
+    pass
+
+class Parallel(ParallelInterpretable, ConcatInterpretable):
+    pass
+
+class SequentialIntermediate(Intermediate, SequentialBase):
     def forward(self, x, depth=-1):
         rdep = depth if depth > 0 else (len(self._children.values()) + depth)
         for i, block in enumerate(self._children.values()):
             x = block(x)
-            if i == depth:
+            if i == rdep:
                 break
         return x
+
+    # def forward_logged(self, x, depth=-1):
+    #     self._in = [x]
+    #     rdep = depth if depth > 0 else (len(self._children.values()) + depth)
+    #     for i, block in enumerate(self._children.values()):
+    #         x = block.forward_logged(x)
+    #         if i == depth:
+    #             break
+    #     self._out = x
+    #     return self._out
 
 class Sequential(SequentialInterpretable, SequentialPatternNet, SequentialIntermediate):
     pass

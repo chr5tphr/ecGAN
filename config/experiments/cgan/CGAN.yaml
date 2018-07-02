@@ -74,9 +74,7 @@ pattern:
       learning_rate: 0.0001
 
 explanation:
-  method: 'dtd'
-  top_net: 'discriminator'
-  # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.discriminator.type}.${epoch}.${explanation.method}.${iter}.h5'
-  output: NULL
-  image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.discriminator.type}.${epoch}.${explanation.method}.${data_desc}.${iter}.png'
-  input:  '${root_dir}/${exp_dir}/rel/${model}.${data_desc}.${iter}.png'
+    kwargs:
+        method: 'dtd'
+    top_net: 'classifier'
+    output: '${root_dir}/${exp_dir}/rel/${explanation.kwargs.method}/${model}.${nets.generator.type}.${start_epoch}.${data_desc}.${iter}.${ftype}'

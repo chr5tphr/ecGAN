@@ -4,8 +4,8 @@ from mxnet.gluon import nn
 import numpy as np
 
 from .base import PatternNet, ActPatternNet
-from ..base import ReLUBase, IdentityBase, YSequentialBase
-from ..func import im2col_indices
+from ..base import ReLUBase, IdentityBase, YSequentialBase, SequentialBase, ParallelBase
+from ..func import im2col_indices, Mlist
 
 class DensePatternNet(PatternNet, nn.Dense):
     def __init__(self, *args, **kwargs):
@@ -110,7 +110,7 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
         return nd.Convolution(y, pattern, name='fwd', **kwargs)
 
 
-class SequentialPatternNet(PatternNet, nn.Sequential):
+class SequentialPatternNet(PatternNet, SequentialBase):
     def init_pattern(self):
         for block in self._children.values():
             block.init_pattern()
@@ -160,11 +160,12 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
         for block in self._children.values():
             block.compute_pattern()
 
-    def explain_pattern(self, *args, attribution=False):
-        x = args[0]
-        x.attach_grad()
+    def explain_pattern(self, X, attribution=False):
+        X = Mlist(X)
+        X.attach_grad()
+
         with autograd.record():
-            y = self.forward_pattern(x)
+            y = self.forward_pattern(X)
 
         if attribution:
             self.overload_weight_attribution_pattern()
@@ -172,12 +173,68 @@ class SequentialPatternNet(PatternNet, nn.Sequential):
             self.overload_weight_pattern()
 
         y.backward(out_grad=y)
-        return x.grad
+        return X.grad
 
     def backward_pattern(self, y_sig):
         for block in self._children.values()[::-1]:
             y_sig = block.backward_pattern(y_sig)
         return y_sig
+
+class ParallelPatternNet(PatternNet, YSequentialBase):
+    def init_pattern(self):
+        for child in self._children.values():
+            child.init_pattern()
+
+    def forward_pattern(self, X):
+        return self.forward(X)
+
+    def overload_weight_pattern(self):
+        for child in self._children.values():
+            child.overload_weight_pattern()
+
+    def overload_weight_attribution_pattern(self):
+        for child in self._children.values():
+            child.overload_weight_attribution_pattern()
+
+    def learn_pattern(self):
+        for child in self._children.values():
+            child.learn_pattern()
+
+    def fit_pattern(self, x, y):
+        Y = []
+        self._err = []
+        for child in self._children.values():
+            Y.append(child.fit_pattern())
+            self._err.append(child._err)
+        return Y
+
+    def fit_assess_pattern(self, x, y):
+        Y = []
+        self._err = []
+        for child in self._children.values():
+            Y.append(child.fit_assess_pattern())
+            self._err.append(child._err)
+        return Y
+
+    def stats_assess_pattern(self):
+        for child in self._children.values():
+            child.stats_assess_pattern()
+
+    def assess_pattern(self):
+        Q = []
+        for child in self._children.values():
+            Q.append(child.assess_pattern())
+        return Q
+
+    def compute_pattern(self):
+        for child in self._children.values():
+            child.compute_pattern()
+
+    def backward_pattern(self, y_sig):
+        S = []
+        for child in self._children.values():
+            S.append(child.backward_pattern())
+        return S
 
 class YSequentialPatternNet(PatternNet, YSequentialBase):
     def init_pattern(self):
