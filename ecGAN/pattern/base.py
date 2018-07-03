@@ -18,9 +18,9 @@ class PatternNet(Block):
         self._err = None
         self.w_qual = None
 
-#   def hybrid_forward(self, F, x, weight, bias=None, **kwargs):
-#       # exists since there is a bug with the way mxnet uses params and our pparams
-#       return super().hybrid_forward(F, x, weight, bias)
+    def hybrid_forward(self, F, x, weight, bias=None, **kwargs):
+        # exists since there is a bug with the way mxnet uses params and our pparams
+        return super().hybrid_forward(F, x, weight, bias)
 
     @property
     def pparams(self):

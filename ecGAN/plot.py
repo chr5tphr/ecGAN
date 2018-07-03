@@ -66,7 +66,8 @@ def align_images(im, H, W, h, w, C=1):
 
 def save_explanation_image(relevance, fpath, center=None, cmap='hot', batchnorm=False, fullcmap=False):
     rdat = relevance
-    if rdat.shape[1] == 1:
+    N, C, H, W = rdat.shape
+    if C == 1:
         if batchnorm:
             lo, hi = rdat.min().asscalar(), rdat.max().asscalar()
         else:
@@ -77,12 +78,12 @@ def save_explanation_image(relevance, fpath, center=None, cmap='hot', batchnorm=
             lo = -hi
         getLogger('ecGAN').debug('Explanation min %f, max %f', lo, hi)
         rdat = (draw_heatmap(rdat, lo, hi, center=center, cmap=cmap)*255).astype(np.uint8)
-    elif rdat.shape[1] == 3:
+    elif C == 3:
         rdat = rdat.transpose([0,2,3,1])
     else:
         raise RuntimeError("Useless number of channels.")
 
-    rdat = align_images(rdat, 5, 6, 28, 28, 3)
+    rdat = align_images(rdat, 5, 6, H, W, 3)
     imwrite(fpath, rdat)
     getLogger('ecGAN').info('Saved explanation image in \'%s\'.', fpath)
 
@@ -111,8 +112,9 @@ def save_cgan_visualization(noise, cond, fpath):
     getLogger('ecGAN').info('Saved visualization in \'%s\'.', fpath)
 
 def save_source_image(data, fpath, bbox):
+    N, C, H, W = data.shape
     indat = ((data - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0, 255).astype(np.uint8)
-    indat = align_images(indat, 5, 6, 28, 28)
+    indat = align_images(indat, 5, 6, H, W)
     imwrite(fpath, indat)
     getLogger('ecGAN').info('Saved input data in \'%s\'.', fpath)
 

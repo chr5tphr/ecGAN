@@ -2,7 +2,7 @@ import mxnet as mx
 import numpy as np
 
 from mxnet import nd
-from mxnet.gluon.data import Dataset
+from mxnet.gluon.data import Dataset, ArrayDataset as ArrayDatasetBase
 
 data_funcs = {}
 def register_data_func(func):
@@ -19,44 +19,24 @@ def mnist(train, ctx, bbox=(-1, 1), labels=None):
     dataset = mx.gluon.data.vision.MNIST(train=train, transform=transform)
     return PreloadedDataset(dataset, ctx, labels=labels, shape=(1, 28, 28), label_shape=[])
 
+@register_data_func
+def toydata(train, ctx, bbox=[-1., 1.], N=1000, F=[1,28,28], K=10, seed=0xdeadbeef):
+    rs = np.random.RandomState(seed)
+    f = np.prod(F)
+    means = rs.uniform(bbox[0], bbox[1], size=[K, f])
+    if not train:
+        rs = np.random.RandomState(seed + 1)
+    data_l = np.concatenate([rs.multivariate_normal(m, np.eye(f)*(bbox[1]-bbox[0])/100, size=N//K) for m in means], axis=0)
+    label_l = np.repeat(np.arange(K, dtype=int), N//K)
+    perm = rs.permutation((N//K)*K)
+    data = data_l[perm].reshape([N] + F).clip(bbox[0], bbox[1]).astype(np.float32)
+    label = label_l[perm].astype(np.int64)
+    return ArrayDataset(data, label, classes=np.arange(K).tolist())
 
-class PreloadedDataset(Dataset):
-    def __init__(self, dataset, ctx, labels=None, shape=None, label_shape=None, *args, **kwargs):
+class ArrayDataset(ArrayDatasetBase):
+    def __init__(self, *args, classes=[], **kwargs):
         super().__init__(*args, **kwargs)
-
-        if labels is not None:
-            llen = 0
-            for cond in labels:
-                llen += (dataset._label == cond).sum()
-            self._length = llen
-        else:
-            self._length = len(dataset)
-
-        if shape is None:
-            shape = dataset._data.shape[1:]
-        if label_shape is None:
-            label_shape = dataset._label.shape[1:]
-
-        self._data = nd.zeros([self._length] + list(shape), dtype='float32', ctx=ctx)
-        self._label = nd.zeros([self._length] + list(label_shape), dtype='int32', ctx=ctx)
-
-        uniques = set()
-        i = 0
-        for dat, dlab in dataset:
-            lab = dlab.item()
-            if labels is None or np.any([lab == cond for cond in labels]):
-                self._data[i] = dat
-                self._label[i] = lab
-                i += 1
-                uniques.add(lab)
-        self.classes = list(uniques)
-
-
-    def __getitem__(self, idx):
-        return (self._data[idx], self._label[idx])
-
-    def __len__(self):
-        return self._length
+        self.classes = classes
 
 # @register_data_func
 # def mnist_cond(train):
