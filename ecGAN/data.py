@@ -38,6 +38,44 @@ class ArrayDataset(ArrayDatasetBase):
         super().__init__(*args, **kwargs)
         self.classes = classes
 
+class PreloadedDataset(Dataset):
+    def __init__(self, dataset, ctx, labels=None, shape=None, label_shape=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if labels is not None:
+            llen = 0
+            for cond in labels:
+                llen += (dataset._label == cond).sum()
+            self._length = llen
+        else:
+            self._length = len(dataset)
+
+        if shape is None:
+            shape = dataset._data.shape[1:]
+        if label_shape is None:
+            label_shape = dataset._label.shape[1:]
+
+        self._data = nd.zeros([self._length] + list(shape), dtype='float32', ctx=ctx)
+        self._label = nd.zeros([self._length] + list(label_shape), dtype='int32', ctx=ctx)
+
+        uniques = set()
+        i = 0
+        for dat, dlab in dataset:
+            lab = dlab.item()
+            if labels is None or np.any([lab == cond for cond in labels]):
+                self._data[i] = dat
+                self._label[i] = lab
+                i += 1
+                uniques.add(lab)
+        self.classes = list(uniques)
+
+
+    def __getitem__(self, idx):
+        return (self._data[idx], self._label[idx])
+
+    def __len__(self):
+        return self._length
+
 # @register_data_func
 # def mnist_cond(train):
 #     def transform(data, label):
