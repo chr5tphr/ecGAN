@@ -20,6 +20,16 @@ def mnist(train, ctx, bbox=(-1, 1), labels=None):
     return PreloadedDataset(dataset, ctx, labels=labels, shape=(1, 28, 28), label_shape=[])
 
 @register_data_func
+def cifar10(train, ctx, bbox=(-1, 1), labels=None):
+    def transform(data, label):
+        data = ((data.astype('float32')/255.) * (bbox[1]-bbox[0]) + bbox[0]).reshape((3, 32, 32))
+        label = label.astype('int32')
+        return (data, label)
+
+    dataset = mx.gluon.data.vision.MNIST(train=train, transform=transform)
+    return PreloadedDataset(dataset, ctx, labels=labels, shape=(3, 32, 32), label_shape=[])
+
+@register_data_func
 def toydata(train, ctx, bbox=[-1., 1.], N=1000, F=[1,28,28], K=10, seed=0xdeadbeef):
     rs = np.random.RandomState(seed)
     f = np.prod(F)

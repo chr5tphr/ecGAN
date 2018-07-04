@@ -31,6 +31,8 @@ class Model(object):
 
         self.nets = {}
         for key, desc in self.config.nets.items():
+            if not desc.get(active, True):
+                continue
             self.nets[key] = nets[desc.type](**(desc.get('kwargs', {})))
             if not self.config.init and desc.get('param'):
                 fpath = self.config.sub('nets.%s.param'%(key))

@@ -1,14 +1,15 @@
 fname: '/home/chrstphr/projects/ecGAN/result/cgan/CGAN.yaml'
 tail:
     - #Model Training
-        priority: 0
-        action: 'train'
+        &training 
         dict:
             start_epoch: 0
             init: True
             data: {kwargs: {train: True}}
+        priority: 0
+        action: 'train'
     - # Fit PatternNet
-        dict:
+        dict: &fitting_dict
             start_epoch: 10
             data: {kwargs: {train: True}}
             pattern:
@@ -38,7 +39,7 @@ tail:
                         discriminator: {kwargs: {patest: 'relu'}}
                     pattern: {name: 'relu'}
 #    - # Assess PatternNet Quality
-#        dict:
+#        dict: &ase_dict
 #            start_epoch: 10
 #            data: {kwargs: {train: False}}
 #            pattern:
@@ -48,7 +49,7 @@ tail:
 #        tail:
 #            -
 #                dict: *linear_pattern
-#                tail: &assess_epochs
+#                tail: &ase_epochs
 #                    -
 #                        dict:
 #                            pattern: {start_epoch: 5}
@@ -70,5 +71,44 @@ tail:
 #                        tail: *small_assess
 #            -
 #                dict: *relu_pattern
-#                tail: *assess_epochs
-
+#                tail: *ase_epochs
+    - # Classifier
+        dict: &classifier_mod
+            model: 'Classifier'
+            nets:
+                generator:     {active: False}
+                discriminator: {active: False}
+                classifier:    {active: True}
+        tail:
+            - # Model Training
+                *training
+            - # Model Testing
+                dict:
+                    start_epoch: 10
+                    data: {kwargs: {train: False}}
+                priority: 1
+                action: 'test'
+            - # Fit PatternNet
+                dict: *fitting_dict
+                tail:
+                    -
+                        priority: 1
+                        action: 'fit_pattern'
+                        dict: &linear_pattern_cls
+                            nets: {classifier: {kwargs: {patest: 'linear'}}}
+                            pattern: {name: 'linear'}
+                    -
+                        priority: 1
+                        action: 'fit_pattern'
+                        dict: &relu_pattern_cls
+                            nets: {classifier: {kwargs: {patest: 'linear'}}}
+                            pattern: {name: 'relu'}
+#            - # Assess PatternNet Quality
+#                dict: *ase_dict
+#                tail:
+#                    -
+#                        dict: *linear_pattern_cls
+#                        tail: *ase_epochs
+#                    -
+#                        dict: *relu_pattern_cls
+#                        tail: *ase_epochs
