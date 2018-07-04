@@ -12,7 +12,7 @@ tail:
                             method: 'lrp'
                             alpha: 1.0
                             beta:  0.0
-                priority: 0
+                priority: 1
                 action: 'explain_cgan'
             -
                 dict:
@@ -24,7 +24,7 @@ tail:
                             method: 'dtd'
                             lo: -1.0
                             hi: 1.0
-                priority: 0
+                priority: 1
                 action: 'explain_cgan'
             -
                 dict:
@@ -39,61 +39,61 @@ tail:
                         kwargs:
                             method: 'intgrads'
                             num: 100
-                priority: 1
+                priority: 0
                 action: 'explain_cgan'
-#    - # PatternNet
-#        dict:
-#            start_epoch: 10
-#            data: {kwargs: {train: False}}
-#            pattern:
-#                init: False
-#                start_epoch: 10
-#                aepoch: 0
-#        tail:
-#            -
-#                dict: &linear_pattern
-#                    nets:
-#                        generator:     {kwargs: {patest: 'linear'}}
-#                        discriminator: {kwargs: {patest: 'linear'}}
-#                    pattern: {name: 'linear'}
-#                tail: &explain_epochs
-#                    -
-#                        dict:
-#                            pattern: {start_epoch: 5}
-#                        tail: &explain_types
-#                            -
-#                                priority: 2
-#                                action: 'explain_pattern_cgan'
-#                    -
-#                        dict:
-#                            pattern: {start_epoch: 10}
-#                        tail: *explain_types
-#            -
-#                dict: &relu_pattern
-#                    nets:
-#                        generator:     {kwargs: {patest: 'relu'}}
-#                        discriminator: {kwargs: {patest: 'relu'}}
-#                    pattern: {name: 'relu'}
-#                tail: *explain_epochs
-#            -
-#                # attribution only makes sense for relu
-#                dict:
-#                    nets:
-#                        generator:     {kwargs: {patest: 'positive'}}
-#                        discriminator: {kwargs: {patest: 'positive'}}
-#                    pattern:
-#                        type: 'attribution'
-#                        name: 'relu'
-#                    # cmap: 'gray'
-#                tail:
-#                    -
-#                        dict:
-#                            pattern: {start_epoch: 5}
-#                        priority: 2
-#                        action: 'explain_pattern_cgan'
-#                    -
-#                        dict:
-#                            pattern: {start_epoch: 10}
-#                        priority: 2
-#                        action: 'explain_pattern_cgan'
-#
+    - # PatternNet
+        dict:
+            start_epoch: 10
+            data: {kwargs: {train: False}}
+            pattern:
+                init: False
+                start_epoch: 10
+                aepoch: 0
+        tail:
+            -
+                dict: &linear_pattern
+                    nets:
+                        generator:     {kwargs: {patest: 'linear'}}
+                        discriminator: {kwargs: {patest: 'linear'}}
+                    pattern: {name: 'linear'}
+                tail: &explain_epochs
+                    -
+                        dict:
+                            pattern: {start_epoch: 5}
+                        tail: &explain_types
+                            -
+                                priority: 2
+                                action: 'explain_pattern_cgan'
+                    -
+                        dict:
+                            pattern: {start_epoch: 10}
+                        tail: *explain_types
+            -
+                dict: &relu_pattern
+                    nets:
+                        generator:     {kwargs: {patest: 'relu'}}
+                        discriminator: {kwargs: {patest: 'relu'}}
+                    pattern: {name: 'relu'}
+                tail: *explain_epochs
+            -
+                # attribution only makes sense for relu
+                dict:
+                    nets:
+                        generator:     {kwargs: {patest: 'positive'}}
+                        discriminator: {kwargs: {patest: 'positive'}}
+                    pattern:
+                        type: 'attribution'
+                        name: 'relu'
+                    # cmap: 'gray'
+                tail:
+                    -
+                        dict:
+                            pattern: {start_epoch: 5}
+                        priority: 2
+                        action: 'explain_pattern_cgan'
+                    -
+                        dict:
+                            pattern: {start_epoch: 10}
+                        priority: 2
+                        action: 'explain_pattern_cgan'
+

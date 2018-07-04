@@ -49,7 +49,7 @@ class SequentialInterpretable(Interpretable, SequentialBase):
 
         R = self._out if out is None else out
         for child in list(self._children.values())[::-1]:
-            R = child.relevance(R, **kwargs)
+            R = child.relevance(out=R, **kwargs)
 
         return R
 
@@ -62,16 +62,20 @@ class SequentialInterpretable(Interpretable, SequentialBase):
         return data.grad
 
     def relevance_intgrads(self, data, out=None, num=50, base=None, **kwargs):
-        data = Mlist(data)
+        if isinstance(data, nd.NDArray):
+            data = [data]
         if base is None:
-            base = nd.zeros_like(data)
+            base = [x.zeros_like() for x in data]
 
-        alpha = linspace(0., 1., num, ctx=data.context)
-        diff = data - base
+        alpha = linspace(0., 1., num, ctx=data[0].context)
+        diff = [x - y for x, y in zip(data, base)]
 
-        res = nd.zeros_like(data)
+        res = [x.zeros_like() for x in data]
         for a in alpha:
-            res += self.relevance_sensitivity(data=base + a*diff, out=out)
+            ddat = [ba + a * di for ba, di in zip(base, diff)]
+            ret = self.relevance_sensitivity(data=ddat, out=out)
+            for tar, val in zip(res, ret):
+                tar += val
 
         return res
 
@@ -88,9 +92,10 @@ class ConcatInterpretable(Interpretable, ConcatBase):
         elif self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
 
+        X = self._in[0]
         Rout = self._out if out is None else out
-        dims = [0] + [x.shape[self._concat_dim] for x in Rout] + [None]
-        R = [x.slice_axis(axis=self._concat_dim, begin=begin, end=end) for x, begin, end in zip(Rout, dims[:-1], dims[1:])]
+        dims = [0] + np.cumsum([x.shape[self._concat_dim] for x in X][:-1]).tolist() + [None]
+        R = [Rout.slice_axis(axis=self._concat_dim, begin=begin, end=end) for begin, end in zip(dims[:-1], dims[1:])]
 
         return R
 

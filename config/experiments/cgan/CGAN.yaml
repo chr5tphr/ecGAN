@@ -1,7 +1,7 @@
 root_dir: '/home/chrstphr/projects/ecGAN/result'
 exp_dir: 'cgan'
 
-device: 'cpu'
+device: 'gpu'
 device_id: 'auto'
 debug: False
 
@@ -16,23 +16,23 @@ feature_matching: False
 semi_supervised: True
 fuzzy_labels: False
 
-# data:
-#     func: 'mnist'
-#     args: []
-#     kwargs:
-#         train: True
-#         bbox: [0,1]
-#         labels: NULL
-#     bbox: [0,1]
-
 data:
-    func: 'toydata'
+    func: 'mnist'
     args: []
     kwargs:
         train: True
-        N: 1000
-        bbox: [0.,1.]
-    bbox: [0.,1.]
+        bbox: [0,1]
+        labels: NULL
+    bbox: [0,1]
+
+#data:
+#    func: 'toydata'
+#    args: []
+#    kwargs:
+#        train: True
+#        N: 1000
+#        bbox: [0.,1.]
+#    bbox: [0.,1.]
 
 model: 'CGAN'
 net_file: '${root_dir}/${exp_dir}/net.py'

@@ -17,18 +17,20 @@ class Interpretable(Block):
         func = getattr(self, 'relevance_'+method)
         return func(*args, **kwargs)
 
-    def relevance_sensitivity(self, R, **kwargs):
+    def relevance_sensitivity(self, out, **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
+        R = out
         a = self._in[0]
         a.attach_grad()
         with autograd.record():
             z = self(a)
         return autograd.grad(z, a, head_grads=R)
 
-    def relevance_dtd(self, R, lo=-1, hi=1, **kwargs):
+    def relevance_dtd(self, out, lo=-1, hi=1, **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
+        R = out
         a = self._in[0]
         if self._isinput: #zb
             weight = self._weight_interpretable()
@@ -55,9 +57,10 @@ class Interpretable(Block):
             c, = autograd.grad(z, a, head_grads=R/(z + (z == 0.)))
             return a*c
 
-    def relevance_lrp(self, R, alpha=1., beta=0., **kwargs):
+    def relevance_lrp(self, out, alpha=1., beta=0., **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
+        R = out
         a = self._in[0]
         weight = self._weight_interpretable()
         wplus = nd.maximum(0., weight)
@@ -81,6 +84,6 @@ class Interpretable(Block):
         raise NotImplementedError
 
 class ActInterpretable(Interpretable):
-    def relevance(self, *args, **kwargs):
-        return args[0]
+    def relevance(self, out, *args, **kwargs):
+        return out
 

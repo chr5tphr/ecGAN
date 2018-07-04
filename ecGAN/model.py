@@ -851,7 +851,8 @@ class CGAN(GAN):
             cond = nd.one_hot(cond, K).reshape((num, -1, 1, 1))
 
         net = Sequential()
-        net.add(self.netG, self.netD)
+        with net.name_scope():
+            net.add(self.netG, self.netD)
         # Rn, Rc = self.netG.relevance(data=noise, cond=cond, out=None, **mkwargs)
         Rn, Rc = net.relevance(data=[noise, cond], out=None, **mkwargs)
 
