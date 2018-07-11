@@ -118,6 +118,8 @@ class SequentialPatternNet(PatternNet, SequentialBase):
     def forward_pattern(self, x):
         for block in self._children.values():
             x = block.forward_pattern(x)
+        # WARNING: is hacky and sucks
+        self._out = x
         return x
 
     def overload_weight_pattern(self):

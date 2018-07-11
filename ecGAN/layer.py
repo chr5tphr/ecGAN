@@ -4,7 +4,7 @@ from mxnet.gluon import nn
 import numpy as np
 
 from .func import im2col_indices
-from .base import Block, Intermediate, YSequentialBase, SequentialBase, ReLUBase, TanhBase
+from .base import Block, Intermediate, YSequentialBase, SequentialBase, ReLUBase, TanhBase, ClipBase
 from .pattern.base import PatternNet, ActPatternNet
 from .pattern.layer import SequentialPatternNet, YSequentialPatternNet, DensePatternNet, Conv2DPatternNet,\
                            Conv2DTransposePatternNet, ReLUPatternNet, IdentityPatternNet, ParallelPatternNet
@@ -29,13 +29,7 @@ class BatchNorm(ActPatternNet, BatchNormInterpretable):
 class Identity(IdentityPatternNet, ActInterpretable):
     pass
 
-class Clip(Interpretable, Block):
-    def forward(self, x):
-        return nd.clip(x, 0., 1.)
-    def relevance(self, R):
-        return R
-
-class LeakyReLU(Interpretable, ActPatternNet, nn.LeakyReLU):
+class LeakyReLU(ActInterpretable, ActPatternNet, nn.LeakyReLU):
     pass
 
 class Activation(Interpretable, nn.Activation):
@@ -48,6 +42,12 @@ class ReLU(ReLUPatternNet, ActInterpretable):
     pass
 
 class Tanh(ActPatternNet, TanhBase):
+    pass
+
+class BatchNorm(nn.BatchNorm, ActPatternNet, ActInterpretable):
+    pass
+
+class Clip(ClipBase, ActPatternNet, ActInterpretable):
     pass
 
 class MaxPool2D(ActPatternNet, nn.MaxPool2D):

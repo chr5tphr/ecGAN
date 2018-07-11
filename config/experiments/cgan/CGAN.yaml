@@ -2,11 +2,12 @@ root_dir: '/home/chrstphr/projects/ecGAN/result'
 exp_dir: 'cgan'
 
 device: 'gpu'
-device_id: 'auto'
+device_id: 3
+#device_id: 'auto'
 debug: False
 
 batch_size: 64
-nepochs: 10
+nepochs: 100
 start_epoch: 0
 save_freq: 5
 
@@ -21,9 +22,9 @@ data:
     args: []
     kwargs:
         train: True
-        bbox: [0,1]
+        bbox: [-1.,1.]
         labels: NULL
-    bbox: [0,1]
+    bbox: [-1.,1.]
 
 #data:
 #    func: 'toydata'
@@ -43,11 +44,12 @@ nets:
         kwargs:
             numhid: 64
             patest: 'linear'
-        param: '${root_dir}/${exp_dir}/${data.func}/params/${model}.${nets.generator.type}.${nets.generator.name}.${start_epoch}.params'
-        save: '${root_dir}/${exp_dir}/${data.func}/params/${model}.${nets.generator.type}.${nets.generator.name}.${epoch}.params'
+        epoch: 100
+        param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.generator.type}.${nets.generator.name}.${nets.generator.epoch}.params'
+        save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.generator.type}.${nets.generator.name}.${epoch}.params'
         optimizer: 'adam'
         optkwargs:
-            learning_rate: 0.0001
+            learning_rate: 0.00001
         top: 'discriminator'
     discriminator:
         type: 'MSCN28'
@@ -56,28 +58,30 @@ nets:
             numhid: 64
             outnum: 20
             patest: 'linear'
-        param: '${root_dir}/${exp_dir}/${data.func}/params/${model}.${nets.discriminator.type}.${nets.discriminator.name}.${start_epoch}.params'
-        save: '${root_dir}/${exp_dir}/${data.func}/params/${model}.${nets.discriminator.type}.${nets.discriminator.name}.${epoch}.params'
-        optimizer: 'adam'
-        optkwargs:
-            learning_rate: 0.0001
-     classifier:
-        type: 'MSCN28'
-        name: 'Cls'
-        active: False
-        kwargs:
-            numhid: 64
-            outnum: 10
-            patest: 'linear'
-            #outest: 'linear'
-        param: '${root_dir}/${exp_dir}/${data.func}/params/${model}.${nets.classifier.type}.${nets.classifier.name}.${start_epoch}.params'
-        save: '${root_dir}/${exp_dir}/${data.func}/params/${model}.${nets.classifier.type}.${nets.classifier.name}.${epoch}.params'
+        epoch: 100
+        param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${nets.discriminator.epoch}.params'
+        save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${epoch}.params'
         optimizer: 'adam'
         optkwargs:
             learning_rate: 0.00001
+    classifier:
+       type: 'MSCN28'
+       name: 'Cls'
+       active: False
+       kwargs:
+           numhid: 64
+           outnum: 10
+           patest: 'linear'
+           #outest: 'linear'
+       epoch: 10
+       param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.classifier.type}.${nets.classifier.name}.${nets.classifier.epoch}.params'
+       save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.classifier.type}.${nets.classifier.name}.${epoch}.params'
+       optimizer: 'adam'
+       optkwargs:
+           learning_rate: 0.00001
 
 log: '${root_dir}/${exp_dir}/${data.func}/log/${model}.log'
-gen_freq: 5
+gen_freq: 1
 genout: '${root_dir}/${exp_dir}/${data.func}/gen/${model}.${nets.generator.type}.${epoch}.png'
 
 cmap: 'coldnhot'
@@ -85,9 +89,9 @@ cmap: 'coldnhot'
 pattern:
     type: 'pattern'
     name: 'linear'
-    save: '${root_dir}/${exp_dir}/${data.func}/params/${model}.${net_type}.${net_name}.${pattern.name}.${fit_epoch}.${ase_epoch}.pattern.params'
-    load: '${root_dir}/${exp_dir}/${data.func}/params/${model}.${net_type}.${net_name}.${pattern.name}.${pattern.start_epoch}.${pattern.aepoch}.pattern.params'
-    output: '${root_dir}/${exp_dir}/${data.func}/rel/${pattern.type}/${model}.${nets.generator.type}.${start_epoch}.${pattern.name}.${pattern.start_epoch}.${data_desc}.${iter}.${ftype}'
+    save: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${fit_epoch}.${ase_epoch}.pattern.params'
+    load: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${pattern.start_epoch}.${pattern.aepoch}.pattern.params'
+    output: '${root_dir}/${exp_dir}/${data.func}/rel/${pattern.type}/${model}.${net}.${net_epoch}.${pattern.name}.${pattern.start_epoch}.${data_desc}.${iter}.${ftype}'
     start_epoch: 0
     aepoch: 0
     nepochs: 10
@@ -99,4 +103,4 @@ pattern:
 explanation:
     kwargs:
         method: 'dtd'
-    output: '${root_dir}/${exp_dir}/${data.func}/rel/${explanation.kwargs.method}/${model}.${nets.generator.type}.${start_epoch}.${data_desc}.${iter}.${ftype}'
+    output: '${root_dir}/${exp_dir}/${data.func}/rel/${explanation.kwargs.method}/${model}.${net}.${net_epoch}.${data_desc}.${iter}.${ftype}'

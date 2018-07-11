@@ -1,6 +1,7 @@
 fname: '/home/chrstphr/projects/ecGAN/result/cgan/CGAN.yaml'
 tail:
     - # Layerwise
+        &layerwise
         dict:
             start_epoch: 10
             data: {kwargs: {train: False}}
@@ -17,6 +18,7 @@ tail:
             -
                 dict:
                     nets:
+                        classifier:    {kwargs: {outact: 'relu'}}
                         discriminator: {kwargs: {outact: 'relu'}}
                         generator:     {kwargs: {outact: 'relu'}}
                     explanation:
@@ -24,7 +26,7 @@ tail:
                             method: 'dtd'
                             lo: -1.0
                             hi: 1.0
-                priority: 1
+                priority: 0
                 action: 'explain_cgan'
             -
                 dict:
@@ -39,9 +41,10 @@ tail:
                         kwargs:
                             method: 'intgrads'
                             num: 100
-                priority: 0
+                priority: 1
                 action: 'explain_cgan'
     - # PatternNet
+        &patternnet
         dict:
             start_epoch: 10
             data: {kwargs: {train: False}}
@@ -79,6 +82,7 @@ tail:
                 # attribution only makes sense for relu
                 dict:
                     nets:
+                        classifier:    {kwargs: {patest: 'positive'}}
                         generator:     {kwargs: {patest: 'positive'}}
                         discriminator: {kwargs: {patest: 'positive'}}
                     pattern:
@@ -96,4 +100,15 @@ tail:
                             pattern: {start_epoch: 10}
                         priority: 2
                         action: 'explain_pattern_cgan'
+    - # Same for classifier
+        dict:
+            nets:
+                generator: {top: 'classifier'}
+                discriminator: {active: False}
+                classifier:
+                    active: True
+                    kwargs: {isinput: False}
+        tail:
+            - *layerwise
+            - *patternnet
 

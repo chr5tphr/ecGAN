@@ -6,6 +6,7 @@ import numpy as np
 from .base import Interpretable
 from ..base import YSequentialBase, SequentialBase, ConcatBase, ParallelBase
 from ..func import linspace, Mlist
+from logging import getLogger
 
 class DenseInterpretable(Interpretable, nn.Dense):
     def _forward_interpretable(self, x, w, bias=None):
@@ -50,7 +51,6 @@ class SequentialInterpretable(Interpretable, SequentialBase):
         R = self._out if out is None else out
         for child in list(self._children.values())[::-1]:
             R = child.relevance(out=R, **kwargs)
-
         return R
 
     def relevance_sensitivity(self, data, out=None, **kwargs):

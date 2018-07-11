@@ -11,6 +11,7 @@ from .pattern.base import PatternNet
 from .layer import Intermediate, Sequential
 from .util import Config, config_ctx
 from .net import nets
+from .data import ArrayDataset
 
 models = {}
 def register_model(obj):
@@ -31,7 +32,7 @@ class Model(object):
 
         self.nets = {}
         for key, desc in self.config.nets.items():
-            if not desc.get(active, True):
+            if not desc.get('active', True):
                 continue
             self.nets[key] = nets[desc.type](**(desc.get('kwargs', {})))
             if not self.config.init and desc.get('param'):
@@ -422,7 +423,7 @@ class GAN(Model):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.netG = self.nets['generator']
-        self.netD = self.nets['discriminator']
+        self.netD = self.nets[self.config.nets.generator.get('top', 'discriminator')]
 
     def train(self, data, batch_size, nepochs):
 
@@ -577,18 +578,12 @@ class GAN(Model):
 
         return Rn, Rc
 
-    def predict(self, data=None, label=None):
-        netTop = self.nets.get(self.config.explanation.top_net, self.netD)
+    def predict(self, data):
+        net = Sequential()
+        with net.name_scope():
+            net.add(self.netG, self.netD)
 
-        if data is None:
-            noise = nd.random_normal(shape=(30, 100), ctx=self.ctx)
-            gdata = self.netG(*([noise] + ([] if label is None else [label])))
-
-        output = netTop(gdata)
-        if output.shape[1] > 1:
-            output = output.softmax(axis=1)
-
-        return output
+        return net(data).argmax(axis=1)
 
 @register_model
 class CGAN(GAN):
@@ -632,6 +627,9 @@ class CGAN(GAN):
         getLogger('ecGAN').info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
                         config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
 
+        # iter_g = 0
+        # ncritic = self.config.get('ncritic', 5)
+
         try:
             for epoch in range(self.start_epoch, self.start_epoch + nepochs):
                 tic = time()
@@ -653,9 +651,7 @@ class CGAN(GAN):
 
                     noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
 
-                    ############################
-                    # (1) Update D
-                    ###########################
+                    # === discriminator ===
                     with autograd.record():
                         real_output = netD(data)
                         errD_real = loss(real_output, real_label)
@@ -670,10 +666,10 @@ class CGAN(GAN):
                     metric.update([real_dense, ], [real_output, ])
                     metric.update([fake_dense, ], [fake_output, ])
 
-                    ############################
-                    # (2) Update G
-                    ###########################
+                    # === generator ===
                     # real_intermed = netD.forward(data, cond, depth=-2)
+                    # diter = 100 if ((iter_g < 25) or not (iter_g % 500)) else ncritic
+                    # if not (i % diter):
                     with autograd.record():
                         # fake = netG(noise, cond)
                         if config.feature_matching:
@@ -702,20 +698,33 @@ class CGAN(GAN):
             cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K).reshape((30, K, 1, 1))
             self.generate_sample('I%d'%epoch, cond)
 
-    def test(self, data, batch_size):
-        data_iter = gluon.data.DataLoader(data, batch_size, last_batch='discard')
+    def test(self, K, num, batch_size=64):
+        noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
+        cond = nd.random.uniform(0, K, shape=num, ctx=self.ctx).floor()
+
+        dset = ArrayDataset(noise, cond)
+
+        data_iter = gluon.data.DataLoader(dset, batch_size)
+
+        net = Sequential()
+        with net.name_scope():
+            net.add(self.netG, self.netD)
+
+        #confusion = nd.zeroes((K,K), ctx=self.ctx)
 
         metric = mx.metric.Accuracy()
         for i, (data, label) in enumerate(data_iter):
-            data = data.as_in_context(self.ctx).reshape((-1, 784))
+            data = data.as_in_context(self.ctx)
             label = label.as_in_context(self.ctx)
+            label_oh = nd.one_hot(label, K).reshape((label.shape[0], -1, 1, 1))
 
-            output = self.netC(data)
+            output = net([data, label_oh])
             metric.update([label, ], [output, ])
+            #confusion += nd.one_hot(label, K) == nd.one_hot(nd.argmax(output, axis=1), K)
 
         name, acc = metric.get()
 
-        getLogger('ecGAN').info('%s test acc: %s=%.4f', self.config.nets.classifier.type, name, acc)
+        getLogger('ecGAN').info('test acc: %s=%.4f', name, acc)
 
     def fit_pattern(self, data, batch_size):
         if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):
@@ -923,45 +932,42 @@ class WGAN(GAN):
         epoch = self.start_epoch
 
         getLogger('ecGAN').info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
-                        config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
+                                config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
 
         iter_g = 0
+
+        gpcoef = 0.
 
         try:
             for epoch in range(self.start_epoch, self.start_epoch + nepochs):
                 tic = time()
                 for i, data in enumerate(data_iter):
-                    ################
-                    # (1) Update D
-                    ################
+                    # === Discriminator ===
                     if type(data) in [tuple, list]:
                         data = data[0]
-
-                    data = data.as_in_context(ctx).reshape((-1, 784))
-
+                    data = data.as_in_context(ctx)
                     noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)
-
-                    with autograd.record():
-                        real_output = netD(data)
-                        errD_real = real_output.mean(axis=0)
+                    # gpeps = nd.random.uniform()
 
                     fake = netG(noise)
+                    # comb = gpeps * data + (1. - gpeps) * fake
+                    # comb.attach_grad()
+                    # with autograd.record():
+                    #     out_comb = netD(comb)
+                    # out_comb.backward()
 
                     with autograd.record():
-                        fake_output = netD(fake.detach())
-                        errD_fake = fake_output.mean(axis=0)
+                        out_real = netD(data)
+                        out_fake = netD(fake.detach())
 
-                        errD = - (errD_real - errD_fake)
+                        # gradpen = gpcoef * ()
+                        errD = (out_real - out_fake).mean(axis=0)
                         errD.backward()
 
                     trainerD.step(batch_size)
-                    # for key, param in paramsD.items():
-                        # param.set_data(param.data(ctx=ctx).clip(-0.01, 0.01))
                     metric.update(None, [-errD, ])
 
-                    ################
-                    # (2) Update G
-                    ################
+                    # === Generator ===
                     diter = 100 if ((iter_g < 25) or not (iter_g % 500)) else self.ncritic
                     if not (i % diter):
                         noise = nd.random_normal(shape=(data.shape[0], 100), ctx=ctx)

@@ -106,3 +106,7 @@ class TanhBase(Block):
     def forward(self, x):
         return nd.tanh(x)
 
+class ClipBase(Block):
+    def forward(self, x):
+        return nd.clip(x, -1., 1.)
+

@@ -2,8 +2,10 @@ import mxnet as mx
 from mxnet import nd, gluon, autograd
 from mxnet.gluon import nn
 import numpy as np
+from logging import getLogger
 
 from ..base import Block
+from ..func import Mlist
 
 class Interpretable(Block):
     def __init__(self, *args, **kwargs):
@@ -15,7 +17,9 @@ class Interpretable(Block):
     def relevance(self, *args, **kwargs):
         method = kwargs.get('method', 'dtd')
         func = getattr(self, 'relevance_'+method)
-        return func(*args, **kwargs)
+        R = func(*args, **kwargs)
+        #getLogger('ecGAN').debug("%s", Mlist(R).sum().asscalar())
+        return R
 
     def relevance_sensitivity(self, out, **kwargs):
         if self._in is None:
