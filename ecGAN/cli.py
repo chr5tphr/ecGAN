@@ -191,7 +191,10 @@ def test(args, config):
     data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     model = models[config.model](ctx=ctx, config=config)
-    model.test(data=data, batch_size=batch_size)
+    metr, acc = model.test(data=data, batch_size=batch_size)
+
+    top_n = '%s<%s>'%tuple([config.nets.classifier.get(nam, '') for nam in ['name', 'type']])
+    getLogger('ecGAN').info('%s("%s"): %s=%.4f', top_n, config.data.func, metr, acc)
 
 @register_command
 def test_gan(args, config):
@@ -205,7 +208,11 @@ def test_gan(args, config):
     K = 10
 
     model = models[config.model](ctx=ctx, config=config)
-    model.test(K=K,num=10000, batch_size=batch_size)
+    metr, acc = model.test(K=K, num=10000, batch_size=batch_size)
+
+    gen_n = '%s<%s>'%tuple([config.nets.generator.get(nam, '') for nam in ['name', 'type']])
+    top_n = '%s<%s>'%tuple([config.nets.get(config.nets.generator.get('top', 'discriminator')).get(nam, '') for nam in ['name', 'type']])
+    getLogger('ecGAN').info('%s(%s(…)): %s=%.4f', top_n, gen_n, metr, acc)
 
 @register_command
 def debug(args, config):

@@ -150,9 +150,7 @@ class Classifier(Model):
             output = self.netC(data)
             metric.update([label, ], [output, ])
 
-        name, acc = metric.get()
-
-        getLogger('ecGAN').info('%s test acc: %s=%.4f', self.config.nets.classifier.type, name, acc)
+        return metric.get()
 
     def explain(self, data, label=None, mkwargs={}):
         if not isinstance(self.netC, Interpretable):
@@ -722,9 +720,7 @@ class CGAN(GAN):
             metric.update([label, ], [output, ])
             #confusion += nd.one_hot(label, K) == nd.one_hot(nd.argmax(output, axis=1), K)
 
-        name, acc = metric.get()
-
-        getLogger('ecGAN').info('test acc: %s=%.4f', name, acc)
+        return metric.get()
 
     def fit_pattern(self, data, batch_size):
         if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):

@@ -48,8 +48,10 @@ class PatternNet(Block):
 
 
     def init_pattern(self):
+        import ipdb;ipdb.set_trace()
         outsize, insize = self._shape_pattern()
         with self.name_scope():
+            # TODO Fix so this is not put into _reg_params (see source of MXNet's Block's __setattr__)
             self.num_samples = self.pparams.get('num_samples',
                                                 shape=(1,),
                                                 init=mx.initializer.Zero(),
