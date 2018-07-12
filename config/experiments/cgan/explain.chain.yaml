@@ -3,7 +3,6 @@ tail:
     - # Layerwise
         &layerwise
         dict:
-            start_epoch: 10
             data: {kwargs: {train: False}}
         tail:
             -
@@ -18,8 +17,8 @@ tail:
             -
                 dict:
                     nets:
-                        classifier:    {kwargs: {outact: 'relu'}}
-                        discriminator: {kwargs: {outact: 'relu'}}
+                        classifier:    {kwargs: {outact: 'relu', leakage: 0.0}}
+                        discriminator: {kwargs: {outact: 'relu', leakage: 0.0}}
                         generator:     {kwargs: {outact: 'relu'}}
                     explanation:
                         kwargs:
@@ -46,7 +45,6 @@ tail:
     - # PatternNet
         &patternnet
         dict:
-            start_epoch: 10
             data: {kwargs: {train: False}}
             pattern:
                 init: False

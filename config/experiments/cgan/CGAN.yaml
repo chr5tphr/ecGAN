@@ -82,7 +82,7 @@ nets:
 
 log: '${root_dir}/${exp_dir}/${data.func}/log/${model}.log'
 gen_freq: 1
-genout: '${root_dir}/${exp_dir}/${data.func}/gen/${model}.${nets.generator.type}.${epoch}.png'
+genout: '${root_dir}/${exp_dir}/${data.func}/gen/${model}.${net}.${net_epoch}.${data_desc}.${iter}.${ftype}'
 
 cmap: 'coldnhot'
 

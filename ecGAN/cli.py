@@ -17,7 +17,7 @@ from .net import nets
 from .model import models
 from .data import data_funcs
 from .util import mkfilelogger, Config, config_ctx, make_ctx, load_module_file, ChainConfig, RessourceManager
-from .plot import plot_data, save_explanation_data, save_explanation_image, save_source_image, save_source_raw_image, save_cgan_visualization
+from .plot import plot_data, save_data_h5, save_colorized_image, save_aligned_image, save_raw_image, save_cgan_visualization, save_predictions
 from .func import linspace
 
 getLogger = logging.getLogger
@@ -148,37 +148,29 @@ def train(args, config):
 def generate(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
-    netG = nets[config.nets.generator.type]()
-
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    for epoch in (range(*args.epoch_range) if args.epoch_range else [config.start_epoch]):
-        if config.nets.generator.param:
-            netG.load_params(config.sub('nets.generator.param', start_epoch=epoch), ctx=ctx)
-        else:
-            netG.initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
-        noise = nd.random_normal(shape=(30, 100), ctx=ctx)
-        gdat = None
-        cond = None
-        if config.model == 'CGAN':
-            cond = nd.one_hot(nd.repeat(nd.arange(10, ctx=ctx), 3), 10)
-            gdat = netG(noise, cond)
-        else:
-            gdat = netG(noise)
+    model = models[config.model](ctx=ctx, config=config)
 
-        if config.genout:
-            bbox = config.data.bbox
-            fpath = config.sub('genout', epoch=epoch)
-            gdat = ((gdat - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0, 255).astype(np.uint8)
-            # snum = int(len(gdat)**.5)
-            # imwrite(fpath, gdat[:snum**2].reshape(snum, snum, 28, 28).transpose(0, 2, 1, 3).reshape(snum*28, snum*28))
-            imwrite(fpath, gdat.reshape(5, 6, 28, 28).transpose(0, 2, 1, 3).reshape(5*28, 6*28))
-            getLogger('ecGAN').info('Saved generated data by generator \'%s\' checkpoint \'%s\' in \'%s\'.',
-                                    config.nets.generator.type, config.sub('nets.generator.param', start_epoch=epoch), fpath)
-        else:
-            fig = plot_data(gdat)
-            fig.show()
+    num = 30
+    K = args.classnum
+    cond = nd.one_hot(linspace(0, K, num, ctx=ctx, dtype='int32'), K).reshape(num, K, 1, 1)
+    netnam = config.nets.generator.name
+    net_epoch = config.nets.generator.epoch
+    templ = config.genout
+
+    for i in range(args.iter):
+        noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+        gen = model.generate(cond=cond)
+
+        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
+
+        gen_n = '%s<%s>'%tuple([config.nets.generator.get(nam, '') for nam in ['name', 'type']])
+        save_aligned_image(data=gen,
+                           fpath=config.exsub(templ, data_desc='0to9', ftype='png', **comkw),
+                           bbox=config.data.bbox,
+                           what='%s(…|0,…,9)'%(gen_n, epoch))
 
 @register_command
 def test(args, config):
@@ -241,6 +233,8 @@ def explain(args, config):
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
 
     netnam = config.nets.classifier.name
+    net_epoch = config.nets.classifier.epoch
+    templ = config.explanation.output
 
     for i, (data, label) in enumerate(data_iter):
         if i >= args.iter:
@@ -248,11 +242,13 @@ def explain(args, config):
         data = data.as_in_context(ctx)
         label = label.as_in_context(ctx)
 
+        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
+
         relevance = model.explain(data, mkwargs=config.explanation.get('kwargs', {}))
 
-        save_source_image(data, config.sub('explanation.output', data_desc='input.%s'%config.data.func, iter=i, ftype='png', net=netnam), config.data.bbox)
-        save_explanation_image(relevance,
-                               config.sub('explanation.output', data_desc=config.data.func, iter=i, ftype='png', net=netnam),
+        save_aligned_image(data, config.exsub(templ, data_desc='input.%s'%config.data.func, ftype='png', **comkw), config.data.bbox)
+        save_colorized_image(relevance,
+                               config.exsub(templ, data_desc=config.data.func, ftype='png', **comkw),
                                center=config.get('cmap_center'),
                                cmap=config.get('cmap', 'hot'))
 
@@ -269,24 +265,26 @@ def explain_cgan(args, config):
     K = args.classnum
     cond = nd.one_hot(linspace(0, K, num, ctx=ctx, dtype='int32'), K).reshape(num, K, 1, 1)
     netnam = config.nets.get(config.nets.generator.top, 'discriminator').name
+    net_epoch = config.nets.get(config.nets.generator.top, 'discriminator').epoch
+    templ = config.explanation.output
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
         s_noise, s_cond = model.explain(K, noise, cond, mkwargs=config.explanation.get('kwargs', {}))
 
-        out = model.netD._out.argmax(axis=1)
-        with open(config.sub('explanation.output', iter=i, data_desc='prediction', ftype='json', net=netnam), 'w') as fp:
-            json.dump(out.asnumpy().astype(int).tolist(), fp, indent=2)
+        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        #save_source_raw_image(noise.squeeze(), config.sub('explanation.output', iter=i, data_desc='input.noise', ftype='png'))
+        save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
+
+        #save_raw_image(noise.squeeze(), config.exsub(templ, iter=i, data_desc='input.noise', ftype='png'))
         save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(),
-                                config.sub('explanation.output', iter=i, data_desc='input.bar', ftype='pdf', net=netnam))
+                                config.exsub(templ, data_desc='input.bar', ftype='pdf', **comkw))
 
-        save_explanation_data(s_noise.squeeze(), config.sub('explanation.output', iter=i, data_desc='noise', ftype='h5', net=netnam))
-        save_explanation_data(s_cond.squeeze(), config.sub('explanation.output', iter=i, data_desc='cond', ftype='h5', net=netnam))
+        save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='noise', ftype='h5', **comkw))
+        save_data_h5(s_cond.squeeze(), config.exsub(templ, data_desc='cond', ftype='h5', **comkw))
 
         save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(),
-                                config.sub('explanation.output', iter=i, data_desc='bar', ftype='pdf', net=netnam))
+                                config.exsub(templ, data_desc='bar', ftype='pdf', **comkw))
 
 @register_command
 def explain_gan(args, config):
@@ -419,6 +417,8 @@ def explain_pattern(args, config):
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
 
     netnam = config.nets.classifier.name
+    net_epoch = config.nets.classifier.epoch
+    templ = config.pattern.output
 
     for i, (data, label) in enumerate(data_iter):
         if i >= args.iter:
@@ -426,13 +426,15 @@ def explain_pattern(args, config):
         data = data.as_in_context(ctx)
         label = label.as_in_context(ctx)
 
+        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
+
         relevance = model.explain_pattern(data, attribution=config.pattern.get('type') == 'attribution')
 
         relevance = relevance.reshape(data.shape)
 
-        save_source_image(data, config.sub('pattern.output', data_desc='input.%s'%config.data.func, iter=i, ftype='png', net=netnam), config.data.bbox)
-        save_explanation_image(relevance,
-                               config.sub('pattern.output', data_desc=config.data.func, iter=i, ftype='png', net=netnam),
+        save_aligned_image(data, config.exsub(templ, data_desc='input.%s'%config.data.func, ftype='png', **comkw), config.data.bbox)
+        save_colorized_image(relevance,
+                               config.exsub(templ, data_desc=config.data.func, ftype='png', **comkw),
                                center=config.get('cmap_center'),
                                cmap=config.get('cmap', 'hot'))
 
@@ -451,24 +453,26 @@ def explain_pattern_cgan(args, config):
     num = 30
     K = args.classnum
     cond = nd.one_hot(linspace(0, K, num, ctx=ctx, dtype='int32'), K).reshape(num, K, 1, 1)
-    # save_source_raw_image(cond.squeeze(), config.sub('pattern.output', iter=0, data_desc='input.cond', ftype='png'))
+    # save_raw_image(cond.squeeze(), config.exsub(templ, iter=0, data_desc='input.cond', ftype='png'))
     netnam = config.nets.get(config.nets.generator.top, 'discriminator').name
+    net_epoch = config.nets.get(config.nets.generator.top, 'discriminator').epoch
+    templ = config.pattern.output
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
         s_noise, s_cond = model.explain_pattern(K, noise, cond, attribution=config.pattern.get('type') == 'attribution')
 
-        out = model.netD._out.argmax(axis=1)
-        with open(config.sub('pattern.output', iter=i, data_desc='prediction', ftype='json', net=netnam), 'w') as fp:
-            json.dump(out.asnumpy().astype(int).tolist(), fp, indent=2)
+        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        #save_source_raw_image(noise.squeeze(), config.sub('pattern.output', iter=i, data_desc='input.noise', ftype='png'))
-        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.sub('pattern.output', iter=0, data_desc='input.bar', ftype='pdf', net=netnam))
+        save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
 
-        save_explanation_data(s_noise.squeeze(), config.sub('pattern.output', iter=i, data_desc='noise', ftype='h5', net=netnam))
-        save_explanation_data(s_cond.squeeze(), config.sub('pattern.output', iter=i, data_desc='cond', ftype='h5', net=netnam))
+        #save_raw_image(noise.squeeze(), config.exsub(templ, iter=i, data_desc='input.noise', ftype='png'))
+        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.exsub(templ, data_desc='input.bar', ftype='pdf', **comkw))
 
-        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.sub('pattern.output', iter=i, data_desc='bar', ftype='pdf', net=netnam))
+        save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='noise', ftype='h5', **comkw))
+        save_data_h5(s_cond.squeeze(), config.exsub(templ, data_desc='cond', ftype='h5', **comkw))
+
+        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.exsub(templ, data_desc='bar', ftype='pdf', **comkw))
 
 @register_command
 def predict(args, config):

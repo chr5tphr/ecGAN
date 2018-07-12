@@ -45,7 +45,7 @@ class SequentialInterpretable(Interpretable, SequentialBase):
     def relevance_layerwise(self, data=None, out=None, **kwargs):
         if data is not None:
             self.forward_logged(data)
-        elif self._in is None:
+        elif self._out is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
 
         R = self._out if out is None else out
@@ -59,6 +59,8 @@ class SequentialInterpretable(Interpretable, SequentialBase):
         with autograd.record():
             y = self.forward(data)
         y.backward(out_grad=out)
+        # WARNING: is hacky and sucks
+        self._out = y
         return data.grad
 
     def relevance_intgrads(self, data, out=None, num=50, base=None, **kwargs):

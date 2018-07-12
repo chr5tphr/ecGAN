@@ -18,11 +18,8 @@ class PatternNet(Block):
         self._err = None
         self.w_qual = None
 
-    #def hybrid_forward(self, F, x, weight, bias=None, **kwargs):
-    #    import ipdb;ipdb.set_trace()
-    #    # exists since there is a bug with the way mxnet uses params and our pparams
-    #    return super().hybrid_forward(F, x, weight, bias)
     def hybrid_forward(self, *args, **kwargs):
+        # don't you put our pattern params into your _reg_params!
         if 'num_samples' in kwargs:
             import ipdb;ipdb.set_trace()
         return super().hybrid_forward(*args, **kwargs)
@@ -48,38 +45,38 @@ class PatternNet(Block):
 
 
     def init_pattern(self):
-        import ipdb;ipdb.set_trace()
         outsize, insize = self._shape_pattern()
         with self.name_scope():
-            # TODO Fix so this is not put into _reg_params (see source of MXNet's Block's __setattr__)
-            self.num_samples = self.pparams.get('num_samples',
-                                                shape=(1,),
-                                                init=mx.initializer.Zero(),
-                                                grad_req='null')
-            self.mean_y = self.pparams.get('mean_y',
-                                           shape=(1, outsize),
-                                           init=mx.initializer.Zero(),
-                                           grad_req='null')
-            self.var_y = self.pparams.get('var_y',
-                                          shape=(1, outsize),
-                                          init=mx.initializer.Zero(),
-                                          grad_req='null')
-            self.mean_d = self.pparams.get('mean_d',
-                                          shape=(1, insize),
-                                          init=mx.initializer.Zero(),
-                                          grad_req='null')
-            self.cov_dd = self.pparams.get('cov_dd',
-                                          shape=(insize, insize),
-                                          init=mx.initializer.Zero(),
-                                          grad_req='null')
-            self.cov_dy = self.pparams.get('cov_dy',
-                                           shape=(outsize, insize),
-                                           init=mx.initializer.Zero(),
-                                           grad_req='null')
-            self.w_qual = self.pparams.get('w_qual',
-                                           shape=(outsize, insize),
-                                           init=mx.initializer.Xavier(),
-                                           grad_req='write')
+            # Screw MXNet's messing with __setattr__ of Blocks!
+            # (Parameters are put into _reg_params when __setattr__ (see source of MXNet's Block's __setattr__))
+            object.__setattr__(self, 'num_samples', self.pparams.get('num_samples',
+                                                                     shape=(1,),
+                                                                     init=mx.initializer.Zero(),
+                                                                     grad_req='null'))
+            object.__setattr__(self, 'mean_y', self.pparams.get('mean_y',
+                                                                shape=(1, outsize),
+                                                                init=mx.initializer.Zero(),
+                                                                grad_req='null'))
+            object.__setattr__(self, 'var_y', self.pparams.get('var_y',
+                                                               shape=(1, outsize),
+                                                               init=mx.initializer.Zero(),
+                                                               grad_req='null'))
+            object.__setattr__(self, 'mean_d', self.pparams.get('mean_d',
+                                                                shape=(1, insize),
+                                                                init=mx.initializer.Zero(),
+                                                                grad_req='null'))
+            object.__setattr__(self, 'cov_dd', self.pparams.get('cov_dd',
+                                                                shape=(insize, insize),
+                                                                init=mx.initializer.Zero(),
+                                                                grad_req='null'))
+            object.__setattr__(self, 'cov_dy', self.pparams.get('cov_dy',
+                                                                shape=(outsize, insize),
+                                                                init=mx.initializer.Zero(),
+                                                                grad_req='null'))
+            object.__setattr__(self, 'w_qual', self.pparams.get('w_qual',
+                                                                shape=(outsize, insize),
+                                                                init=mx.initializer.Xavier(),
+                                                                grad_req='write'))
             for regime in self._regimes:
                 regime.mean_x = self.pparams.get('mean_x_%s'%str(regime),
                                                  shape=(1, insize),

@@ -1,4 +1,5 @@
 import numpy as np
+import json
 import h5py
 from imageio import imwrite
 import matplotlib as mpl
@@ -64,35 +65,34 @@ def draw_heatmap(data, lo=0., hi=1., center=None, cmap='hot'):
 def align_images(im, H, W, h, w, C=1):
     return im.reshape(H, W, h, w, C).transpose(0, 2, 1, 3, 4).reshape(H*h, W*w, C)
 
-def save_explanation_image(relevance, fpath, center=None, cmap='hot', batchnorm=False, fullcmap=False):
-    rdat = relevance
-    N, C, H, W = rdat.shape
+def save_colorized_image(data, fpath, center=None, cmap='hot', batchnorm=False, fullcmap=False, what='explanation'):
+    N, C, H, W = data.shape
     if C == 1:
         if batchnorm:
-            lo, hi = rdat.min().asscalar(), rdat.max().asscalar()
+            lo, hi = data.min().asscalar(), data.max().asscalar()
         else:
-            lo = rdat.min(axis=(2, 3), keepdims=True).asnumpy()
-            hi = rdat.max(axis=(2, 3), keepdims=True).asnumpy()
+            lo = data.min(axis=(2, 3), keepdims=True).asnumpy()
+            hi = data.max(axis=(2, 3), keepdims=True).asnumpy()
         if not fullcmap:
             hi = np.maximum(np.abs(lo), np.abs(hi))
             lo = -hi
-        getLogger('ecGAN').debug('Explanation min %f, max %f', lo, hi)
-        rdat = (draw_heatmap(rdat, lo, hi, center=center, cmap=cmap)*255).astype(np.uint8)
+        getLogger('ecGAN').debug('%s min %f, max %f', what, lo, hi)
+        data = (draw_heatmap(data, lo, hi, center=center, cmap=cmap)*255).astype(np.uint8)
     elif C == 3:
-        rdat = rdat.transpose([0,2,3,1])
+        data = data.transpose([0,2,3,1])
     else:
         raise RuntimeError("Useless number of channels.")
 
-    rdat = align_images(rdat, 5, 6, H, W, 3)
-    imwrite(fpath, rdat)
-    getLogger('ecGAN').info('Saved explanation image in \'%s\'.', fpath)
+    data = align_images(data, 5, 6, H, W, 3)
+    imwrite(fpath, data)
+    getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 
-def save_explanation_data(relevance, fpath):
+def save_data_h5(relevance, fpath, what='explanation'):
     with h5py.File(fpath, 'w') as fp:
         fp['heatmap'] = relevance.asnumpy()
-    getLogger('ecGAN').info('Saved explanation in \'%s\'.', fpath)
+    getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 
-def save_cgan_visualization(noise, cond, fpath):
+def save_cgan_visualization(noise, cond, fpath, what='visualization'):
     fig = plt.figure(figsize=(16, 9))
     #combo = np.concatenate([noise, cond], axis=1)
     #amin = combo.min()
@@ -109,20 +109,27 @@ def save_cgan_visualization(noise, cond, fpath):
         #plt.ylim(amin, amax)
     fig.tight_layout()
     fig.savefig(fpath)
-    getLogger('ecGAN').info('Saved visualization in \'%s\'.', fpath)
+    plt.close(fig)
+    getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 
-def save_source_image(data, fpath, bbox):
+def save_aligned_image(data, fpath, bbox, what='input data'):
     N, C, H, W = data.shape
     indat = ((data - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0, 255).astype(np.uint8)
     indat = align_images(indat, 5, 6, H, W)
     imwrite(fpath, indat)
-    getLogger('ecGAN').info('Saved input data in \'%s\'.', fpath)
+    getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 
-def save_source_raw_image(data, fpath):
+def save_raw_image(data, fpath, what='input data'):
     lo, hi = data.min().asscalar(), data.max().asscalar()
     indat = (draw_heatmap(data, lo, hi)*255).astype(np.uint8)
     imwrite(fpath, indat)
-    getLogger('ecGAN').info('Saved input data in \'%s\'.', fpath)
+    getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
+
+def save_predictions(data, fpath):
+    with open(fpath, 'w') as fp:
+        json.dump(data.asnumpy().astype(int).tolist(), fp, indent=2)
+    getLogger('ecGAN').info('Saved predicted labels in \'%s\'.', fpath)
+
 
 def plot_data(data):
     snum = int(len(data)**.5)
