@@ -1,10 +1,10 @@
 root_dir: '/home/chrstphr/projects/ecGAN/result'
-exp_dir: 'cgan'
+exp_dir: 'cgan_pos'
 
 device: 'gpu'
 device_id: 3
 #device_id: 'auto'
-debug: False
+debug: True
 
 batch_size: 64
 nepochs: 100
@@ -16,6 +16,8 @@ init: False
 feature_matching: False
 semi_supervised: True
 fuzzy_labels: False
+#clip_penalty: 0.001
+merge_batchnorm: True
 
 data:
     func: 'mnist'
@@ -43,7 +45,10 @@ nets:
         name: 'Gen'
         kwargs:
             numhid: 64
+            use_bias: True
             patest: 'linear'
+            outact: 'clip'
+            clip: [-1., 1.]
         epoch: 100
         param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.generator.type}.${nets.generator.name}.${nets.generator.epoch}.params'
         save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.generator.type}.${nets.generator.name}.${epoch}.params'
@@ -56,8 +61,10 @@ nets:
         name: 'Dis'
         kwargs:
             numhid: 64
+            use_bias: True
             outnum: 20
             patest: 'linear'
+            leakage: 0.0
         epoch: 100
         param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${nets.discriminator.epoch}.params'
         save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${epoch}.params'
@@ -70,6 +77,7 @@ nets:
        active: False
        kwargs:
            numhid: 64
+           use_bias: True
            outnum: 10
            patest: 'linear'
            #outest: 'linear'

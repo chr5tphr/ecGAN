@@ -650,6 +650,10 @@ class CGAN(GAN):
                         errD_real = loss(real_output, real_label)
 
                         fake = netG([noise, cond])
+                        if config.get('clip_penalty', None) is not None:
+                            lo, hi = config.nets.generator.kwargs.get('clip', [-1., 1.])
+                            fake_nb = fake
+                            fake = nd.clip(fake, lo, hi)
                         fake_output = netD(fake.detach())
                         errD_fake = loss(fake_output, fake_label)
                         errD = errD_real + errD_fake
@@ -669,10 +673,14 @@ class CGAN(GAN):
                             # feature matching
                             real_intermed = netD.forward(data, depth=-2)
                             fake_intermed = netD.forward(fake, depth=-2)
-                            errG = ((real_intermed - fake_intermed)**2).sum()
+                            errG = ((real_intermed - fake_intermed)**2).flatten().sum(axis=1)
                         else:
                             output = netD(fake)
                             errG = loss(output, real_label)
+                        if config.get('clip_penalty', None) is not None:
+                            cp_gamma = config.get('clip_penalty', 1.)
+                            clip_penalty = ((fake_nb - fake)**2).flatten().sum(axis=1)
+                            errG = errG + cp_gamma*clip_penalty
                     errG.backward()
 
                     trainerG.step(num)
@@ -731,18 +739,19 @@ class CGAN(GAN):
             else:
                 raise RuntimeError('Either number of classes or labels have to be supplied!')
         if noise is None:
-            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
         if cond is None:
             cond = nd.random.uniform(0, K, shape=num, ctx=self.ctx).floor()
             cond = nd.one_hot(cond, K).reshape((num, -1, 1, 1))
 
-        return netG([noise, cond])
+        return self.netG([noise, cond])
 
     def save_generated(self, epoch, cond=None):
         if self.config.genout:
             gen_n = '%s<%s>'%tuple([self.config.nets.generator.get(nam, '') for nam in ['name', 'type']])
+            fpath = self.config.sub('genout', net_epoch=epoch, data_desc='trainlog', iter=0, ftype='png', net=self.config.nets.generator.name)
             save_aligned_image(data=self.generate(num=30, cond=cond),
-                               fpath=self.config.sub('genout', epoch=epoch),
+                               fpath=fpath,
                                bbox=self.data_bbox,
                                what='%s(…) epoch %s'%(gen_n, epoch))
 
@@ -884,6 +893,8 @@ class CGAN(GAN):
         net = Sequential()
         with net.name_scope():
             net.add(self.netG, self.netD)
+        self.netG.merge_batchnorm(ctx=self.ctx)
+        self.netD.merge_batchnorm(ctx=self.ctx)
         # Rn, Rc = self.netG.relevance(data=noise, cond=cond, out=None, **mkwargs)
         Rn, Rc = net.relevance(data=[noise, cond], out=None, **mkwargs)
         self._out = net._out

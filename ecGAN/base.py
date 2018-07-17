@@ -14,6 +14,22 @@ class Intermediate(Block):
     def forward(self, *args, depth=-1):
         return self.forward(self, *args)
 
+class BatchNormMergable(Block):
+    def merge_batchnorm(self, bnorm, ctx=None):
+        if not isinstance(bnorm, nn.BatchNorm):
+            raise RuntimeError('Cannot merge_batchnorm with type %s.'%type(bnorm))
+        mmod = (bnorm.gamma.data(ctx=ctx) / (bnorm.running_var.data(ctx=ctx) + bnorm._kwargs['eps'])**.5)
+        wshape = [d if i == bnorm._kwargs['axis'] else 1 for i,d in enumerate(self.weight.shape)]
+        print(self.weight.shape, bnorm.gamma.shape, wshape, bnorm._kwargs)
+        # TODO shaping is wrong???
+        wmod = self.weight.data(ctx=ctx) * mmod.reshape(wshape)
+        self.weight.set_data(wmod)
+        if self.bias is not None:
+            bshape = [d if i == bnorm._kwargs['axis'] else 1 for i,d in enumerate(self.bias.shape)]
+            bmod = (self.bias.data(ctx=ctx) - bnorm.running_mean.data(ctx=ctx).reshape(bshape)) * mmod.reshape(bshape) + bnorm.beta.data(ctx=ctx).reshape(bshape)
+            self.bias.set_data(bmod)
+        return True
+
 class SequentialBase(Block, nn.Sequential):
     def forward_logged(self, x):
         self._in = x
@@ -98,6 +114,19 @@ class ReLUBase(Block):
     def forward(self, x):
         return nd.maximum(0., x)
 
+class LeakyReLUBase(Block):
+    def __init__(self, alpha, **kwargs):
+        super().__init__(**kwargs)
+        self._alpha = alpha
+
+    def forward(self, x):
+        return nd.LeakyReLU(x, act_type='leaky', slope=self._alpha, name='fwd')
+
+    def __repr__(self):
+        s = '{name}({alpha})'
+        return s.format(name=self.__class__.__name__,
+                        alpha=self._alpha)
+
 class IdentityBase(Block):
     def forward(self, *args, **kwargs):
         return args[0]
@@ -107,6 +136,11 @@ class TanhBase(Block):
         return nd.tanh(x)
 
 class ClipBase(Block):
+    def __init__(self, low=-1., high=1., **kwargs):
+        super().__init__(**kwargs)
+        self._low = low
+        self._high = high
+
     def forward(self, x):
-        return nd.clip(x, -1., 1.)
+        return nd.clip(x, self._low, self._high)
 

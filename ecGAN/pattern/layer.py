@@ -4,7 +4,7 @@ from mxnet.gluon import nn
 import numpy as np
 
 from .base import PatternNet, ActPatternNet
-from ..base import ReLUBase, IdentityBase, YSequentialBase, SequentialBase, ParallelBase
+from ..base import ReLUBase, LeakyReLUBase, IdentityBase, YSequentialBase, SequentialBase, ParallelBase
 from ..func import im2col_indices, Mlist
 
 class DensePatternNet(PatternNet, nn.Dense):
@@ -328,10 +328,11 @@ class YSequentialPatternNet(PatternNet, YSequentialBase):
 
 class ReLUPatternNet(ActPatternNet, ReLUBase):
     def backward_pattern(self, y_sig):
-        if self._out is None:
-            raise RuntimeError('Block has not yet executed forward_logged!')
-        y_neut = self._out
-        return nd.where(y_neut>=0., y_sig, nd.zeros_like(y_neut, ctx=y_neut.context))
+        return self.forward(y_sig)
+
+class LeakyReLUPatternNet(ActPatternNet, LeakyReLUBase):
+    def backward_pattern(self, y_sig):
+        return self.forward(y_sig)
 
 class IdentityPatternNet(ActPatternNet, IdentityBase):
     def backward_pattern(self, y_sig):

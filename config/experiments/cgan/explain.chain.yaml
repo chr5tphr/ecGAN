@@ -54,6 +54,7 @@ tail:
             -
                 dict: &linear_pattern
                     nets:
+                        classifier:    {kwargs: {patest: 'linear'}}
                         generator:     {kwargs: {patest: 'linear'}}
                         discriminator: {kwargs: {patest: 'linear'}}
                     pattern: {name: 'linear'}
@@ -72,6 +73,7 @@ tail:
             -
                 dict: &relu_pattern
                     nets:
+                        classifier:    {kwargs: {patest: 'relu'}}
                         generator:     {kwargs: {patest: 'relu'}}
                         discriminator: {kwargs: {patest: 'relu'}}
                     pattern: {name: 'relu'}

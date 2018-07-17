@@ -200,6 +200,9 @@ def test_gan(args, config):
     K = 10
 
     model = models[config.model](ctx=ctx, config=config)
+    if config.get('merge_batchnorm'):
+        model.netG.merge_batchnorm(ctx=ctx)
+        model.netD.merge_batchnorm(ctx=ctx)
     metr, acc = model.test(K=K, num=10000, batch_size=batch_size)
 
     gen_n = '%s<%s>'%tuple([config.nets.generator.get(nam, '') for nam in ['name', 'type']])
