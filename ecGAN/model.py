@@ -6,8 +6,8 @@ from imageio import imwrite
 from logging import getLogger
 
 from .func import fuzzy_one_hot, linspace, randint
-from .explain.base import Interpretable
-from .pattern.base import PatternNet
+from .explain.base import Explainable
+from .explain.pattern.base import PatternNet
 from .layer import Intermediate, Sequential
 from .util import Config, config_ctx
 from .net import nets
@@ -154,8 +154,8 @@ class Classifier(Model):
         return metric.get()
 
     def explain(self, data, label=None, mkwargs={}):
-        if not isinstance(self.netC, Interpretable):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+        if not isinstance(self.netC, Explainable):
+            raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets.classifier.type)
 
         R = self.netC.relevance(data=data, out=None, **mkwargs)
 
@@ -268,7 +268,7 @@ class Classifier(Model):
 
     def explain_pattern(self, data, attribution=False):
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets.classifier.type)
 
         R = self.netC.explain_pattern(data, attribution=attribution)
 
@@ -276,7 +276,7 @@ class Classifier(Model):
 
     def assess_pattern(self):
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets.classifier.type)
 
         R = self.netC.assess_pattern()
 
@@ -411,7 +411,7 @@ class Regressor(Model):
 
     def explain_pattern(self, data):
         if not isinstance(self.netR, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Interpretable!'%self.config.nets.regressor.type)
+            raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets.regressor.type)
 
         R = self.netR.explain_pattern(data)
 
@@ -554,8 +554,8 @@ class GAN(Model):
         return netG(noise)
 
     def explain(self, K, noise=None, num=None, mkwargs={}, ctx=None):
-        if not all([isinstance(net, Interpretable) for net in [self.netD, self.netG]]):
-            raise NotImplementedError('At least one net is not an Interpretable!')
+        if not all([isinstance(net, Explainable) for net in [self.netD, self.netG]]):
+            raise NotImplementedError('At least one net is not an Explainable!')
 
         if num is None:
             if noise is not None:
@@ -874,8 +874,8 @@ class CGAN(GAN):
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
     def explain(self, K, noise=None, cond=None, num=None, mkwargs={}, ctx=None):
-        if not all([isinstance(net, Interpretable) for net in [self.netD, self.netG]]):
-            raise NotImplementedError('At least one net is not an Interpretable!')
+        if not all([isinstance(net, Explainable) for net in [self.netD, self.netG]]):
+            raise NotImplementedError('At least one net is not an Explainable!')
 
         if num is None:
             if noise is not None:
@@ -893,8 +893,8 @@ class CGAN(GAN):
         net = Sequential()
         with net.name_scope():
             net.add(self.netG, self.netD)
-        self.netG.merge_batchnorm(ctx=self.ctx)
-        self.netD.merge_batchnorm(ctx=self.ctx)
+        # self.netG.merge_batchnorm(ctx=self.ctx)
+        # self.netD.merge_batchnorm(ctx=self.ctx)
         # Rn, Rc = self.netG.relevance(data=noise, cond=cond, out=None, **mkwargs)
         Rn, Rc = net.relevance(data=[noise, cond], out=None, **mkwargs)
         self._out = net._out

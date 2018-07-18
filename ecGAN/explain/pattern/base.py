@@ -3,10 +3,47 @@ import mxnet as mx
 from mxnet import nd, autograd
 from mxnet.gluon import nn, ParameterDict
 
-from ..base import Block
-from ..func import stats_batchwise
+from ...base import Block
+from ...func import stats_batchwise
 
 class PatternNet(Block):
+    def init_pattern(self, *args):
+        raise NotImplementedError
+
+    def forward_pattern(self, *args):
+        raise NotImplementedError
+
+    def learn_pattern(self, *args):
+        raise NotImplementedError
+
+    def fit_pattern(self, x):
+        raise NotImplementedError
+
+    def compute_pattern(self):
+        raise NotImplementedError
+
+    def fit_assess_pattern(self, x):
+        raise NotImplementedError
+
+    def stats_assess_pattern(self):
+        raise NotImplementedError
+
+    def assess_pattern(self):
+        raise NotImplementedError
+
+    def overload_weight_pattern(self):
+        raise NotImplementedError
+
+    def overload_weight_attribution_pattern(self):
+        raise NotImplementedError
+
+    def backward_pattern(self, y_sig):
+        raise NotImplementedError
+
+    def explain_pattern(self, X, attribution=False):
+        raise NotImplementedError
+
+class LinearPatternNet(PatternNet):
     def __init__(self, *args, **kwargs):
         #self.estimator = kwargs.pop('estimator', 'linear')
         self._regimes = kwargs.pop('regimes', [PatternRegime('linear', lambda y: nd.ones_like(y))])
@@ -17,12 +54,6 @@ class PatternNet(Block):
         self.mean_y = None
         self._err = None
         self.w_qual = None
-
-    def hybrid_forward(self, *args, **kwargs):
-        # don't you put our pattern params into your _reg_params!
-        if 'num_samples' in kwargs:
-            import ipdb;ipdb.set_trace()
-        return super().hybrid_forward(*args, **kwargs)
 
     @property
     def pparams(self):
@@ -103,9 +134,9 @@ class PatternNet(Block):
     def forward_pattern(self, x):
         z = None
         for regime in self._regimes:
-            regime.pattern_ref = self._weight_pattern().copy()
+            regime.pattern_ref = self._weight().copy()
             a_reg = regime.pattern_ref
-            z_reg = self._forward_pattern(x, a_reg)
+            z_reg = self._forward(x, a_reg)
             # regimes are assumed to be disjunct
             if z is None:
                 z = nd.zeros_like(z_reg)
@@ -127,7 +158,7 @@ class PatternNet(Block):
         return self._signal_pattern(y_sig, y_cond)
 
     def compute_pattern(self):
-        weight = self._weight_pattern()
+        weight = self._weight()
         for regime in self._regimes:
             cov = regime.mean_xy.data() - nd.dot(self.mean_y.data(), regime.mean_x.data(), transpose_a=True)
             var_y = (weight * cov).sum(axis=1, keepdims=True) + 1e-12
@@ -167,7 +198,7 @@ class PatternNet(Block):
         distractor = x - signal.reshape(x.shape)
         loss = mx.gluon.loss.L2Loss()
         with autograd.record():
-            vtd = self._forward_pattern(distractor, w_qual)
+            vtd = self._forward(distractor, w_qual)
             err = loss(vtd, y)
         err.backward()
         self._err = err
@@ -267,9 +298,6 @@ class PatternNet(Block):
     def _shape_pattern(self):
         raise NotImplementedError
 
-    def _weight_pattern(self):
-        raise NotImplementedError
-
     @staticmethod
     def _args_forward_pattern(*args):
         if len(args) == 1:
@@ -279,33 +307,22 @@ class PatternNet(Block):
         else:
             raise RuntimeError('Number of input arguments not correct!')
 
-    def _forward_pattern(self, x, pattern, pias=None):
-        raise NotImplementedError
-
 class ActPatternNet(PatternNet):
-    def init_pattern(self, *args):
-        pass
-
     def forward_pattern(self, *args):
         return self.forward(*args)
-
-    def learn_pattern(self, *args):
-        pass
 
     def fit_pattern(self, x):
         return self(x)
 
-    def compute_pattern(self):
-        pass
-
     def fit_assess_pattern(self, x):
         return self(x)
 
-    def stats_assess_pattern(self):
-        pass
-
     def assess_pattern(self):
         return None
+
+
+    def init_pattern(self):
+        pass
 
     def overload_weight_pattern(self):
         pass
@@ -313,8 +330,14 @@ class ActPatternNet(PatternNet):
     def overload_weight_attribution_pattern(self):
         pass
 
-    def backward_pattern(self, y_sig):
-        raise NotImplementedError
+    def learn_pattern(self):
+        pass
+
+    def stats_assess_pattern(self):
+        pass
+
+    def compute_pattern(self):
+        pass
 
 class PatternRegime(object):
     def __init__(self, name, condition):

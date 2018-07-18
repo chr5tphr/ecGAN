@@ -3,11 +3,12 @@ from mxnet import nd, gluon, autograd
 from mxnet.gluon import nn
 import numpy as np
 
-from .base import PatternNet, ActPatternNet
-from ..base import ReLUBase, LeakyReLUBase, IdentityBase, YSequentialBase, SequentialBase, ParallelBase
-from ..func import im2col_indices, Mlist
+from .base import PatternNet, LinearPatternNet, ActPatternNet
+from ... import base
+from ...func import im2col_indices, Mlist
 
-class DensePatternNet(PatternNet, nn.Dense):
+# Linear Layers
+class Dense(LinearPatternNet, base.Dense):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.act is not None:
@@ -15,9 +16,6 @@ class DensePatternNet(PatternNet, nn.Dense):
 
     def _shape_pattern(self):
         return self.weight.shape
-
-    def _weight_pattern(self):
-        return self.weight.data().flatten()
 
     def _prepare_data_pattern(self):
         if self._in is None:
@@ -34,7 +32,7 @@ class DensePatternNet(PatternNet, nn.Dense):
         return nd.FullyConnected(y, pattern.T, pias, no_bias=(pias is None),
                                  num_hidden=pattern.shape[1], flatten=self._flatten)
 
-class Conv2DPatternNet(PatternNet, nn.Conv2D):
+class Conv2D(LinearPatternNet, base.Conv2D):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.act is not None:
@@ -44,9 +42,6 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
         chan = self.weight.shape[0]
         ksize = np.prod(self.weight.shape[1:])
         return (chan, ksize)
-
-    def _weight_pattern(self):
-        return self.weight.data().flatten()
 
     def _prepare_data_pattern(self):
         if self._in is None:
@@ -58,12 +53,6 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
             y = y.flatten().T
             yield x, y
 
-    def _forward_pattern(self, x, w, bias=None):
-        kwargs = self._kwargs.copy()
-        kwargs['no_bias'] = bias is None
-        w = w.reshape(self.weight.shape)
-        return nd.Convolution(x, w, bias, name='fwd', **kwargs)
-
     def _backward_pattern(self, y, pattern, pias=None):
         kwargs = self._kwargs.copy()
         kwargs['no_bias'] = True
@@ -71,7 +60,7 @@ class Conv2DPatternNet(PatternNet, nn.Conv2D):
         pattern = pattern.reshape(self.weight.shape)
         return nd.Deconvolution(y, pattern, name='fwd', **kwargs)
 
-class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
+class Conv2DTranspose(LinearPatternNet, base.Conv2DTranspose):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.act is not None:
@@ -81,9 +70,6 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
         chan = self.weight.shape[0]
         ksize = np.prod(self.weight.shape[1:])
         return (chan, ksize)
-
-    def _weight_pattern(self):
-        return self.weight.data().flatten()
 
     def _prepare_data_pattern(self):
         if self._in is None:
@@ -95,12 +81,6 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
             y = im2col_indices(nd.expand_dims(y, 0), self._kwargs['kernel'][0], self._kwargs['kernel'][1], self._kwargs['pad'][0], self._kwargs['stride'][0]).T
             yield x, y
 
-    def _forward_pattern(self, x, w):
-        kwargs = self._kwargs.copy()
-        kwargs['no_bias'] = True
-        w = w.reshape(self.weight.shape)
-        return nd.Deconvolution(x, w, name='fwd', **kwargs)
-
     def _backward_pattern(self, y, pattern, pias=None):
         kwargs = self._kwargs.copy()
         kwargs['no_bias'] = True
@@ -110,7 +90,32 @@ class Conv2DTransposePatternNet(PatternNet, nn.Conv2DTranspose):
         return nd.Convolution(y, pattern, name='fwd', **kwargs)
 
 
-class SequentialPatternNet(PatternNet, SequentialBase):
+# Activation (-esque) Layers
+class ReLU(ActPatternNet, base.ReLU):
+    def backward_pattern(self, y_sig):
+        return self.forward(y_sig)
+
+class LeakyReLU(ActPatternNet, base.LeakyReLU):
+    def backward_pattern(self, y_sig):
+        return self.forward(y_sig)
+
+class Identity(ActPatternNet, base.Identity):
+    def backward_pattern(self, y_sig):
+        return y_sig
+
+class Tanh(ActPatternNet, base.Tanh):
+    pass
+
+class Clip(ActPatternNet, base.Clip):
+    pass
+
+class BatchNorm(ActPatternNet, base.BatchNorm):
+    pass
+
+
+# Flow Layers
+
+class Sequential(PatternNet, base.Sequential):
     def init_pattern(self):
         for block in self._children.values():
             block.init_pattern()
@@ -182,7 +187,7 @@ class SequentialPatternNet(PatternNet, SequentialBase):
             y_sig = block.backward_pattern(y_sig)
         return y_sig
 
-class ParallelPatternNet(PatternNet, YSequentialBase):
+class Parallel(PatternNet, base.Parallel):
     def init_pattern(self):
         for child in self._children.values():
             child.init_pattern()
@@ -238,103 +243,7 @@ class ParallelPatternNet(PatternNet, YSequentialBase):
             S.append(child.backward_pattern())
         return S
 
-class YSequentialPatternNet(PatternNet, YSequentialBase):
-    def init_pattern(self):
-        self._data_net.init_pattern()
-        self._cond_net.init_pattern()
-        self._main_net.init_pattern()
+class Concat(ActPatternNet, base.Concat):
+    pass
 
-    def forward_pattern(self, x, y):
-        data_pat = self._data_net.forward_pattern(x)
-        cond_pat = self._cond_net.forward_pattern(y)
-        combo_pat = nd.concat(data_pat, cond_pat, dim=self._concat_dim)
-        return self._main_net.forward_pattern(combo_pat)
-
-    def overload_weight_pattern(self):
-        self._data_net.overload_weight_pattern()
-        self._cond_net.overload_weight_pattern()
-        self._main_net.overload_weight_pattern()
-
-    def overload_weight_attribution_pattern(self):
-        self._data_net.overload_weight_attribution_pattern()
-        self._cond_net.overload_weight_attribution_pattern()
-        self._main_net.overload_weight_attribution_pattern()
-
-    def learn_pattern(self):
-        self._data_net.learn_pattern()
-        self._cond_net.learn_pattern()
-        self._main_net.learn_pattern()
-
-    def fit_pattern(self, x, y):
-        data = self._data_net.fit_pattern(x)
-        cond = self._cond_net.fit_pattern(y)
-        combo = nd.concat(data, cond, dim=self._concat_dim)
-        out = self._main_net.fit_pattern(combo)
-        self._err = self._data_net._err + self._cond_net._err + self._main_net._err
-        return out
-
-    def fit_assess_pattern(self, x, y):
-        data = self._data_net.fit_assess_pattern(x)
-        cond = self._cond_net.fit_assess_pattern(y)
-        combo = nd.concat(data, cond, dim=self._concat_dim)
-        out = self._main_net.fit_assess_pattern(combo)
-        self._err = self._data_net._err + self._cond_net._err + self._main_net._err
-        return out
-
-    def stats_assess_pattern(self):
-        self._data_net.stats_assess_pattern()
-        self._cond_net.stats_assess_pattern()
-        self._main_net.stats_assess_pattern()
-
-    def assess_pattern(self):
-        quals = self._data_net.assess_pattern() \
-              + self._cond_net.assess_pattern() \
-              + self._main_net.assess_pattern()
-        return quals
-
-    def compute_pattern(self):
-        self._data_net.compute_pattern()
-        self._cond_net.compute_pattern()
-        self._main_net.compute_pattern()
-
-    def explain_pattern(self, x, y):
-        x.attach_grad()
-        with autograd.record():
-            z = self.forward_pattern(x, y)
-        self.overload_weight_pattern()
-        z[1].backward(out_grad=z[0])
-        return x.grad
-
-    def explain_attribution_pattern(self, x, y):
-        x.attach_grad()
-        with autograd.record():
-            z = self.forward_pattern(x, y)
-        self.overload_weight_attribution_pattern()
-        z[1].backward(out_grad=z[0])
-        return x.grad
-
-    def backward_pattern(self, y_sig):
-        y_sig_dc = self._main_net.backward_pattern(y_sig)
-
-        dim_d = self._data_net._out.shape[self._concat_dim]
-
-        y_sid_d = y_sig_dc.slice_axis(axis=self._concat_dim, begin=0, end=dim_d)
-        y_sid_c = y_sig_dc.slice_axis(axis=self._concat_dim, begin=dim_d, end=None)
-
-        x_sig_d = self._data_net.backward_pattern(y_sid_d)
-        x_sig_c = self._cond_net.backward_pattern(y_sid_c)
-
-        return x_sig_d, x_sig_c
-
-class ReLUPatternNet(ActPatternNet, ReLUBase):
-    def backward_pattern(self, y_sig):
-        return self.forward(y_sig)
-
-class LeakyReLUPatternNet(ActPatternNet, LeakyReLUBase):
-    def backward_pattern(self, y_sig):
-        return self.forward(y_sig)
-
-class IdentityPatternNet(ActPatternNet, IdentityBase):
-    def backward_pattern(self, y_sig):
-        return y_sig
 

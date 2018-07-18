@@ -1,8 +1,8 @@
 from mxnet import nd
 from mxnet.gluon import nn
 from .layer import Sequential, YSequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, Activation, ReLU
-from .pattern.regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime
-from .pattern.estimator import estimators
+from .explain.pattern.regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime
+from .explain.pattern.estimator import estimators
 
 nets = {}
 def register_net(obj):

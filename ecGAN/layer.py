@@ -4,83 +4,53 @@ from mxnet.gluon import nn
 import numpy as np
 
 from .func import im2col_indices
-from .base import Block, Intermediate, YSequentialBase, SequentialBase, ReLUBase, TanhBase, ClipBase,\
-                  BatchNormMergable
-from .pattern.base import PatternNet, ActPatternNet
-from .pattern.layer import SequentialPatternNet, YSequentialPatternNet, DensePatternNet, Conv2DPatternNet,\
-                           Conv2DTransposePatternNet, ReLUPatternNet, IdentityPatternNet, ParallelPatternNet,\
-                           LeakyReLUPatternNet
-from .explain.base import Interpretable, ActInterpretable
-from .explain.layer import SequentialInterpretable, YSequentialInterpretable, DenseInterpretable,\
-                           Conv2DTransposeInterpretable, Conv2DInterpretable, BatchNormInterpretable,\
-                           ParallelInterpretable, ConcatInterpretable
+from . import base
+from .explain.pattern.base import PatternNet, ActPatternNet
+from .explain.pattern import layer as pattern
+from .explain.layerwise.base import LayerwiseExplainable, ActLayerwiseExplainable
+from .explain.layerwise import layer as layerwise
+from .explain.gradient.base import GradBasedExplainable
 
 
-class Dense(DenseInterpretable, DensePatternNet, BatchNormMergable):
+# Linear Layers
+class Dense(pattern.Dense, layerwise.Dense, BatchNormMergable):
     pass
 
-class Conv2D(Conv2DInterpretable, Conv2DPatternNet, BatchNormMergable):
+class Conv2D(pattern.Conv2D, layerwise.Conv2D, BatchNormMergable):
     pass
 
-class Conv2DTranspose(Conv2DTransposePatternNet, Conv2DTransposeInterpretable, BatchNormMergable):
+class Conv2DTranspose(pattern.Conv2DTranspose, layerwise.Conv2DTranspose, BatchNormMergable):
     pass
 
-class BatchNorm(ActPatternNet, BatchNormInterpretable):
+
+# Activation (-esque) Layers
+class Identity(pattern.Identity, layerwise.Identity):
     pass
 
-class Identity(IdentityPatternNet, ActInterpretable):
+class ReLU(pattern.ReLU, layerwise.ReLU):
     pass
 
-class Activation(Interpretable, nn.Activation):
+class LeakyReLU(pattern.LeakyReLU, layerwise.LeakyReLU):
     pass
 
-class MaxOut(Block):
+class Tanh(pattern.Tanh, layerwise.Tanh):
     pass
 
-class ReLU(ReLUPatternNet, ActInterpretable):
+class Clip(pattern.Clip, layerwise.Clip):
     pass
 
-class LeakyReLU(LeakyReLUPatternNet, ActInterpretable):
+class BatchNorm(pattern.BatchNorm, layerwise.BatchNorm):
     pass
 
-class Tanh(ActPatternNet, TanhBase):
+
+# Flow Layers
+class Concat(pattern.Concat, layerwise.Concat):
     pass
 
-class BatchNorm(nn.BatchNorm, ActPatternNet, ActInterpretable):
+class Parallel(pattern.Parallel, layerwise.Parallel):
     pass
 
-class Clip(ClipBase, ActPatternNet, ActInterpretable):
-    pass
-
-class MaxPool2D(ActPatternNet, nn.MaxPool2D):
-    pass
-
-class Concat(ConcatInterpretable, ActPatternNet):
-    pass
-
-class Parallel(ParallelInterpretable, ParallelPatternNet):
-    pass
-
-class SequentialIntermediate(Intermediate, SequentialBase):
-    def forward(self, x, depth=-1):
-        rdep = depth if depth > 0 else (len(self._children.values()) + depth)
-        for i, block in enumerate(self._children.values()):
-            x = block(x)
-            if i == rdep:
-                break
-        return x
-
-    # def forward_logged(self, x, depth=-1):
-    #     self._in = [x]
-    #     rdep = depth if depth > 0 else (len(self._children.values()) + depth)
-    #     for i, block in enumerate(self._children.values()):
-    #         x = block.forward_logged(x)
-    #         if i == depth:
-    #             break
-    #     self._out = x
-    #     return self._out
-
-class Sequential(SequentialInterpretable, SequentialPatternNet, SequentialIntermediate, BatchNormMergable):
+class Sequential(pattern.Sequential, layerwise.Sequential, GradBasedExplainable, Intermediate, BatchNormMergable):
     '''
         Merge batchnorm for Sequential
 
@@ -99,13 +69,21 @@ class Sequential(SequentialInterpretable, SequentialPatternNet, SequentialInterm
                 del self._children[cnkey]
         return retval
 
-class YSequentialIntermediate(Intermediate, YSequentialBase):
-    def forward(self, x, y, depth=-1):
-        data = self._data_net(x)
-        cond = self._cond_net(y)
-        combo = nd.concat(data, cond, dim=self._concat_dim)
-        return self._main_net.forward(combo, depth=depth)
+    def forward(self, x, depth=-1):
+        rdep = depth if depth > 0 else (len(self._children.values()) + depth)
+        for i, block in enumerate(self._children.values()):
+            x = block(x)
+            if i == rdep:
+                break
+        return x
 
-class YSequential(YSequentialInterpretable, YSequentialPatternNet, YSequentialIntermediate):
-    _Subnet = Sequential
+    # def forward_logged(self, x, depth=-1):
+    #     self._in = [x]
+    #     rdep = depth if depth > 0 else (len(self._children.values()) + depth)
+    #     for i, block in enumerate(self._children.values()):
+    #         x = block.forward_logged(x)
+    #         if i == depth:
+    #             break
+    #     self._out = x
+    #     return self._out
 
