@@ -1,9 +1,9 @@
 from mxnet import nd, autograd
 
-from ...func import Mlist
 from ...base import Block
+from ...func import Mlist, linspace
 
-class GradBasedExplainable(Block)
+class GradBasedExplainable(Block):
     def relevance_sensitivity(self, data, out=None, **kwargs):
         data = Mlist(data)
         data.attach_grad()

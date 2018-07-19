@@ -4,7 +4,6 @@ from mxnet.gluon import nn
 import numpy as np
 from logging import getLogger
 
-from ...base import Block
 from ...func import Mlist
 from ..base import Explainable
 

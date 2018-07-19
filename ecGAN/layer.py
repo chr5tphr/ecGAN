@@ -13,13 +13,13 @@ from .explain.gradient.base import GradBasedExplainable
 
 
 # Linear Layers
-class Dense(pattern.Dense, layerwise.Dense, BatchNormMergable):
+class Dense(pattern.Dense, layerwise.Dense, base.BatchNormMergable):
     pass
 
-class Conv2D(pattern.Conv2D, layerwise.Conv2D, BatchNormMergable):
+class Conv2D(pattern.Conv2D, layerwise.Conv2D, base.BatchNormMergable):
     pass
 
-class Conv2DTranspose(pattern.Conv2DTranspose, layerwise.Conv2DTranspose, BatchNormMergable):
+class Conv2DTranspose(pattern.Conv2DTranspose, layerwise.Conv2DTranspose, base.BatchNormMergable):
     pass
 
 
@@ -50,7 +50,7 @@ class Concat(pattern.Concat, layerwise.Concat):
 class Parallel(pattern.Parallel, layerwise.Parallel):
     pass
 
-class Sequential(pattern.Sequential, layerwise.Sequential, GradBasedExplainable, Intermediate, BatchNormMergable):
+class Sequential(pattern.Sequential, layerwise.Sequential, GradBasedExplainable, base.Intermediate, base.BatchNormMergable):
     '''
         Merge batchnorm for Sequential
 
@@ -65,7 +65,7 @@ class Sequential(pattern.Sequential, layerwise.Sequential, GradBasedExplainable,
             # if parent is Sequential and wants to merge BatchNorm with our last layer
             retval = hasattr(children[-1], 'merge_batchnorm') and children[-1].merge_batchnorm(bnorm, ctx=ctx)
         for cnkey, child, cnext in zip(ckeys[1:], children[:-1], children[1:]):
-            if isinstance(cnext, nn.BatchNorm) and isinstance(child, BatchNormMergable) and child.merge_batchnorm(cnext, ctx=ctx):
+            if isinstance(cnext, base.BatchNorm) and isinstance(child, base.BatchNormMergable) and child.merge_batchnorm(cnext, ctx=ctx):
                 del self._children[cnkey]
         return retval
 

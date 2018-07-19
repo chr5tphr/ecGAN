@@ -3,9 +3,9 @@ from mxnet import nd, gluon, autograd
 from mxnet.gluon import nn
 import numpy as np
 
-from .base import PatternNet, LinearPatternNet, ActPatternNet
 from ... import base
 from ...func import im2col_indices, Mlist
+from .base import PatternNet, LinearPatternNet, ActPatternNet
 
 # Linear Layers
 class Dense(LinearPatternNet, base.Dense):
@@ -23,10 +23,6 @@ class Dense(LinearPatternNet, base.Dense):
         x = self._in[0].flatten()
         y = self._out.flatten()
         yield x, y
-
-    def _forward_pattern(self, x, w, bias=None):
-        return nd.FullyConnected(x, w, bias, no_bias=(bias is None),
-                                 num_hidden=self._units, flatten=self._flatten)
 
     def _backward_pattern(self, y, pattern, pias=None):
         return nd.FullyConnected(y, pattern.T, pias, no_bias=(pias is None),

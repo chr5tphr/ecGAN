@@ -5,7 +5,7 @@ import numpy as np
 
 from ... import base
 from ...func import linspace, Mlist
-from .base import LayerwiseExplainable, ActLayerwiseExplainable
+from .base import LayerwiseExplainable, LinearLayerwiseExplainable, ActLayerwiseExplainable
 from logging import getLogger
 
 # Linear Layers
@@ -20,7 +20,7 @@ class Conv2DTranspose(LinearLayerwiseExplainable, base.Conv2DTranspose):
 
 
 # Activation (-esque) Layers
-class Identity(ActLayerwiseExplainable, bae.Identity):
+class Identity(ActLayerwiseExplainable, base.Identity):
     pass
 
 class ReLU(ActLayerwiseExplainable, base.ReLU):
