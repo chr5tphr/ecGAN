@@ -5,10 +5,11 @@ from mxnet import gluon, autograd, nd
 from imageio import imwrite
 from logging import getLogger
 
+from .base import BatchNormMergable
 from .func import fuzzy_one_hot, linspace, randint
 from .explain.base import Explainable
 from .explain.pattern.base import PatternNet
-from .layer import Intermediate, Sequential
+from .layer import Sequential
 from .util import Config, config_ctx
 from .net import nets
 from .data import ArrayDataset
@@ -43,6 +44,8 @@ class Model(object):
             else:
                 self.nets[key].initialize(mx.init.Xavier(rnd_type='gaussian', magnitude=2.24), ctx=self.ctx)
                 getLogger('ecGAN').debug('Initializing %s \'%s\'.', key, desc.type)
+            if desc.get('merge_batchnorm', False) and isinstance(self.nets[key], BatchNormMergable):
+                self.nets[key].merge_batchnorm()
 
     def checkpoint(self, epoch):
         for key, tnet in self.nets.items():
@@ -585,9 +588,6 @@ class CGAN(GAN):
         netG = self.netG
         netD = self.netD
         ctx = self.ctx
-
-        if not isinstance(netD, Intermediate):
-            raise TypeError('Discriminator is not an Intermediate!')
 
         K = len(data.classes)
 

@@ -27,34 +27,32 @@ class Intermediate(Block):
         return self.forward(self, *args)
 
 class BatchNormMergable(Block):
-    # def merge_batchnorm(self, bnorm, ctx=None):
-    #     if not isinstance(bnorm, nn.BatchNorm):
-    #         raise RuntimeError('Cannot merge_batchnorm with type %s.'%type(bnorm))
-    #     mmod = (bnorm.gamma.data(ctx=ctx) / (bnorm.running_var.data(ctx=ctx) + bnorm._kwargs['eps'])**.5)
-    #     wshape = [d if i == bnorm._kwargs['axis'] else 1 for i,d in enumerate(self.weight.shape)]
-    #     print(self.weight.shape, bnorm.gamma.shape, wshape, bnorm._kwargs)
-    #     # TODO shaping is wrong???
-    #     wmod = self.weight.data(ctx=ctx) * mmod.reshape(wshape)
-    #     self.weight.set_data(wmod)
-    #     if self.bias is not None:
-    #         bshape = [d if i == bnorm._kwargs['axis'] else 1 for i,d in enumerate(self.bias.shape)]
-    #         bmod = (self.bias.data(ctx=ctx) - bnorm.running_mean.data(ctx=ctx).reshape(bshape)) * mmod.reshape(bshape) + bnorm.beta.data(ctx=ctx).reshape(bshape)
-    #         self.bias.set_data(bmod)
-    #     return True
-    _outaxis = 1
+    _weight_axis = 0
+    _bias_axis = 0
 
     def merge_batchnorm(self, bnorm, ctx=None):
         if not isinstance(bnorm, nn.BatchNorm):
             raise RuntimeError('Cannot merge_batchnorm with type %s.'%type(bnorm))
+
         kwargs = bnorm._kwargs.copy()
-        kwargs['axis'] = self._outaxis
-        wmod = nd.BatchNorm(data=self.weight.data(ctx=ctx), gamma=bnorm.gamma.data(ctx=ctx),
-                            moving_var=bnorm.moving_var.data(ctx=ctx), **kwargs)
+        del kwargs['axis']
+
+        gamma = bnorm.gamma.data(ctx=ctx)
+        beta = bnorm.beta.data(ctx=ctx)
+        moving_mean = bnorm.running_mean.data(ctx=ctx)
+        moving_var = bnorm.running_var.data(ctx=ctx)
+
+        wmod = nd.BatchNorm(data=self.weight.data(ctx=ctx), gamma=gamma, beta=beta.zeros_like(),
+                            moving_mean=moving_mean.zeros_like(), moving_var=moving_var, axis=self._weight_axis, **kwargs)
         self.weight.set_data(wmod)
+
         if self.bias is not None:
-            bmod = nd.BatchNorm(data=self.bias.data(ctx=ctx), gamma=bnorm.gamma.data(ctx=ctx), beta=bnorm.beta.data(ctx=ctx),
-                                moving_mean=bnorm.moving_mean.data(ctx=ctx), moving_var=bnorm.moving_var.data(ctx=ctx), **kwargs)
-            self.bias.set_data(wmod)
+            bmod = nd.BatchNorm(data=self.bias.data(ctx=ctx), gamma=gamma, beta=beta,
+                                moving_mean=moving_mean, moving_var=moving_var, axis=self._bias_axis, **kwargs)
+            self.bias.set_data(bmod)
+        else:
+            raise NotImplementedError('Adding bias to previously bias-less linear layers during BatchNorm-merging is not yet supported.')
+
         return True
 
 # Linear Layers

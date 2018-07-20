@@ -20,6 +20,7 @@ class Conv2D(pattern.Conv2D, layerwise.Conv2D, base.BatchNormMergable):
     pass
 
 class Conv2DTranspose(pattern.Conv2DTranspose, layerwise.Conv2DTranspose, base.BatchNormMergable):
+    _weight_axis = 1
     pass
 
 

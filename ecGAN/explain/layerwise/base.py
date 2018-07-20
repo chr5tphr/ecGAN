@@ -10,6 +10,7 @@ from ..base import Explainable
 class LayerwiseExplainable(Explainable):
     def __init__(self, *args, **kwargs):
         self._explain = kwargs.pop('explain', False)
+        self._ekwargs = kwargs.pop('ekwargs', {})
         super().__init__(*args, **kwargs)
 
     def relevance_layerwise(self, *args, **kwargs):
@@ -19,7 +20,9 @@ class LinearLayerwiseExplainable(LayerwiseExplainable):
     def relevance_layerwise(self, *args, **kwargs):
         method = self._explain
         func = getattr(self, 'layerwise_relevance_'+method)
-        R = func(*args, **kwargs)
+        ekwargs = self._ekwargs.copy()
+        ekwargs.update(kwargs)
+        R = func(*args, **ekwargs)
         return R
 
     def layerwise_relevance_zb(self, out, lo=-1, hi=1, **kwargs):

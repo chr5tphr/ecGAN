@@ -1,52 +1,52 @@
 from ecGAN.net import register_net
-from ecGAN.layer import Sequential, YSequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, Activation, ReLU, Concat, BatchNorm, Clip, Tanh
+from ecGAN.layer import Sequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, ReLU, Concat, BatchNorm, Clip, Tanh
 from ecGAN.explain.pattern.regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime
 from ecGAN.explain.pattern.estimator import estimators
 
 @register_net
 class MYTCN28(Sequential):
     def __init__(self, **kwargs):
-        self._outnum = kwargs.pop('outnum', 1)
-        self._outact = kwargs.pop('outact', None)
-        self._numhid = kwargs.pop('numhid', 64)
-        self._patest = kwargs.pop('patest', 'linear')
-        self._outest = kwargs.pop('outest', self._patest)
-        self._clip = kwargs.pop('clip', [-1., 1.])
-        self._use_bias = kwargs.pop('use_bias', False)
-        self._explain = dict(relu='zplus', clip='zclip', pixel='zb', gauss='wsquare')
-        self._explain.update(kwargs.pop('explain', {}))
+        outnum = kwargs.pop('outnum', 1)
+        outact = kwargs.pop('outact', None)
+        numhid = kwargs.pop('numhid', 64)
+        patest = kwargs.pop('patest', 'linear')
+        outest = kwargs.pop('outest', patest)
+        clip = kwargs.pop('clip', [-1., 1.])
+        use_bias = kwargs.pop('use_bias', False)
+        explain = dict(relu='zplus', clip='zclip', pixel='zb', gauss='wsquare')
+        explain.update(kwargs.pop('explain', {}))
         super().__init__(**kwargs)
         with self.name_scope():
 
             self.add(Concat())
 
-            self.add(Conv2DTranspose(self._numhid * 8, 4, strides=1, padding=0, use_bias=self._use_bias,
-                                     explain=self._explain['gauss'], regimes=estimators[self._patest]()))
+            self.add(Conv2DTranspose(numhid * 8, 4, strides=1, padding=0, use_bias=use_bias,
+                                     explain=explain['gauss'], regimes=estimators[patest]()))
             self.add(BatchNorm())
             self.add(ReLU())
             # _numhid x 4 x 4
 
-            self.add(Conv2DTranspose(self._numhid * 4, 4, strides=1, padding=0, use_bias=self._use_bias,
-                                     explain=self._explain['relu'], regimes=estimators[self._patest]()))
+            self.add(Conv2DTranspose(numhid * 4, 4, strides=1, padding=0, use_bias=use_bias,
+                                     explain=explain['relu'], regimes=estimators[patest]()))
             self.add(BatchNorm())
             self.add(ReLU())
             # _numhid x 7 x 7
 
-            self.add(Conv2DTranspose(self._numhid * 2, 4, strides=2, padding=1, use_bias=self._use_bias,
-                                     explain=self._explain['relu'], regimes=estimators[self._patest]()))
+            self.add(Conv2DTranspose(numhid * 2, 4, strides=2, padding=1, use_bias=use_bias,
+                                     explain=explain['relu'], regimes=estimators[patest]()))
             self.add(BatchNorm())
             self.add(ReLU())
             # _numhid x 14 x 14
 
-            self.add(Conv2DTranspose(self._outnum, 4, strides=2, padding=1, use_bias=self._use_bias,
-                                     explain=self._explain['clip'], regimes=estimators[self._outest]()))
-            if self._outact == 'relu':
+            self.add(Conv2DTranspose(outnum, 4, strides=2, padding=1, use_bias=use_bias,
+                                     explain=explain['clip'], regimes=estimators[outest]()))
+            if outact == 'relu':
                 self.add(ReLU())
-            elif self._outact == 'clip':
-                self.add(Clip(low=self._clip[0], high=self._clip[1]))
-            elif self._outact == 'tanh':
+            elif outact == 'clip':
+                self.add(Clip(low=clip[0], high=clip[1]))
+            elif outact == 'tanh':
                 self.add(Tanh())
-            elif self._outact == 'batchnorm':
+            elif outact == 'batchnorm':
                 self.add(BatchNorm(scale=False, center=False))
                 self.add(Identity())
             else:
@@ -56,45 +56,44 @@ class MYTCN28(Sequential):
 @register_net
 class MSCN28(Sequential):
     def __init__(self, **kwargs):
-        self._outnum = kwargs.pop('outnum', 1)
-        self._outact = kwargs.pop('outact', None)
-        self._numhid = kwargs.pop('numhid', 64)
-        self._patest = kwargs.pop('patest', 'linear')
-        self._outest = kwargs.pop('outest', self._patest)
-        self._isinput= kwargs.pop('isinput', False)
-        self._leakage = kwargs.pop('leakage', 0.1)
-        self._use_bias = kwargs.pop('use_bias', False)
-        self._explain = dict(relu='zplus', clip='zclip', pixel='zb', gauss='wsquare')
-        self._explain.update(kwargs.pop('explain', {}))
+        outnum = kwargs.pop('outnum', 1)
+        outact = kwargs.pop('outact', None)
+        numhid = kwargs.pop('numhid', 64)
+        patest = kwargs.pop('patest', 'linear')
+        outest = kwargs.pop('outest', patest)
+        leakage = kwargs.pop('leakage', 0.1)
+        use_bias = kwargs.pop('use_bias', False)
+        explain = dict(relu='zplus', clip='zclip', pixel='zb', gauss='wsquare')
+        explain.update(kwargs.pop('explain', {}))
         super().__init__(**kwargs)
         with self.name_scope():
             # _numhid x 28 x 28
-            self.add(Conv2D(self._numhid, 4, strides=2, padding=1, use_bias=self._use_bias,
-                            explain=self._explain['pixel'], regimes=estimators[self._patest]()))
-            self.add(LeakyReLU(self._leakage))
+            self.add(Conv2D(numhid, 4, strides=2, padding=1, use_bias=use_bias,
+                            explain=explain['pixel'], regimes=estimators[patest]()))
+            self.add(LeakyReLU(leakage))
             # _numhid x 14 x 14
 
-            self.add(Conv2D(self._numhid * 2, 4, strides=2, padding=1, use_bias=self._use_bias,
-                            explain=self._explain['relu'], regimes=estimators[self._patest]()))
+            self.add(Conv2D(numhid * 2, 4, strides=2, padding=1, use_bias=use_bias,
+                            explain=explain['relu'], regimes=estimators[patest]()))
             self.add(BatchNorm())
-            self.add(LeakyReLU(self._leakage))
+            self.add(LeakyReLU(leakage))
             # _numhid x 7 x 7
 
-            self.add(Conv2D(self._numhid * 4, 4, strides=1, padding=0, use_bias=self._use_bias,
-                            explain=self._explain['relu'], regimes=estimators[self._patest]()))
+            self.add(Conv2D(numhid * 4, 4, strides=1, padding=0, use_bias=use_bias,
+                            explain=explain['relu'], regimes=estimators[patest]()))
             self.add(BatchNorm())
-            self.add(LeakyReLU(self._leakage))
+            self.add(LeakyReLU(leakage))
             # _numhid x 4 x 4
 
-            self.add(Conv2D(self._numhid * 8, 4, strides=1, padding=0, use_bias=self._use_bias,
-                            explain=self._explain['relu'], regimes=estimators[self._patest]()))
+            self.add(Conv2D(numhid * 8, 4, strides=1, padding=0, use_bias=use_bias,
+                            explain=explain['relu'], regimes=estimators[patest]()))
             self.add(BatchNorm())
-            self.add(LeakyReLU(self._leakage))
+            self.add(LeakyReLU(leakage))
             # filters x 1 x 1
 
-            self.add(Dense(self._outnum,
-                           explain=self._explain['relu'], regimes=estimators[self._outest]()))
-            if self._outact == 'relu':
+            self.add(Dense(outnum,
+                           explain=explain['relu'], regimes=estimators[outest]()))
+            if outact == 'relu':
                 self.add(ReLU())
             else:
                 self.add(Identity())
@@ -102,92 +101,92 @@ class MSCN28(Sequential):
 @register_net
 class MYTCN32(Sequential):
     def __init__(self, **kwargs):
-        self._outnum = kwargs.pop('outnum', 1)
-        self._outact = kwargs.pop('outact', None)
-        self._numhid = kwargs.pop('numhid', 64)
-        self._patest = kwargs.pop('patest', 'linear')
-        self._outest = kwargs.pop('outest', self._patest)
+        outnum = kwargs.pop('outnum', 1)
+        outact = kwargs.pop('outact', None)
+        numhid = kwargs.pop('numhid', 64)
+        patest = kwargs.pop('patest', 'linear')
+        outest = kwargs.pop('outest', patest)
         super().__init__(**kwargs)
         with self.name_scope():
 
             self.add(Concat())
 
-            self.add(Conv2DTranspose(self._numhid * 16, 3, strides=1, padding=0, use_bias=False, isinput=True, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
+            self.add(Conv2DTranspose(numhid * 16, 3, strides=1, padding=0, use_bias=False, isinput=True, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
             # _numhid x 3 x 3
 
-            self.add(Conv2DTranspose(self._numhid * 8, 3, strides=1, padding=0, use_bias=False, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
+            self.add(Conv2DTranspose(numhid * 8, 3, strides=1, padding=0, use_bias=False, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
             # _numhid x 5 x 5
 
-            self.add(Conv2DTranspose(self._numhid * 4, 4, strides=1, padding=0, use_bias=False, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
+            self.add(Conv2DTranspose(numhid * 4, 4, strides=1, padding=0, use_bias=False, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
             # _numhid x 8 x 8
 
-            self.add(Conv2DTranspose(self._numhid * 2, 4, strides=2, padding=1, use_bias=False, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
+            self.add(Conv2DTranspose(numhid * 2, 4, strides=2, padding=1, use_bias=False, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
             # _numhid x 16 x 16
 
-            self.add(Conv2DTranspose(self._outnum, 4, strides=2, padding=1, use_bias=False, regimes=estimators[self._outest]()))
-            if self._outact == 'relu':
-                self.add(ReLU(regimes=estimators[self._outest]()))
+            self.add(Conv2DTranspose(outnum, 4, strides=2, padding=1, use_bias=False, regimes=estimators[outest]()))
+            if outact == 'relu':
+                self.add(ReLU(regimes=estimators[outest]()))
             else:
-                self.add(Identity(regimes=estimators[self._outest]()))
+                self.add(Identity(regimes=estimators[outest]()))
             # _numhid x 32 x 32
 
 @register_net
 class MSCN32(Sequential):
     def __init__(self, **kwargs):
-        self._outnum = kwargs.pop('outnum', 1)
-        self._outact = kwargs.pop('outact', None)
-        self._numhid = kwargs.pop('numhid', 64)
-        self._patest = kwargs.pop('patest', 'linear')
-        self._outest = kwargs.pop('outest', self._patest)
+        outnum = kwargs.pop('outnum', 1)
+        outact = kwargs.pop('outact', None)
+        numhid = kwargs.pop('numhid', 64)
+        patest = kwargs.pop('patest', 'linear')
+        outest = kwargs.pop('outest', patest)
         super().__init__(**kwargs)
         with self.name_scope():
             # _numhid x 32 x 32
-            self.add(Conv2D(self._numhid, 4, strides=2, padding=1, use_bias=False, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
+            self.add(Conv2D(numhid, 4, strides=2, padding=1, use_bias=False, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
             # _numhid x 16 x 16
 
-            self.add(Conv2D(self._numhid * 2, 4, strides=2, padding=1, use_bias=False, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
+            self.add(Conv2D(numhid * 2, 4, strides=2, padding=1, use_bias=False, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
             # _numhid x 8 x 8
 
-            self.add(Conv2D(self._numhid * 4, 4, strides=1, padding=0, use_bias=False, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
+            self.add(Conv2D(numhid * 4, 4, strides=1, padding=0, use_bias=False, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
             # _numhid x 5 x 5
 
-            self.add(Conv2D(self._numhid * 8, 3, strides=1, padding=0, use_bias=False, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
+            self.add(Conv2D(numhid * 8, 3, strides=1, padding=0, use_bias=False, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
             # _numhid x 3 x 3
 
-            self.add(Conv2D(self._numhid * 16, 3, strides=1, padding=0, use_bias=False, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
+            self.add(Conv2D(numhid * 16, 3, strides=1, padding=0, use_bias=False, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
             # filters x 1 x 1
 
-            self.add(Dense(self._outnum, regimes=estimators[self._outest]()))
-            if self._outact == 'relu':
-                self.add(ReLU(regimes=estimators[self._outest]()))
+            self.add(Dense(outnum, regimes=estimators[outest]()))
+            if outact == 'relu':
+                self.add(ReLU(regimes=estimators[outest]()))
             else:
-                self.add(Identity(regimes=estimators[self._outest]()))
+                self.add(Identity(regimes=estimators[outest]()))
 
 @register_net
 class MSFC(Sequential):
     def __init__(self, **kwargs):
-        self._outnum = kwargs.pop('outnum', 1)
-        self._numhid = kwargs.pop('numhid', 64)
-        self._outact = kwargs.pop('outact', None)
-        self._patest = kwargs.pop('patest', 'linear')
-        self._outest = kwargs.pop('outest', self._patest)
+        outnum = kwargs.pop('outnum', 1)
+        numhid = kwargs.pop('numhid', 64)
+        outact = kwargs.pop('outact', None)
+        patest = kwargs.pop('patest', 'linear')
+        outest = kwargs.pop('outest', patest)
         super().__init__(**kwargs)
         with self.name_scope():
-            self.add(Dense(self._numhid, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
-            self.add(Dense(self._numhid, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
-            self.add(Dense(self._numhid, regimes=estimators[self._patest]()))
-            self.add(ReLU(regimes=estimators[self._patest]()))
-            self.add(Dense(self._outnum, regimes=estimators[self._outest]()))
-            self.add(Identity(regimes=estimators[self._outest]()))
+            self.add(Dense(numhid, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
+            self.add(Dense(numhid, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
+            self.add(Dense(numhid, regimes=estimators[patest]()))
+            self.add(ReLU(regimes=estimators[patest]()))
+            self.add(Dense(outnum, regimes=estimators[outest]()))
+            self.add(Identity(regimes=estimators[outest]()))
 

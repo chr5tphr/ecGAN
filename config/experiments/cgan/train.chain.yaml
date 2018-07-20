@@ -12,6 +12,15 @@ tail:
             data: {kwargs: {train: False}}
         priority: 1
         action: 'test_gan'
+    - #Model Testing (BatchNormMerge successful?)
+        dict:
+            data: {kwargs: {train: False}}
+            nets:
+                generator:     {merge_batchnorm: True}
+                discriminator: {merge_batchnorm: True}
+                classifier:    {merge_batchnorm: True}
+        priority: 1
+        action: 'test_gan'
     - # Fit PatternNet
         &fitting
         dict:
@@ -99,6 +108,15 @@ tail:
                     data: {kwargs: {train: False}}
                 priority: 1
                 action: 'test'
+            - # Model Testing (BatchNorm Check)
+                dict:
+                    data: {kwargs: {train: False}}
+                    nets:
+                        generator:     {top: 'classifier', merge_batchnorm: True}
+                        discriminator: {active: False, merge_batchnorm: True}
+                        classifier:    {active: True, merge_batchnorm: True}
+                priority: 1
+                action: 'test'
             - # Fit PatternNet
                 *fitting
 #            - # Assess PatternNet Quality
@@ -110,5 +128,14 @@ tail:
                 generator:     {top: 'classifier'}
                 discriminator: {active: False}
                 classifier:    {active: True}
+        priority: 1
+        action: 'test_gan'
+    - #Model Testing (BatchNormMerged)
+        dict:
+            data: {kwargs: {train: False}}
+            nets:
+                generator:     {top: 'classifier', merge_batchnorm: True}
+                discriminator: {active: False, merge_batchnorm: True}
+                classifier:    {active: True, merge_batchnorm: True}
         priority: 1
         action: 'test_gan'

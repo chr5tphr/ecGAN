@@ -7,6 +7,30 @@ from ...base import Block
 from ...func import stats_batchwise
 
 class PatternNet(Block):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._pparams = ParameterDict(getattr(self, '_prefix', ''))
+        self._err = None
+
+    @property
+    def pparams(self):
+        return self._pparams
+
+    def collect_pparams(self, select=None):
+        self._check_container_with_block()
+        ret = ParameterDict(self.pparams.prefix)
+        if not select:
+            ret.update(self.pparams)
+        else:
+            pattern = re.compile(select)
+            ret.update({name:value for name, value in self.pparams.items() if pattern.match(name)})
+        for cld in self._children.values():
+            try:
+                ret.update(cld.collect_pparams(select=select))
+            except AttributeError:
+                pass
+        return ret
+
     def init_pattern(self, *args):
         raise NotImplementedError
 
@@ -49,31 +73,9 @@ class LinearPatternNet(PatternNet):
         self._regimes = kwargs.pop('regimes', [PatternRegime('linear', lambda y: nd.ones_like(y))])
         #self._regimes = kwargs.pop('regimes', [PatternRegime('pos', lambda y: y>0)])
         super().__init__(*args, **kwargs)
-        self._pparams = ParameterDict(getattr(self, '_prefix', ''))
         self.num_samples = None
         self.mean_y = None
-        self._err = None
         self.w_qual = None
-
-    @property
-    def pparams(self):
-        return self._pparams
-
-    def collect_pparams(self, select=None):
-        self._check_container_with_block()
-        ret = ParameterDict(self.pparams.prefix)
-        if not select:
-            ret.update(self.pparams)
-        else:
-            pattern = re.compile(select)
-            ret.update({name:value for name, value in self.pparams.items() if pattern.match(name)})
-        for cld in self._children.values():
-            try:
-                ret.update(cld.collect_pparams(select=select))
-            except AttributeError:
-                pass
-        return ret
-
 
     def init_pattern(self):
         outsize, insize = self._shape_pattern()

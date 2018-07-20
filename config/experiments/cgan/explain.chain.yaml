@@ -1,28 +1,35 @@
 fname: '/home/chrstphr/projects/ecGAN/result/cgan/CGAN.yaml'
 tail:
-    - # Layerwise
+    - # Layerwise and GradBased
         &layerwise
         dict:
             data: {kwargs: {train: False}}
+            nets:
+                classifier:    {merge_batchnorm: True}
+                discriminator: {merge_batchnorm: True}
+                generator:     {merge_batchnorm: True}
         tail:
             -
                 dict:
+                    classifier:    {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
+                    discriminator: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
+                    generator:     {kwargs: {                              explain: {relu: 'alphabeta'}}}
                     explanation:
                         kwargs:
-                            method: 'lrp'
-                            alpha: 1.0
-                            beta:  0.0
+                            method: 'layerwise'
+                            alpha: 2.0
+                            beta:  1.0
                 priority: 1
                 action: 'explain_cgan'
             -
                 dict:
                     nets:
-                        classifier:    {kwargs: {outact: 'relu', leakage: 0.0}}
-                        discriminator: {kwargs: {outact: 'relu', leakage: 0.0}}
-                        generator:     {kwargs: {outact: 'relu'}}
+                        classifier:    {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'zplus'}}}
+                        discriminator: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'zplus'}}}
+                        generator:     {kwargs: {                              explain: {relu: 'zplus'}}}
                     explanation:
                         kwargs:
-                            method: 'dtd'
+                            method: 'layerwise'
                             lo: -1.0
                             hi: 1.0
                 priority: 0

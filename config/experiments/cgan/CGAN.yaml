@@ -110,5 +110,5 @@ pattern:
 
 explanation:
     kwargs:
-        method: 'dtd'
+        method: 'layerwise'
     output: '${root_dir}/${exp_dir}/${data.func}/rel/${explanation.kwargs.method}/${model}.${net}.${net_epoch}.${data_desc}.${iter}.${ftype}'
