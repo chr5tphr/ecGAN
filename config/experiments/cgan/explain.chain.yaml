@@ -15,6 +15,7 @@ tail:
                     discriminator: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
                     generator:     {kwargs: {                              explain: {relu: 'alphabeta'}}}
                     explanation:
+                        desc: 'lrp'
                         kwargs:
                             method: 'layerwise'
                             alpha: 2.0
@@ -28,6 +29,7 @@ tail:
                         discriminator: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'zplus'}}}
                         generator:     {kwargs: {                              explain: {relu: 'zplus'}}}
                     explanation:
+                        desc: 'dtd'
                         kwargs:
                             method: 'layerwise'
                             lo: -1.0
@@ -37,6 +39,7 @@ tail:
             -
                 dict:
                     explanation:
+                        desc: 'sensitivity'
                         kwargs:
                             method: 'sensitivity'
                 priority: 1
@@ -44,6 +47,7 @@ tail:
             -
                 dict:
                     explanation:
+                        desc: 'intgrads'
                         kwargs:
                             method: 'intgrads'
                             num: 100
@@ -114,7 +118,6 @@ tail:
                 discriminator: {active: False}
                 classifier:
                     active: True
-                    kwargs: {isinput: False}
         tail:
             - *layerwise
             - *patternnet

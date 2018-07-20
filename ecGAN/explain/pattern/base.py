@@ -147,11 +147,11 @@ class LinearPatternNet(PatternNet):
 
     def overload_weight_pattern(self):
         for regime in self._regimes:
-            regime.pattern_ref[:] = regime.pattern.data(ctx=regime.pattern_ref.context)
+            regime.pattern_ref[:] = regime.pattern.data(ctx=regime.pattern_ref.context).reshape(regime.pattern_ref.shape)
 
     def overload_weight_attribution_pattern(self):
         for regime in self._regimes:
-            regime.pattern_ref *= regime.pattern.data(ctx=regime.pattern_ref.context)
+            regime.pattern_ref *= regime.pattern.data(ctx=regime.pattern_ref.context).reshape(regime.pattern_ref.shape)
 
     def backward_pattern(self, y_sig):
         if self._out is None:
