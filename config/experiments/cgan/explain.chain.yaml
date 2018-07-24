@@ -34,7 +34,7 @@ tail:
                             method: 'layerwise'
                             lo: -1.0
                             hi: 1.0
-                priority: 0
+                priority: 1
                 action: 'explain_cgan'
             -
                 dict:
@@ -65,9 +65,9 @@ tail:
             -
                 dict: &linear_pattern
                     nets:
-                        classifier:    {kwargs: {patest: 'linear'}}
-                        generator:     {kwargs: {patest: 'linear'}}
-                        discriminator: {kwargs: {patest: 'linear'}}
+                        generator:     {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                        discriminator: {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                        classifier:    {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
                     pattern: {name: 'linear'}
                 tail: &explain_epochs
                     -
@@ -84,18 +84,18 @@ tail:
             -
                 dict: &relu_pattern
                     nets:
-                        classifier:    {kwargs: {patest: 'relu'}}
-                        generator:     {kwargs: {patest: 'relu'}}
-                        discriminator: {kwargs: {patest: 'relu'}}
+                        generator:     {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                        discriminator: {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                        classifier:    {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
                     pattern: {name: 'relu'}
                 tail: *explain_epochs
             -
                 # attribution only makes sense for relu
                 dict:
                     nets:
-                        classifier:    {kwargs: {patest: 'positive'}}
-                        generator:     {kwargs: {patest: 'positive'}}
-                        discriminator: {kwargs: {patest: 'positive'}}
+                        generator:     {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
+                        discriminator: {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
+                        classifier:    {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
                     pattern:
                         type: 'attribution'
                         name: 'relu'
@@ -109,7 +109,7 @@ tail:
                     -
                         dict:
                             pattern: {start_epoch: 10}
-                        priority: 2
+                        priority: 0
                         action: 'explain_pattern_cgan'
     - # Same for classifier
         dict:

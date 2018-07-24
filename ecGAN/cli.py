@@ -236,6 +236,9 @@ def explain(args, config):
     net_epoch = config.nets.classifier.epoch
     templ = config.explanation.output
 
+    if args.seed:
+        random.seed(args.seed)
+
     for i, (data, label) in enumerate(data_iter):
         if i >= args.iter:
             break
@@ -268,8 +271,12 @@ def explain_cgan(args, config):
     net_epoch = config.nets.get(config.nets.generator.top, 'discriminator').epoch
     templ = config.explanation.output
 
+    if args.seed:
+        random.seed(args.seed)
+
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+        s_gen, gen = model.explain_top(K, noise, cond, mkwargs=config.explanation.get('kwargs', {}))
         s_noise, s_cond = model.explain(K, noise, cond, mkwargs=config.explanation.get('kwargs', {}))
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
@@ -278,13 +285,18 @@ def explain_cgan(args, config):
 
         #save_raw_image(noise.squeeze(), config.exsub(templ, iter=i, data_desc='input.noise', ftype='png'))
         save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(),
-                                config.exsub(templ, data_desc='input.bar', ftype='pdf', **comkw))
+                                config.exsub(templ, data_desc='input.bar', ftype='png', **comkw))
 
         save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='noise', ftype='h5', **comkw))
         save_data_h5(s_cond.squeeze(), config.exsub(templ, data_desc='cond', ftype='h5', **comkw))
 
         save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(),
-                                config.exsub(templ, data_desc='bar', ftype='pdf', **comkw))
+                                config.exsub(templ, data_desc='bar', ftype='png', **comkw))
+
+
+        save_aligned_image(gen, config.exsub(templ, data_desc='input.gen', ftype='png', **comkw), config.data.bbox, what='generated input data')
+        save_colorized_image(s_gen, config.exsub(templ, data_desc='gen', ftype='png', **comkw), center=0., cmap='bwr', what='top explanation')
+        save_data_h5(s_gen, config.exsub(templ, data_desc='gen', ftype='h5', **comkw))
 
 @register_command
 def explain_gan(args, config):
@@ -460,6 +472,7 @@ def explain_pattern_cgan(args, config):
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+        s_gen, gen = model.explain_pattern_top(K, noise, cond, attribution=config.pattern.get('type') == 'attribution')
         s_noise, s_cond = model.explain_pattern(K, noise, cond, attribution=config.pattern.get('type') == 'attribution')
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
@@ -467,12 +480,16 @@ def explain_pattern_cgan(args, config):
         save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
 
         #save_raw_image(noise.squeeze(), config.exsub(templ, iter=i, data_desc='input.noise', ftype='png'))
-        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.exsub(templ, data_desc='input.bar', ftype='pdf', **comkw))
+        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.exsub(templ, data_desc='input.bar', ftype='png', **comkw))
 
         save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='noise', ftype='h5', **comkw))
         save_data_h5(s_cond.squeeze(), config.exsub(templ, data_desc='cond', ftype='h5', **comkw))
 
-        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.exsub(templ, data_desc='bar', ftype='pdf', **comkw))
+        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.exsub(templ, data_desc='bar', ftype='png', **comkw))
+
+        save_aligned_image(gen, config.exsub(templ, data_desc='input.gen', ftype='png', **comkw), config.data.bbox, what='generated input data')
+        save_colorized_image(s_gen, config.exsub(templ, data_desc='gen', ftype='png', **comkw), center=0., cmap='bwr', what='top explanation')
+        save_data_h5(s_gen, config.exsub(templ, data_desc='gen', ftype='h5', **comkw))
 
 @register_command
 def predict(args, config):

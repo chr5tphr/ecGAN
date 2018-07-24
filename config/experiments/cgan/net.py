@@ -9,10 +9,12 @@ class MYTCN28(Sequential):
         outnum = kwargs.pop('outnum', 1)
         outact = kwargs.pop('outact', None)
         numhid = kwargs.pop('numhid', 64)
-        patest = kwargs.pop('patest', 'linear')
-        outest = kwargs.pop('outest', patest)
         clip = kwargs.pop('clip', [-1., 1.])
         use_bias = kwargs.pop('use_bias', False)
+
+        # patest = dict(relu='relu', clip='clip', pixel='relu', gauss='relu')
+        patest = dict(relu='linear', clip='linear', pixel='linear', gauss='linear')
+        patest.update(kwargs.pop('patest', {}))
         explain = dict(relu='zplus', clip='zclip', pixel='zb', gauss='wsquare')
         explain.update(kwargs.pop('explain', {}))
         super().__init__(**kwargs)
@@ -21,25 +23,26 @@ class MYTCN28(Sequential):
             self.add(Concat())
 
             self.add(Conv2DTranspose(numhid * 8, 4, strides=1, padding=0, use_bias=use_bias,
-                                     explain=explain['gauss'], regimes=estimators[patest]()))
+                                     explain=explain['gauss'], regimes=estimators[patest['gauss']]()))
             self.add(BatchNorm())
             self.add(ReLU())
             # _numhid x 4 x 4
 
             self.add(Conv2DTranspose(numhid * 4, 4, strides=1, padding=0, use_bias=use_bias,
-                                     explain=explain['relu'], regimes=estimators[patest]()))
+                                     explain=explain['relu'], regimes=estimators[patest['relu']]()))
             self.add(BatchNorm())
             self.add(ReLU())
             # _numhid x 7 x 7
 
             self.add(Conv2DTranspose(numhid * 2, 4, strides=2, padding=1, use_bias=use_bias,
-                                     explain=explain['relu'], regimes=estimators[patest]()))
+                                     explain=explain['relu'], regimes=estimators[patest['relu']]()))
             self.add(BatchNorm())
             self.add(ReLU())
             # _numhid x 14 x 14
 
             self.add(Conv2DTranspose(outnum, 4, strides=2, padding=1, use_bias=use_bias,
-                                     explain=explain['clip'], regimes=estimators[outest]()))
+                                     explain=explain['clip'], regimes=estimators[patest['clip']](),
+                                     noregconst=-1.))
             if outact == 'relu':
                 self.add(ReLU())
             elif outact == 'clip':
@@ -59,40 +62,42 @@ class MSCN28(Sequential):
         outnum = kwargs.pop('outnum', 1)
         outact = kwargs.pop('outact', None)
         numhid = kwargs.pop('numhid', 64)
-        patest = kwargs.pop('patest', 'linear')
-        outest = kwargs.pop('outest', patest)
         leakage = kwargs.pop('leakage', 0.1)
         use_bias = kwargs.pop('use_bias', False)
+
+        # patest = dict(relu='relu', clip='clip', pixel='relu', gauss='relu')
+        patest = dict(relu='linear', clip='linear', pixel='linear', gauss='linear')
+        patest.update(kwargs.pop('patest', {}))
         explain = dict(relu='zplus', clip='zclip', pixel='zb', gauss='wsquare')
         explain.update(kwargs.pop('explain', {}))
         super().__init__(**kwargs)
         with self.name_scope():
             # _numhid x 28 x 28
             self.add(Conv2D(numhid, 4, strides=2, padding=1, use_bias=use_bias,
-                            explain=explain['pixel'], regimes=estimators[patest]()))
+                            explain=explain['pixel'], regimes=estimators[patest['pixel']]()))
             self.add(LeakyReLU(leakage))
             # _numhid x 14 x 14
 
             self.add(Conv2D(numhid * 2, 4, strides=2, padding=1, use_bias=use_bias,
-                            explain=explain['relu'], regimes=estimators[patest]()))
+                            explain=explain['relu'], regimes=estimators[patest['relu']]()))
             self.add(BatchNorm())
             self.add(LeakyReLU(leakage))
             # _numhid x 7 x 7
 
             self.add(Conv2D(numhid * 4, 4, strides=1, padding=0, use_bias=use_bias,
-                            explain=explain['relu'], regimes=estimators[patest]()))
+                            explain=explain['relu'], regimes=estimators[patest['relu']]()))
             self.add(BatchNorm())
             self.add(LeakyReLU(leakage))
             # _numhid x 4 x 4
 
             self.add(Conv2D(numhid * 8, 4, strides=1, padding=0, use_bias=use_bias,
-                            explain=explain['relu'], regimes=estimators[patest]()))
+                            explain=explain['relu'], regimes=estimators[patest['relu']]()))
             self.add(BatchNorm())
             self.add(LeakyReLU(leakage))
             # filters x 1 x 1
 
             self.add(Dense(outnum,
-                           explain=explain['relu'], regimes=estimators[outest]()))
+                           explain=explain['relu'], regimes=estimators[patest['relu']]()))
             if outact == 'relu':
                 self.add(ReLU())
             else:

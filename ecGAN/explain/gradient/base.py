@@ -26,9 +26,13 @@ class GradBasedExplainable(Block):
         res = [x.zeros_like() for x in data]
         for a in alpha:
             ddat = [ba + a * di for ba, di in zip(base, diff)]
+            if len(ddat) == 1:
+                ddat = ddat[0]
             ret = self.relevance_sensitivity(data=ddat, out=out)
             for tar, val in zip(res, ret):
                 tar += val
 
+        if len(res) == 1:
+            res = res[0]
         return res
 

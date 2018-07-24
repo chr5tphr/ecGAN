@@ -43,7 +43,7 @@ def coldnhot(x):
 def bwr(x):
     hpos = wred((2*x-1.).clip(0., 1.))
     hneg = wblue(-(2*x-1.).clip(-1., 0.))
-    return hpos + hneg
+    return hpos + hneg - 1.
 
 def draw_heatmap(data, lo=0., hi=1., center=None, cmap='hot'):
     try:
@@ -76,8 +76,10 @@ def save_colorized_image(data, fpath, center=None, cmap='hot', batchnorm=False, 
         if not fullcmap:
             hi = np.maximum(np.abs(lo), np.abs(hi))
             lo = -hi
-        getLogger('ecGAN').debug('%s min %f, max %f', what, lo, hi)
-        data = (draw_heatmap(data, lo, hi, center=center, cmap=cmap)*255).astype(np.uint8)
+        #getLogger('ecGAN').debug('%s min %f, max %f', what, lo.min(), hi.max())
+        data = draw_heatmap(data, lo, hi, center=center, cmap=cmap)
+        #getLogger('ecGAN').debug('data min %s, max %s', str(data.min()), str(data.max()))
+        data = (data * 255).clip(0, 255).astype(np.uint8)
     elif C == 3:
         data = data.transpose([0,2,3,1])
     else:

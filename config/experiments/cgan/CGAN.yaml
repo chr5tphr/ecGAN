@@ -46,7 +46,6 @@ nets:
         kwargs:
             numhid: 64
             use_bias: True
-            patest: 'linear'
             outact: 'clip'
             clip: [-1., 1.]
         epoch: 100
@@ -63,7 +62,6 @@ nets:
             numhid: 64
             use_bias: True
             outnum: 20
-            patest: 'linear'
             leakage: 0.0
         epoch: 100
         param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${nets.discriminator.epoch}.params'
@@ -72,21 +70,20 @@ nets:
         optkwargs:
             learning_rate: 0.00001
     classifier:
-       type: 'MSCN28'
-       name: 'Cls'
-       active: False
-       kwargs:
-           numhid: 64
-           use_bias: True
-           outnum: 10
-           patest: 'linear'
-           #outest: 'linear'
-       epoch: 10
-       param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.classifier.type}.${nets.classifier.name}.${nets.classifier.epoch}.params'
-       save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.classifier.type}.${nets.classifier.name}.${epoch}.params'
-       optimizer: 'adam'
-       optkwargs:
-           learning_rate: 0.00001
+        type: 'MSCN28'
+        name: 'Cls'
+        active: False
+        kwargs:
+            numhid: 64
+            use_bias: True
+            outnum: 10
+            leakage: 0.0
+        epoch: 10
+        param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.classifier.type}.${nets.classifier.name}.${nets.classifier.epoch}.params'
+        save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.classifier.type}.${nets.classifier.name}.${epoch}.params'
+        optimizer: 'adam'
+        optkwargs:
+            learning_rate: 0.00001
 
 log: '${root_dir}/${exp_dir}/${data.func}/log/${model}.log'
 gen_freq: 1

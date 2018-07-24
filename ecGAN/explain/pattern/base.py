@@ -55,6 +55,9 @@ class PatternNet(Block):
     def assess_pattern(self):
         raise NotImplementedError
 
+    def overload_weight_reset(self):
+        raise NotImplementedError
+
     def overload_weight_pattern(self):
         raise NotImplementedError
 
@@ -64,13 +67,14 @@ class PatternNet(Block):
     def backward_pattern(self, y_sig):
         raise NotImplementedError
 
-    def explain_pattern(self, X, attribution=False):
+    def explain_pattern(self, data, attribution=False):
         raise NotImplementedError
 
 class LinearPatternNet(PatternNet):
     def __init__(self, *args, **kwargs):
         #self.estimator = kwargs.pop('estimator', 'linear')
         self._regimes = kwargs.pop('regimes', [PatternRegime('linear', lambda y: nd.ones_like(y))])
+        self._noregconst = kwargs.pop('noregconst', 0.)
         #self._regimes = kwargs.pop('regimes', [PatternRegime('pos', lambda y: y>0)])
         super().__init__(*args, **kwargs)
         self.num_samples = None
@@ -135,15 +139,20 @@ class LinearPatternNet(PatternNet):
 
     def forward_pattern(self, x):
         z = None
+        bias = self.bias.data(ctx=x.context) if self.bias is not None else None
         for regime in self._regimes:
-            regime.pattern_ref = self._weight().copy()
+            regime.pattern_ref = self._weight(ctx=x.context).copy()
             a_reg = regime.pattern_ref
-            z_reg = self._forward(x, a_reg)
+            z_reg = self._forward(x, a_reg, bias)
             # regimes are assumed to be disjunct
             if z is None:
-                z = nd.zeros_like(z_reg)
+                z = nd.ones_like(z_reg) * self._noregconst
             z = nd.where(regime(z_reg), z_reg, z)
         return z
+
+    def overload_weight_reset(self):
+        for regime in self._regimes:
+            regime.pattern_ref[:] = self._weight(ctx=regime.pattern_ref.context).reshape(regime.pattern_ref.shape)
 
     def overload_weight_pattern(self):
         for regime in self._regimes:
@@ -236,12 +245,6 @@ class LinearPatternNet(PatternNet):
             signal = signal + s_reg
         return signal
 
-    def explain_pattern(self):
-        raise NotImplementedError
-
-    def explain_attribution_pattern(self):
-        raise NotImplementedError
-
     def assess_pattern(self):
         v = self.w_qual.data()
         dd_cov = self.cov_dd.data(ctx=v.context)
@@ -324,6 +327,9 @@ class ActPatternNet(PatternNet):
 
 
     def init_pattern(self):
+        pass
+
+    def overload_weight_reset(self):
         pass
 
     def overload_weight_pattern(self):

@@ -726,23 +726,7 @@ class CGAN(GAN):
         return metric.get()
 
     def generate(self, K=None, noise=None, cond=None, num=None):
-        if num is None:
-            if noise is not None:
-                num = len(noise)
-            elif cond is not None:
-                num = len(cond)
-            else:
-                raise RuntimeError('Either num or one of either noise or cond have to be supplied!')
-        if K is None:
-            if cond is not None:
-                K = cond.shape[0]
-            else:
-                raise RuntimeError('Either number of classes or labels have to be supplied!')
-        if noise is None:
-            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
-        if cond is None:
-            cond = nd.random.uniform(0, K, shape=num, ctx=self.ctx).floor()
-            cond = nd.one_hot(cond, K).reshape((num, -1, 1, 1))
+        noise, cond = self.sample_noise(K, noise, cond, num)
 
         return self.netG([noise, cond])
 
@@ -873,55 +857,43 @@ class CGAN(GAN):
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-    def explain(self, K, noise=None, cond=None, num=None, mkwargs={}, ctx=None):
-        if not all([isinstance(net, Explainable) for net in [self.netD, self.netG]]):
-            raise NotImplementedError('At least one net is not an Explainable!')
-
-        if num is None:
-            if noise is not None:
-                num = len(noise)
-            elif cond is not None:
-                num = len(cond)
-            else:
-                raise RuntimeError('At least one arg has to be supplied!')
-        if noise is None:
-            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        if cond is None:
-            cond = nd.random.uniform(0, K, shape=num, ctx=self.ctx).floor()
-            cond = nd.one_hot(cond, K).reshape((num, -1, 1, 1))
+    def explain(self, K, noise=None, cond=None, num=None, mkwargs={}):
+        noise, cond = self.sample_noise(K, noise, cond, num)
 
         net = Sequential()
         with net.name_scope():
             net.add(self.netG, self.netD)
-        # self.netG.merge_batchnorm(ctx=self.ctx)
-        # self.netD.merge_batchnorm(ctx=self.ctx)
-        # Rn, Rc = self.netG.relevance(data=noise, cond=cond, out=None, **mkwargs)
         Rn, Rc = net.relevance(data=[noise, cond], out=None, **mkwargs)
         self._out = net._out
 
         return Rn, Rc
 
-    def explain_pattern(self, K, noise=None, cond=None, num=None, attribution=False, ctx=None):
-        if num is None:
-            if noise is not None:
-                num = len(noise)
-            elif cond is not None:
-                num = len(cond)
-            else:
-                raise RuntimeError('At least one arg has to be supplied!')
-        if noise is None:
-            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        if cond is None:
-            cond = nd.random.uniform(0,K,shape=num, ctx=self.ctx).floor()
-            cond = nd.one_hot(cond, K).reshape((num, -1, 1, 1))
+    def explain_pattern(self, K, noise=None, cond=None, num=None, attribution=False):
+        noise, cond = self.sample_noise(K, noise, cond, num)
 
         net = Sequential()
         with net.name_scope():
             net.add(self.netG, self.netD)
-        data = [noise, cond]
-        R = net.explain_pattern(data, attribution=attribution)
+        R = net.explain_pattern(data=[noise, cond], attribution=attribution)
         self._out = net._out
         return R
+
+    def explain_top(self, K, noise=None, cond=None, num=None, mkwargs={}):
+        noise, cond = self.sample_noise(K, noise, cond, num)
+        data = self.netG([noise, cond])
+
+        R = self.netD.relevance(data=data, out=None, **mkwargs)
+        self._out = self.netD._out
+
+        return R, data
+
+    def explain_pattern_top(self, K, noise=None, cond=None, num=None, attribution=False):
+        noise, cond = self.sample_noise(K, noise, cond, num)
+        data = self.netG([noise, cond])
+
+        R = self.netD.explain_pattern(data=data, attribution=attribution)
+        self._out = self.netD._out
+        return R, data
 
     def assess_pattern(self):
         net = Sequential()
@@ -937,6 +909,26 @@ class CGAN(GAN):
         R = net.backward_pattern(y)
 
         return R
+
+    def sample_noise(self, K=None, noise=None, cond=None, num=None, ctx=None):
+        if num is None:
+            if noise is not None:
+                num = len(noise)
+            elif cond is not None:
+                num = len(cond)
+            else:
+                raise RuntimeError('Either num or one of either noise or cond have to be supplied!')
+        if K is None:
+            if cond is not None:
+                K = cond.shape[0]
+            else:
+                raise RuntimeError('Either number of classes or labels have to be supplied!')
+        if noise is None:
+            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
+        if cond is None:
+            cond = nd.random.uniform(0, K, shape=num, ctx=self.ctx).floor()
+            cond = nd.one_hot(cond, K).reshape((num, -1, 1, 1))
+        return noise, cond
 
 @register_model
 class WGAN(GAN):

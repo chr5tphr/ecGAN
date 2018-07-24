@@ -9,3 +9,9 @@ since noise-mean + signal-mean cannot be decomposed
 ### Problem: Zero-corners in MNIST conv PatternNet
 because corners are always zero in dataset
 
+### Problem: Attribution gives wrong predictions
+because we use relu where actually clipping (or something else) is used, output gets lost
+Solution: use clipping regimes
+Problem: Still inaccurate
+Solution: add bias in pattern pass
+

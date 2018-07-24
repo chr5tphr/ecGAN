@@ -123,6 +123,10 @@ class Sequential(PatternNet, base.Sequential):
         self._out = x
         return x
 
+    def overload_weight_reset(self):
+        for block in self._children.values():
+            block.overload_weight_reset()
+
     def overload_weight_pattern(self):
         for block in self._children.values():
             block.overload_weight_pattern()
@@ -163,8 +167,8 @@ class Sequential(PatternNet, base.Sequential):
         for block in self._children.values():
             block.compute_pattern()
 
-    def explain_pattern(self, X, attribution=False):
-        X = Mlist(X)
+    def explain_pattern(self, data, attribution=False):
+        X = Mlist(data)
         X.attach_grad()
 
         with autograd.record():
@@ -176,6 +180,7 @@ class Sequential(PatternNet, base.Sequential):
             self.overload_weight_pattern()
 
         y.backward(out_grad=y)
+        self.overload_weight_reset()
         return X.grad
 
     def backward_pattern(self, y_sig):
@@ -190,6 +195,10 @@ class Parallel(PatternNet, base.Parallel):
 
     def forward_pattern(self, X):
         return self.forward(X)
+
+    def overload_weight_reset(self):
+        for child in self._children.values():
+            child.overload_weight_reset()
 
     def overload_weight_pattern(self):
         for child in self._children.values():

@@ -1,4 +1,4 @@
-from .regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime
+from .regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime, ClipPatternRegime
 
 estimators = {}
 
@@ -18,3 +18,10 @@ def relu():
 def positive():
     return [PositivePatternRegime()]
 
+@register_estimator
+def clip(ymin=-1., ymax=1.):
+    return [ClipPatternRegime(*args) for args in [[None, ymin], [ymin, ymax], [ymax, None]]]
+
+@register_estimator
+def cliptop(ymin=-1., ymax=1.):
+    return [ClipPatternRegime(*args) for args in [[ymin, ymax], [ymax, None]]]

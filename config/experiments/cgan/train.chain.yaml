@@ -40,18 +40,18 @@ tail:
                 action: 'fit_pattern'
                 dict: &linear_pattern
                     nets:
-                        generator:     {kwargs: {patest: 'linear'}}
-                        discriminator: {kwargs: {patest: 'linear'}}
-                        classifier:    {kwargs: {patest: 'linear'}}
+                        generator:     {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                        discriminator: {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                        classifier:    {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
                     pattern: {name: 'linear'}
             -
                 priority: 2
                 action: 'fit_pattern'
                 dict: &relu_pattern
                     nets:
-                        generator:     {kwargs: {patest: 'relu'}}
-                        discriminator: {kwargs: {patest: 'relu'}}
-                        classifier:    {kwargs: {patest: 'relu'}}
+                        generator:     {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                        discriminator: {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                        classifier:    {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
                     pattern: {name: 'relu'}
 #    - # Assess PatternNet Quality
 #        &assessing
