@@ -114,9 +114,10 @@ def chain(args, config):
         for leaf in ctree.leaves():
             if leaf._priority in args.pskip:
                 continue
-            net_module = ress(load_module_file, leaf.sub('net_file'), 'net_module')
+            lconf = leaf.fuse()
+            net_module = ress(load_module_file, lconf.sub('net_file'), 'net_module')
             try:
-                commands[leaf._action](args, leaf)
+                commands[leaf._action](args, lconf)
             except:
                 print(traceback.format_exc(), file=sys.stderr)
 

@@ -117,7 +117,7 @@ def save_cgan_visualization(noise, cond, fpath, what='visualization'):
 def save_aligned_image(data, fpath, bbox, what='input data'):
     N, C, H, W = data.shape
     indat = ((data - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0, 255).astype(np.uint8)
-    indat = align_images(indat, 5, 6, H, W)
+    indat = align_images(indat, 5, 6, H, W, C)
     imwrite(fpath, indat)
     getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 

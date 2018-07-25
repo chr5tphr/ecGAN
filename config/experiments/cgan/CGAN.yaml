@@ -1,5 +1,5 @@
 root_dir: '/home/chrstphr/projects/ecGAN/result'
-exp_dir: 'cgan_pos'
+exp_dir: 'cgan_pos' #'cgan'
 
 device: 'gpu'
 device_id: 3
@@ -7,7 +7,7 @@ device_id: 3
 debug: True
 
 batch_size: 64
-nepochs: 100
+nepochs: 400
 start_epoch: 0
 save_freq: 5
 
@@ -17,15 +17,14 @@ feature_matching: False
 semi_supervised: True
 fuzzy_labels: False
 #clip_penalty: 0.001
-merge_batchnorm: True
 
 data:
-    func: 'mnist'
+    func: 'cifar10' #'mnist'
     args: []
     kwargs:
         train: True
         bbox: [-1.,1.]
-        labels: NULL
+        labels: [0, 1]
     bbox: [-1.,1.]
 
 #data:
@@ -41,34 +40,35 @@ model: 'CGAN'
 net_file: '${root_dir}/${exp_dir}/net.py'
 nets:
     generator:
-        type: 'MYTCN28'
+        type: 'MYTCN32' #'MYTCN28
         name: 'Gen'
         kwargs:
-            numhid: 64
+            numhid: 64 #64
+            outnum: 3 #1
             use_bias: True
-            outact: 'clip'
+            outact: 'tanh' # 'clip'
             clip: [-1., 1.]
-        epoch: 100
+        epoch: 400
         param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.generator.type}.${nets.generator.name}.${nets.generator.epoch}.params'
         save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.generator.type}.${nets.generator.name}.${epoch}.params'
         optimizer: 'adam'
         optkwargs:
-            learning_rate: 0.00001
+            learning_rate: 0.00001 #0.00001
         top: 'discriminator'
     discriminator:
-        type: 'MSCN28'
+        type: 'MSCN32'
         name: 'Dis'
         kwargs:
             numhid: 64
             use_bias: True
-            outnum: 20
+            outnum: 4 # 20
             leakage: 0.0
-        epoch: 100
+        epoch: 400
         param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${nets.discriminator.epoch}.params'
         save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${epoch}.params'
         optimizer: 'adam'
         optkwargs:
-            learning_rate: 0.00001
+            learning_rate: 0.00001 #0.00001
     classifier:
         type: 'MSCN28'
         name: 'Cls'

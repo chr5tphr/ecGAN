@@ -1,3 +1,4 @@
+## Problems
 ### Problem: Float precision when updating mean:
 If the mantissa of the float is 23 bit, there is a precision of up to 1677000 during addition with a single digit number.
 Above that threshold, adding a single digit number does not have any effect on the sum anymore.
@@ -15,3 +16,23 @@ Solution: use clipping regimes
 Problem: Still inaccurate
 Solution: add bias in pattern pass
 
+## Experiments
+
+### Datasets
+- MNIST
+- Toy  (think of a better one?)
+- CIFAR10
+
+### Nets
+- w/ clipping
+- w/o clipping (bad performance)
+
+### Weights
+- trained weights
+- constant weights
+- random weights?
+
+## Questions
+
+- Why does no clipping result in better explanations? (not shown whether true)
+- Is tanh better than clipping? (sparse gradients)

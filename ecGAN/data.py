@@ -26,7 +26,7 @@ def cifar10(train, ctx, bbox=(-1, 1), labels=None):
         label = label.astype('int32')
         return (data, label)
 
-    dataset = mx.gluon.data.vision.MNIST(train=train, transform=transform)
+    dataset = mx.gluon.data.vision.CIFAR10(train=train, transform=transform)
     return PreloadedDataset(dataset, ctx, labels=labels, shape=(3, 32, 32), label_shape=[])
 
 @register_data_func
