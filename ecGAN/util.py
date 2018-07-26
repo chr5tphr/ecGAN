@@ -235,7 +235,9 @@ class ChainConfig(ChainNode):
         action = kwargs.pop('action', None)
         fname = kwargs.pop('fname', None)
         priority = kwargs.pop('priority', 0)
+        tag = kwargs.pop('tag', None)
         super().__init__(*args, **kwargs)
+        self._tag = tag
         self._action = action
         self._priority = priority
         self._tail = []
@@ -256,6 +258,13 @@ class ChainConfig(ChainNode):
 
     def leaves(self):
         return sorted(self._leaves(), key=lambda x: x._priority)
+
+    def tags(self):
+        own = [] if self._tag is None else [self._tag]
+        if self._parent is None:
+            return own
+        else:
+            return self._parent.tags() + own
 
 class RessourceManager(dict):
     def __call__(self, func, *args, **kwargs):

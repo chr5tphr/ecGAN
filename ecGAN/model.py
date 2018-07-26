@@ -583,15 +583,15 @@ class GAN(Model):
 
 @register_model
 class CGAN(GAN):
-    def train(self, data, batch_size, nepochs):
+    def train(self, dataset, batch_size, nepochs):
         config = self.config
         netG = self.netG
         netD = self.netD
         ctx = self.ctx
 
-        K = len(data.classes)
+        K = len(dataset.classes)
 
-        data_iter = gluon.data.DataLoader(data, batch_size, shuffle=True)
+        data_iter = gluon.data.DataLoader(dataset, batch_size, shuffle=True)
 
         # loss
         loss = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
@@ -691,12 +691,12 @@ class CGAN(GAN):
                 if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.checkpoint(epoch+1)
                 if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
-                    cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K).reshape((30, K, 1, 1))
+                    cond = one_hot(nd.repeat(nd.arange(K, ctx=ctx), 29//K+1)[:30], K).reshape((30, K, 1, 1))
                     self.save_generated(epoch+1, cond)
         except KeyboardInterrupt:
             getLogger('ecGAN').info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
-            cond = one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K).reshape((30, K, 1, 1))
+            cond = one_hot(nd.repeat(nd.arange(K, ctx=ctx), 29//K+1)[:30], K).reshape((30, K, 1, 1))
             self.save_generated('I%d'%epoch, cond)
 
     def test(self, K, num, batch_size=64):

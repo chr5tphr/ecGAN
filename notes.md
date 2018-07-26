@@ -34,5 +34,10 @@ Solution: add bias in pattern pass
 
 ## Questions
 
-- Why does no clipping result in better explanations? (not shown whether true)
-- Is tanh better than clipping? (sparse gradients)
+### Does no clipping result in better explanations?
+- (not shown)
+- but clipping results in better generator
+
+### Tanh vs. Clipping
+- Tanh: no sparse gradients -> inabillity to learn cifar10
+- Clip: does not have the 'noisy pixels', since it can easily reach full colors

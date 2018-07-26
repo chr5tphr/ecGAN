@@ -42,6 +42,7 @@ def main():
     parser.add_argument('--classnum', type=int, default=10)
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('-k', '--pskip', action='append', type=int, default=[])
+    parser.add_argument('-t', '--tag', action='append', type=str, default=[], desc='-t tag1,tag2 -t tag3 := (tag1 AND tag2) OR tag3')
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -114,6 +115,8 @@ def chain(args, config):
         for leaf in ctree.leaves():
             if leaf._priority in args.pskip:
                 continue
+            if not any([all([tag leaf.tags() for tag in atags.split(',')]) for atags in args.tag]):
+                continue
             lconf = leaf.fuse()
             net_module = ress(load_module_file, lconf.sub('net_file'), 'net_module')
             try:
@@ -156,7 +159,7 @@ def generate(args, config):
 
     num = 30
     K = args.classnum
-    cond = nd.one_hot(linspace(0, K, num, ctx=ctx, dtype='int32'), K).reshape(num, K, 1, 1)
+    cond = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
     netnam = config.nets.generator.name
     net_epoch = config.nets.generator.epoch
     templ = config.genout
@@ -267,7 +270,7 @@ def explain_cgan(args, config):
 
     num = 30
     K = args.classnum
-    cond = nd.one_hot(linspace(0, K, num, ctx=ctx, dtype='int32'), K).reshape(num, K, 1, 1)
+    cond = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
     netnam = config.nets.get(config.nets.generator.top, 'discriminator').name
     net_epoch = config.nets.get(config.nets.generator.top, 'discriminator').epoch
     templ = config.explanation.output
@@ -465,7 +468,7 @@ def explain_pattern_cgan(args, config):
 
     num = 30
     K = args.classnum
-    cond = nd.one_hot(linspace(0, K, num, ctx=ctx, dtype='int32'), K).reshape(num, K, 1, 1)
+    cond = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
     # save_raw_image(cond.squeeze(), config.exsub(templ, iter=0, data_desc='input.cond', ftype='png'))
     netnam = config.nets.get(config.nets.generator.top, 'discriminator').name
     net_epoch = config.nets.get(config.nets.generator.top, 'discriminator').epoch

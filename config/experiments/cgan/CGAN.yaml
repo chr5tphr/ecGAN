@@ -24,7 +24,7 @@ data:
     kwargs:
         train: True
         bbox: [-1.,1.]
-        labels: [0, 1]
+        labels: [0, 1, 2, 3, 4]
     bbox: [-1.,1.]
 
 #data:
@@ -61,8 +61,8 @@ nets:
         kwargs:
             numhid: 64
             use_bias: True
-            outnum: 4 # 20
-            leakage: 0.0
+            outnum: 10 # 20
+            leakage: 0.2
         epoch: 400
         param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${nets.discriminator.epoch}.params'
         save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${epoch}.params'
@@ -70,7 +70,7 @@ nets:
         optkwargs:
             learning_rate: 0.00001 #0.00001
     classifier:
-        type: 'MSCN28'
+        type: 'MSCN32'
         name: 'Cls'
         active: False
         kwargs:

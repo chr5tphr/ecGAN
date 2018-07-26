@@ -1,141 +1,167 @@
 fname: '/home/chrstphr/projects/ecGAN/result/cgan/CGAN.yaml'
+tag: 'root'
 tail:
-    - #Model Training
-        &training
+    - #MNIST
+        tag: 'mnist'
         dict:
-            init: True
-            data: {kwargs: {train: True}}
-        priority: 0
-        action: 'train'
-    - #Model Testing
-        dict:
-            data: {kwargs: {train: False}}
-        priority: 1
-        action: 'test_gan'
-    - #Model Testing (BatchNormMerge successful?)
-        dict:
-            data: {kwargs: {train: False}}
+            data: {func: 'mnist'}
             nets:
-                generator:     {merge_batchnorm: True}
-                discriminator: {merge_batchnorm: True}
-                classifier:    {merge_batchnorm: True}
-        priority: 1
-        action: 'test_gan'
-    - # Fit PatternNet
-        &fitting
-        dict:
-            data: {kwargs: {train: True}}
-            pattern:
-                start_epoch: 0
-                init: True
-                aepoch: 0
-                nepochs: 10
-                optimizer: 'adam'
-                optkwargs:
-                    learning_rate: 0.0001
-                    wd: 0.99
+                generator:     {type: 'MYTCN28', epoch: 100}
+                discriminator: {type: 'MSCN28' , epoch: 100}
+                classifier:    {type: 'MSCN28' , epoch: 10}
         tail:
-            -
-                priority: 2
-                action: 'fit_pattern'
-                dict: &linear_pattern
+            &models
+            - #GAN
+                tag: 'gan'
+                dict: &cgan
+                    model: 'CGAN'
                     nets:
-                        generator:     {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
-                        discriminator: {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
-                        classifier:    {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
-                    pattern: {name: 'linear'}
-            -
-                priority: 2
-                action: 'fit_pattern'
-                dict: &relu_pattern
+                        generator:     {active: True}
+                        discriminator: {active: True}
+                        classifier:    {active: False}
+                tail:
+                    - #Model Training
+                        &training
+                        tag: 'train'
+                        dict:
+                            init: True
+                            data: {kwargs: {train: True}}
+                        priority: 0
+                        action: 'train'
+                    - #Model Testing
+                        tag: 'test'
+                        dict:
+                            data: {kwargs: {train: False}}
+                        priority: 1
+                        action: 'test_gan'
+                    - # Fit PatternNet
+                        &fitting
+                        tag: 'fit'
+                        dict:
+                            data: {kwargs: {train: True}}
+                            pattern:
+                                start_epoch: 0
+                                init: True
+                                aepoch: 0
+                                nepochs: 10
+                                optimizer: 'adam'
+                                optkwargs:
+                                    learning_rate: 0.0001
+                                    wd: 0.99
+                        tail:
+                            -
+                                tag: 'linear'
+                                priority: 2
+                                action: 'fit_pattern'
+                                dict: &linear_pattern
+                                    nets:
+                                        generator:     {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                                        discriminator: {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                                        classifier:    {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                                    pattern: {name: 'linear'}
+                            -
+                                tag: 'relu'
+                                priority: 2
+                                action: 'fit_pattern'
+                                dict: &relu_pattern
+                                    nets:
+                                        generator:     {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                                        discriminator: {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                                        classifier:    {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                                    pattern: {name: 'relu'}
+                    - # Assess PatternNet Quality
+                        &assessing
+                        tag: 'assess'
+                        dict: &ase_dict
+                            start_epoch: 10
+                            data: {kwargs: {train: False}}
+                            pattern:
+                                init: False
+                                start_epoch: 10
+                                aepoch: 0
+                        tail:
+                            -
+                                dict: *linear_pattern
+                                tail: &ase_epochs
+                                    -
+                                        dict:
+                                            pattern: {start_epoch: 5}
+                                        tail: &small_assess
+                                            -
+                                                priority: 3
+                                                action: 'stats_assess_pattern'
+                                            -
+                                                priority: 4
+                                                action: 'fit_assess_pattern'
+                                            -
+                                                priority: 5
+                                                dict:
+                                                    pattern: {aepoch: 10}
+                                                action: 'assess_pattern'
+                                    -
+                                        dict:
+                                            pattern: {start_epoch: 10}
+                                        tail: *small_assess
+                            -
+                            dict: *relu_pattern
+                            tail: *ase_epochs
+            - # Classifier
+                tag: 'classifier'
+                dict: &classifier
+                    model: 'Classifier'
                     nets:
-                        generator:     {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
-                        discriminator: {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
-                        classifier:    {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
-                    pattern: {name: 'relu'}
-#    - # Assess PatternNet Quality
-#        &assessing
-#        dict: &ase_dict
-#            start_epoch: 10
-#            data: {kwargs: {train: False}}
-#            pattern:
-#                init: False
-#                start_epoch: 10
-#                aepoch: 0
-#        tail:
-#            -
-#                dict: *linear_pattern
-#                tail: &ase_epochs
-#                    -
-#                        dict:
-#                            pattern: {start_epoch: 5}
-#                        tail: &small_assess
-#                            -
-#                                priority: 3
-#                                action: 'stats_assess_pattern'
-#                            -
-#                                priority: 4
-#                                action: 'fit_assess_pattern'
-#                            -
-#                                priority: 5
-#                                dict:
-#                                    pattern: {aepoch: 10}
-#                                action: 'assess_pattern'
-#                    -
-#                        dict:
-#                            pattern: {start_epoch: 10}
-#                        tail: *small_assess
-#            -
-#                dict: *relu_pattern
-#                tail: *ase_epochs
-    - # Classifier
-        dict: &classifier_mod
-            model: 'Classifier'
-            nets:
-                generator:     {active: False}
-                discriminator: {active: False}
-                classifier:    {active: True}
-        tail:
-            - # Model Training
-                dict:
-                    init: True
-                    nepochs: 10
-                    data: {kwargs: {train: True}}
-                priority: 0
-                action: 'train'
-            - # Model Testing
+                        generator:     {active: False}
+                        discriminator: {active: False}
+                        classifier:    {active: True}
+                tail:
+                    - # Model Training
+                        tag: 'train'
+                        dict:
+                            init: True
+                            nepochs: 10
+                            data: {kwargs: {train: True}}
+                        priority: 0
+                        action: 'train'
+                    - # Model Testing
+                        tag: 'test'
+                        dict:
+                            data: {kwargs: {train: False}}
+                        priority: 1
+                        action: 'test'
+                    - # Fit PatternNet
+                        *fitting
+                    - # Assess PatternNet Quality
+                        *assessing
+            - # Gen & Cls
+                tag: 'clsgen'
                 dict:
                     data: {kwargs: {train: False}}
-                priority: 1
-                action: 'test'
-            - # Model Testing (BatchNorm Check)
-                dict:
-                    data: {kwargs: {train: False}}
                     nets:
-                        generator:     {top: 'classifier', merge_batchnorm: True}
-                        discriminator: {active: False, merge_batchnorm: True}
-                        classifier:    {active: True, merge_batchnorm: True}
-                priority: 1
-                action: 'test'
-            - # Fit PatternNet
-                *fitting
-#            - # Assess PatternNet Quality
-#                *assessing
-    - #Model Testing
+                        generator:     {active: True, top: 'classifier'}
+                        discriminator: {active: False}
+                        classifier:    {active: True}
+                tail:
+                    - #Model Testing
+                        tag: 'test'
+                        priority: 1
+                        action: 'test_gan'
+    - #CIFAR10
+        tag: 'cifar10'
         dict:
-            data: {kwargs: {train: False}}
+            data: {func: 'cifar10'}
             nets:
-                generator:     {top: 'classifier'}
-                discriminator: {active: False}
-                classifier:    {active: True}
-        priority: 1
-        action: 'test_gan'
-    - #Model Testing (BatchNormMerged)
+                generator:     {type: 'MYTCN32', epoch: 400}
+                discriminator: {type: 'MSCN32' , epoch: 400}
+                classifier:    {type: 'MSCN32' , epoch: 10}
+        tail:
+            *models
+    - #toy
+        tag: 'toy'
         dict:
-            data: {kwargs: {train: False}}
+            data: {func: 'toy'}
             nets:
-                generator:     {top: 'classifier', merge_batchnorm: True}
-                discriminator: {active: False, merge_batchnorm: True}
-                classifier:    {active: True, merge_batchnorm: True}
-        priority: 1
-        action: 'test_gan'
+                generator:     {type: 'MYTCN28', epoch: 10}
+                discriminator: {type: 'MSCN28' , epoch: 10}
+                classifier:    {type: 'MSCN28' , epoch: 10}
+        tail:
+            *models

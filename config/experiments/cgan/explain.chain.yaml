@@ -1,124 +1,181 @@
 fname: '/home/chrstphr/projects/ecGAN/result/cgan/CGAN.yaml'
+tag: 'root'
 tail:
-    - # Layerwise and GradBased
-        &layerwise
+    - #MNIST
+        tag: 'mnist'
         dict:
-            data: {kwargs: {train: False}}
+            data: {func: 'mnist'}
             nets:
-                classifier:    {merge_batchnorm: True}
-                discriminator: {merge_batchnorm: True}
-                generator:     {merge_batchnorm: True}
+                generator:     {type: 'MYTCN28', epoch: 100}
+                discriminator: {type: 'MSCN28' , epoch: 100}
+                classifier:    {type: 'MSCN28' , epoch: 10}
         tail:
-            -
-                dict:
-                    classifier:    {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
-                    discriminator: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
-                    generator:     {kwargs: {                              explain: {relu: 'alphabeta'}}}
-                    explanation:
-                        desc: 'lrp'
-                        kwargs:
-                            method: 'layerwise'
-                            alpha: 2.0
-                            beta:  1.0
-                priority: 1
-                action: 'explain_cgan'
-            -
-                dict:
+            &models
+            - #GAN
+                tag: 'gan'
+                dict: &cgan
+                    model: 'CGAN'
                     nets:
-                        classifier:    {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'zplus'}}}
-                        discriminator: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'zplus'}}}
-                        generator:     {kwargs: {                              explain: {relu: 'zplus'}}}
-                    explanation:
-                        desc: 'dtd'
-                        kwargs:
-                            method: 'layerwise'
-                            lo: -1.0
-                            hi: 1.0
-                priority: 1
-                action: 'explain_cgan'
-            -
-                dict:
-                    explanation:
-                        desc: 'sensitivity'
-                        kwargs:
-                            method: 'sensitivity'
-                priority: 1
-                action: 'explain_cgan'
-            -
-                dict:
-                    explanation:
-                        desc: 'intgrads'
-                        kwargs:
-                            method: 'intgrads'
-                            num: 100
-                priority: 1
-                action: 'explain_cgan'
-    - # PatternNet
-        &patternnet
-        dict:
-            data: {kwargs: {train: False}}
-            pattern:
-                init: False
-                start_epoch: 10
-                aepoch: 0
-        tail:
-            -
-                dict: &linear_pattern
-                    nets:
-                        generator:     {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
-                        discriminator: {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
-                        classifier:    {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
-                    pattern: {name: 'linear'}
-                tail: &explain_epochs
-                    -
-                        dict:
-                            pattern: {start_epoch: 5}
-                        tail: &explain_types
-                            -
-                                priority: 2
-                                action: 'explain_pattern_cgan'
-                    -
-                        dict:
-                            pattern: {start_epoch: 10}
-                        tail: *explain_types
-            -
-                dict: &relu_pattern
-                    nets:
-                        generator:     {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
-                        discriminator: {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
-                        classifier:    {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
-                    pattern: {name: 'relu'}
-                tail: *explain_epochs
-            -
-                # attribution only makes sense for relu
-                dict:
-                    nets:
-                        generator:     {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
-                        discriminator: {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
-                        classifier:    {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
-                    pattern:
-                        type: 'attribution'
-                        name: 'relu'
-                    # cmap: 'gray'
+                        generator:     {active: True}
+                        discriminator: {active: True}
+                        classifier:    {active: False}
                 tail:
-                    -
+                    &explaining
+                    - # Layerwise
+                        &layerwise
+                        tag: 'layerwise'
                         dict:
-                            pattern: {start_epoch: 5}
-                        priority: 2
-                        action: 'explain_pattern_cgan'
-                    -
+                            data: {kwargs: {train: False}}
+                            nets:
+                                classifier:    {merge_batchnorm: True}
+                                discriminator: {merge_batchnorm: True}
+                                generator:     {merge_batchnorm: True}
+                        tail:
+                            -
+                                tag: 'lrp'
+                                dict:
+                                    classifier:    {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
+                                    discriminator: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
+                                    generator:     {kwargs: {                              explain: {relu: 'alphabeta'}}}
+                                    explanation:
+                                        desc: 'lrp'
+                                        kwargs:
+                                            method: 'layerwise'
+                                            alpha: 2.0
+                                            beta:  1.0
+                                priority: 1
+                                action: 'explain_cgan'
+                            -
+                                tag: 'dtd'
+                                dict:
+                                    nets:
+                                        classifier:    {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'zplus'}}}
+                                        discriminator: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'zplus'}}}
+                                        generator:     {kwargs: {                              explain: {relu: 'zplus'}}}
+                                    explanation:
+                                        desc: 'dtd'
+                                        kwargs:
+                                            method: 'layerwise'
+                                            lo: -1.0
+                                            hi: 1.0
+                                priority: 1
+                                action: 'explain_cgan'
+                    - # GradBased
+                        &gradbased
                         dict:
-                            pattern: {start_epoch: 10}
-                        priority: 0
-                        action: 'explain_pattern_cgan'
-    - # Same for classifier
+                            data: {kwargs: {train: False}}
+                        tail:
+                            -
+                                tag: 'sensitivity'
+                                dict:
+                                    explanation:
+                                        desc: 'sensitivity'
+                                        kwargs:
+                                            method: 'sensitivity'
+                                priority: 1
+                                action: 'explain_cgan'
+                            -
+                                tag: 'intgrads'
+                                dict:
+                                    explanation:
+                                        desc: 'intgrads'
+                                        kwargs:
+                                            method: 'intgrads'
+                                            num: 100
+                                priority: 1
+                                action: 'explain_cgan'
+                    - # PatternNet
+                        &patternnet
+                        tag: 'pattern'
+                        dict:
+                            data: {kwargs: {train: False}}
+                            pattern:
+                                init: False
+                                start_epoch: 10
+                                aepoch: 0
+                        tail:
+                            -
+                                tag: 'linear'
+                                dict: &linear_pattern
+                                    nets:
+                                        generator:     {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                                        discriminator: {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                                        classifier:    {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                                    pattern: {name: 'linear'}
+                                tail: &explain_epochs
+                                    -
+                                        dict:
+                                            pattern: {start_epoch: 5}
+                                        tail: &explain_types
+                                            -
+                                                priority: 2
+                                                action: 'explain_pattern_cgan'
+                                    -
+                                        dict:
+                                            pattern: {start_epoch: 10}
+                                        tail: *explain_types
+                                                priority: 2
+                                                action: 'explain_pattern_cgan'
+                            -
+                                tag: 'relu'
+                                dict: &relu_pattern
+                                    nets:
+                                        generator:     {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                                        discriminator: {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                                        classifier:    {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                                    pattern: {name: 'relu'}
+                                tail: *explain_epochs
+                            -
+                                # attribution only makes sense for relu
+                                tag: 'attribution'
+                                dict:
+                                    nets:
+                                        generator:     {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
+                                        discriminator: {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
+                                        classifier:    {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
+                                    pattern:
+                                        type: 'attribution'
+                                        name: 'relu'
+                                    # cmap: 'gray'
+                                tail:
+                                    -
+                                        dict:
+                                            pattern: {start_epoch: 5}
+                                        priority: 2
+                                        action: 'explain_pattern_cgan'
+                                    -
+                                        dict:
+                                            pattern: {start_epoch: 10}
+                                        priority: 0
+                                        action: 'explain_pattern_cgan'
+            - # Gen & Cls
+                tag: 'clsgen'
+                dict:
+                    data: {kwargs: {train: False}}
+                    nets:
+                        generator:     {active: True, top: 'classifier'}
+                        discriminator: {active: False}
+                        classifier:    {active: True}
+                tail:
+                    *explaining
+    - #CIFAR10
+        tag: 'cifar10'
         dict:
+            data: {func: 'cifar10'}
             nets:
-                generator: {top: 'classifier'}
-                discriminator: {active: False}
-                classifier:
-                    active: True
+                generator:     {type: 'MYTCN32', epoch: 400}
+                discriminator: {type: 'MSCN32' , epoch: 400}
+                classifier:    {type: 'MSCN32' , epoch: 10}
         tail:
-            - *layerwise
-            - *patternnet
+            *models
+    - #toy
+        tag: 'toy'
+        dict:
+            data: {func: 'toy'}
+            nets:
+                generator:     {type: 'MYTCN28', epoch: 10}
+                discriminator: {type: 'MSCN28' , epoch: 10}
+                classifier:    {type: 'MSCN28' , epoch: 10}
+        tail:
+            *models
 
