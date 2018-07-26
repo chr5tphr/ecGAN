@@ -25,6 +25,7 @@ tail:
                         tag: 'train'
                         dict:
                             init: True
+                            nepochs: 100
                             data: {kwargs: {train: True}}
                         priority: 0
                         action: 'train'
@@ -103,8 +104,8 @@ tail:
                                             pattern: {start_epoch: 10}
                                         tail: *small_assess
                             -
-                            dict: *relu_pattern
-                            tail: *ase_epochs
+                                dict: *relu_pattern
+                                tail: *ase_epochs
             - # Classifier
                 tag: 'classifier'
                 dict: &classifier
@@ -148,10 +149,10 @@ tail:
     - #CIFAR10
         tag: 'cifar10'
         dict:
-            data: {func: 'cifar10'}
+            data: {func: 'cifar10', kwargs:{grey: False}}
             nets:
-                generator:     {type: 'MYTCN32', epoch: 400}
-                discriminator: {type: 'MSCN32' , epoch: 400}
+                generator:     {type: 'MYTCN32', epoch: 400, kwargs: {outnum: 3}, optkwargs: {learning_rate: 1.e-4}}
+                discriminator: {type: 'MSCN32' , epoch: 400,                      optkwargs: {learning_rate: 1.e-4}}
                 classifier:    {type: 'MSCN32' , epoch: 10}
         tail:
             *models

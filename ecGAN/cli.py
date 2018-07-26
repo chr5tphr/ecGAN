@@ -16,7 +16,7 @@ from mxnet import nd, gluon, autograd, random
 from .net import nets
 from .model import models
 from .data import data_funcs
-from .util import mkfilelogger, Config, config_ctx, make_ctx, load_module_file, ChainConfig, RessourceManager
+from .util import mkfilelogger, Config, config_ctx, make_ctx, load_module_file, ChainConfig, RessourceManager, get_logic_parser
 from .plot import plot_data, save_data_h5, save_colorized_image, save_aligned_image, save_raw_image, save_cgan_visualization, save_predictions
 from .func import linspace
 
@@ -41,8 +41,10 @@ def main():
     parser.add_argument('--seed', type=int)
     parser.add_argument('--classnum', type=int, default=10)
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--mkdirs', action='store_true')
+    parser.add_argument('--crash_chain', action='store_true')
     parser.add_argument('-k', '--pskip', action='append', type=int, default=[])
-    parser.add_argument('-t', '--tag', action='append', type=str, default=[], desc='-t tag1,tag2 -t tag3 := (tag1 AND tag2) OR tag3')
+    parser.add_argument('-t', '--tag', type=str, default='', help='-t \'(tag1|!tag2)&tag3|tag4\' := ((tag1 or not tag2) and tag3) or tag4')
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -56,6 +58,9 @@ def main():
             config.update(yaml.safe_load(ustr))
 
         net_module = load_module_file(config.sub('net_file'), 'net_module')
+
+        if args.mkdirs:
+            mkdirs(None, lconf)
     else:
         config = None
 
@@ -66,6 +71,13 @@ def main():
         import ipdb; ipdb.set_trace()
 
     commands[args.command](args, config)
+
+def debug():
+    import ipdb
+    try:
+        ipdb.runcall(main)
+    except Exception as e:
+        ipdb.post_mortem(e.__traceback__)
 
 @register_command
 def setup(args, config):
@@ -105,6 +117,28 @@ def setup(args, config):
     #     yaml.safe_dump(fp, config)
 
 @register_command
+def mkdirs(args, config):
+    explore = [
+        'log',
+        'genout',
+        'explanation.outout',
+        'pattern.outout',
+        'pattern.save',
+        'pattern.load',
+        'nets.discriminator.params',
+        'nets.discriminator.save',
+        'nets.generator.params',
+        'nets.generator.save',
+        'nets.classifier.params',
+        'nets.classifier.save',
+        ]
+    for key in explore:
+        try:
+            os.makedirs(os.path.dirname(config.sub(key)), exist_ok=True)
+        except KeyError:
+            pass
+
+@register_command
 def chain(args, config):
     for fname in args.chain:
         with open(fname,'r') as fp:
@@ -115,14 +149,25 @@ def chain(args, config):
         for leaf in ctree.leaves():
             if leaf._priority in args.pskip:
                 continue
-            if not any([all([tag leaf.tags() for tag in atags.split(',')]) for atags in args.tag]):
-                continue
+            if args.tag is not None:
+                parser = get_logic_parser(lambda x: x in leaf.tags())
+                if not parser.parse(args.tag):
+                    continue
             lconf = leaf.fuse()
+            for ustr in args.update:
+                lconf.update(yaml.safe_load(ustr))
             net_module = ress(load_module_file, lconf.sub('net_file'), 'net_module')
-            try:
+
+            if args.mkdirs:
+                mkdirs(None, lconf)
+
+            if args.crash_chain:
                 commands[leaf._action](args, lconf)
-            except:
-                print(traceback.format_exc(), file=sys.stderr)
+            else:
+                try:
+                    commands[leaf._action](args, lconf)
+                except:
+                    print(traceback.format_exc(), file=sys.stderr)
 
 
 @register_command
@@ -211,7 +256,7 @@ def test_gan(args, config):
     getLogger('ecGAN').info('%s(%s(…)): %s=%.4f', top_n, gen_n, metr, acc)
 
 @register_command
-def debug(args, config):
+def model_debug(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
     if config.log:

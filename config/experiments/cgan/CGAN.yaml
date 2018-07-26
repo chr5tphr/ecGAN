@@ -19,12 +19,12 @@ fuzzy_labels: False
 #clip_penalty: 0.001
 
 data:
-    func: 'cifar10' #'mnist'
+    func: 'mnist' #'mnist'
     args: []
     kwargs:
         train: True
         bbox: [-1.,1.]
-        labels: [0, 1, 2, 3, 4]
+        labels: NULL
     bbox: [-1.,1.]
 
 #data:
@@ -44,7 +44,7 @@ nets:
         name: 'Gen'
         kwargs:
             numhid: 64 #64
-            outnum: 3 #1
+            outnum: 1 #1
             use_bias: True
             outact: 'tanh' # 'clip'
             clip: [-1., 1.]
@@ -61,7 +61,7 @@ nets:
         kwargs:
             numhid: 64
             use_bias: True
-            outnum: 10 # 20
+            outnum: 20 # 20
             leakage: 0.2
         epoch: 400
         param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${nets.discriminator.epoch}.params'

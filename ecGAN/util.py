@@ -7,6 +7,7 @@ import importlib.util
 import json
 
 from types import FunctionType as function
+from lark import Lark, Transformer
 
 import mxnet as mx
 from mxnet import nd
@@ -261,10 +262,10 @@ class ChainConfig(ChainNode):
 
     def tags(self):
         own = [] if self._tag is None else [self._tag]
-        if self._parent is None:
+        if self._root is None:
             return own
         else:
-            return self._parent.tags() + own
+            return self._root.tags() + own
 
 class RessourceManager(dict):
     def __call__(self, func, *args, **kwargs):
@@ -345,4 +346,34 @@ def exec_file(fname):
     if fname is not None:
         with open(fname, 'r') as fp:
             exec(fp.read(), {'__builtins__': __builtins__}, {})
+
+
+logic_tag_grammar = r"""
+                     ?expr : or
+                     ?or   : and
+                           | or "|" and -> _or
+                     ?and  : atom
+                           | and "&" atom -> _and
+                     ?atom : VALUE -> _val
+                           | "!" atom -> _not
+                           | "(" or ")"
+                     VALUE : /[^!&|()]+/
+                     """
+
+class LogicTagTrans(Transformer):
+    def __init__(self, func):
+        self._func = func
+    def _val(self, a):
+        return self._func(a[0])
+    def _or(self, a):
+        return a[0] or a[1]
+    def _and(self, a):
+        return a[0] and a[1]
+    def _not(self, a):
+        return not a[0]
+
+def get_logic_parser(func):
+    trans = LogicTagTrans(func)
+    parser = Lark(logic_tag_grammar, start='expr', parser='lalr', transformer=trans)
+    return parser
 

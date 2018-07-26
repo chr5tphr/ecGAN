@@ -56,7 +56,8 @@ def run_setup(gpu_support):
         packages=find_packages(),
         entry_points={
             'console_scripts': [
-                'ecgan = ecGAN.cli:main'
+                'ecgan = ecGAN.cli:main',
+                'ecgan_pdb = ecGAN.cli:debug'
             ]
         },
         install_requires=[
@@ -69,6 +70,7 @@ def run_setup(gpu_support):
             ['h5py>=2.7.1'],
             ['idna>=2.6'],
             ['imageio>=2.2.0'],
+            ['lark-parser==0.6.2']
             ['lazy-object-proxy>=1.3.1'],
             ['matplotlib>=2.1.0'],
             ['msgpack>=0.5.4'],
