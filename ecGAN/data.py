@@ -33,7 +33,7 @@ def cifar10(train, ctx, bbox=(-1, 1), labels=None, grey=False):
     return PreloadedDataset(dataset, ctx, labels=labels, shape=(C, 32, 32), label_shape=[])
 
 @register_data_func
-def toydata(train, ctx, bbox=[-1., 1.], N=1000, F=[1,28,28], K=10, seed=0xdeadbeef):
+def toydata(train, ctx, bbox=[-1., 1.], N=1000, F=[1,28,28], K=10, seed=0xdeadbeef, **kwargs):
     rs = np.random.RandomState(seed)
     f = np.prod(F)
     means = rs.uniform(bbox[0], bbox[1], size=[K, f])

@@ -114,8 +114,6 @@ tail:
                                         dict:
                                             pattern: {start_epoch: 10}
                                         tail: *explain_types
-                                                priority: 2
-                                                action: 'explain_pattern_cgan'
                             -
                                 tag: 'relu'
                                 dict: &relu_pattern
@@ -161,17 +159,17 @@ tail:
     - #CIFAR10
         tag: 'cifar10'
         dict:
-            data: {func: 'cifar10'}
+            data: {func: 'cifar10', kwargs:{label: [0, 1, 2]}}
             nets:
                 generator:     {type: 'MYTCN32', epoch: 400}
-                discriminator: {type: 'MSCN32' , epoch: 400}
-                classifier:    {type: 'MSCN32' , epoch: 10}
+                discriminator: {type: 'MSCN32' , epoch: 400, kwargs: {outnum: 6}}
+                classifier:    {type: 'MSCN32' , epoch: 10 , kwargs: {outnum: 3}}
         tail:
             *models
-    - #toy
-        tag: 'toy'
+    - #toydata
+        tag: 'toydata'
         dict:
-            data: {func: 'toy'}
+            data: {func: 'toydata'}
             nets:
                 generator:     {type: 'MYTCN28', epoch: 10}
                 discriminator: {type: 'MSCN28' , epoch: 10}

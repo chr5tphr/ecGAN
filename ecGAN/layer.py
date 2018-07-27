@@ -88,3 +88,6 @@ class Sequential(pattern.Sequential, layerwise.Sequential, GradBasedExplainable,
     #     self._out = x
     #     return self._out
 
+class Flatten(pattern.Flatten, layerwise.Flatten):
+    pass
+

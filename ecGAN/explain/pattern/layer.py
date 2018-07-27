@@ -251,4 +251,7 @@ class Parallel(PatternNet, base.Parallel):
 class Concat(ActPatternNet, base.Concat):
     pass
 
+class Flatten(ActPatternNet, base.Flatten):
+    pass
+
 

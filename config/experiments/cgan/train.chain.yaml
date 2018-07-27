@@ -156,10 +156,11 @@ tail:
                 classifier:    {type: 'MSCN32' , epoch: 10}
         tail:
             *models
-    - #toy
-        tag: 'toy'
+    - #toydata
+        tag: 'toydata'
         dict:
-            data: {func: 'toy'}
+            data: {func: 'toydata'}
+            nepochs: 10
             nets:
                 generator:     {type: 'MYTCN28', epoch: 10}
                 discriminator: {type: 'MSCN28' , epoch: 10}

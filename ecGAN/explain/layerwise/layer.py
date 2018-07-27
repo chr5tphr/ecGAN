@@ -80,3 +80,7 @@ class Parallel(LayerwiseExplainable, base.Parallel):
 
         return R
 
+class Flatten(LayerwiseExplainable, base.Flatten):
+    def relevance_layerwise(self, out, *args, **kwargs):
+        return out.reshape(self._in[0].shape)
+

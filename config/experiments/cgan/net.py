@@ -1,5 +1,5 @@
 from ecGAN.net import register_net
-from ecGAN.layer import Sequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, ReLU, Concat, BatchNorm, Clip, Tanh
+from ecGAN.layer import Sequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, ReLU, Concat, BatchNorm, Clip, Tanh, Flatten
 from ecGAN.explain.pattern.regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime
 from ecGAN.explain.pattern.estimator import estimators
 
@@ -90,14 +90,17 @@ class MSCN28(Sequential):
             self.add(LeakyReLU(leakage))
             # _numhid x 4 x 4
 
-            self.add(Conv2D(numhid * 8, 4, strides=1, padding=0, use_bias=use_bias,
+            self.add(Conv2D(outnum, 4, strides=1, padding=0, use_bias=use_bias,
                             explain=explain['relu'], regimes=estimators[patest['relu']]()))
-            self.add(BatchNorm())
-            self.add(LeakyReLU(leakage))
-            # filters x 1 x 1
+            self.add(Flatten())
+            # self.add(Conv2D(numhid * 8, 4, strides=1, padding=0, use_bias=use_bias,
+            #                 explain=explain['relu'], regimes=estimators[patest['relu']]()))
+            # self.add(BatchNorm())
+            # self.add(LeakyReLU(leakage))
+            # # filters x 1 x 1
 
-            self.add(Dense(outnum,
-                           explain=explain['relu'], regimes=estimators[patest['relu']]()))
+            # self.add(Dense(outnum,
+            #                explain=explain['relu'], regimes=estimators[patest['relu']]()))
             if outact == 'relu':
                 self.add(ReLU())
             else:
@@ -190,14 +193,15 @@ class MSCN32(Sequential):
             self.add(LeakyReLU(leakage))
             # _numhid x 4 x 4
 
-            self.add(Conv2D(numhid * 8, 4, strides=1, padding=0, use_bias=use_bias,
+            self.add(Conv2D(outnum, 4, strides=1, padding=0, use_bias=use_bias,
                             explain=explain['relu'], regimes=estimators[patest['relu']]()))
-            self.add(BatchNorm())
-            self.add(LeakyReLU(leakage))
-            # filters x 1 x 1
+            self.add(Flatten())
+            # self.add(BatchNorm())
+            # self.add(LeakyReLU(leakage))
+            # # filters x 1 x 1
 
-            self.add(Dense(outnum,
-                           explain=explain['relu'], regimes=estimators[patest['relu']]()))
+            # self.add(Dense(outnum,
+            #                explain=explain['relu'], regimes=estimators[patest['relu']]()))
             if outact == 'relu':
                 self.add(ReLU())
             else:

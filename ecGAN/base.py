@@ -157,4 +157,7 @@ class Concat(Block):
     def forward(self, X):
         return nd.concat(*X, dim=self._concat_dim)
 
+class Flatten(Block, nn.Flatten):
+    pass
+
 
