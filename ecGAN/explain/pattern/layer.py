@@ -254,4 +254,7 @@ class Concat(ActPatternNet, base.Concat):
 class Flatten(ActPatternNet, base.Flatten):
     pass
 
+class Reshape(ActPatternNet, base.Reshape):
+    pass
+
 

@@ -599,12 +599,13 @@ class CGAN(GAN):
         one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
 
         # trainer for the generator and the discriminator
+        optkwargsD = config.nets.discriminator.get('optkwargs', {'learning_rate': 0.05})
+        optkwargsG = config.nets.generator.get('optkwargs', {'learning_rate': 0.01})
+
         trainerG = gluon.Trainer(netG.collect_params(),
-            config.nets.generator.get('optimizer', 'adam'),
-            config.nets.generator.get('optkwargs', {'learning_rate': 0.01}))
+            config.nets.generator.get('optimizer', 'adam'), optkwargsG)
         trainerD = gluon.Trainer(netD.collect_params(),
-            config.nets.discriminator.get('optimizer', 'adam'),
-            config.nets.discriminator.get('optkwargs', {'learning_rate': 0.05}))
+            config.nets.discriminator.get('optimizer', 'adam'), optkwargsD)
 
         metric = mx.metric.Accuracy()
 
@@ -623,9 +624,13 @@ class CGAN(GAN):
         # iter_g = 0
         # ncritic = self.config.get('ncritic', 5)
 
+        max_epochs = self.start_epoch + nepochs
         try:
-            for epoch in range(self.start_epoch, self.start_epoch + nepochs):
+            for epoch in range(self.start_epoch, max_epochs):
                 tic = time()
+                lrmod = min(3.*(1. - epoch/max_epochs), 1.)
+                trainerD.set_learning_rate(optkwargsD['learning_rate'] * lrmod)
+                trainerG.set_learning_rate(optkwargsG['learning_rate'] * lrmod)
                 for i, (data, cond_dense) in enumerate(data_iter):
 
                     num = data.shape[0]

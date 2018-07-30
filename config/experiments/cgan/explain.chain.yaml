@@ -161,9 +161,9 @@ tail:
         dict:
             data: {func: 'cifar10', kwargs:{label: [0, 1, 2]}}
             nets:
-                generator:     {type: 'MYTCN32', epoch: 400}
-                discriminator: {type: 'MSCN32' , epoch: 400, kwargs: {outnum: 6}}
-                classifier:    {type: 'MSCN32' , epoch: 10 , kwargs: {outnum: 3}}
+                generator:     {type: 'DTCN32', epoch: 400}
+                discriminator: {type: 'DCN32' , epoch: 400, kwargs: {outnum: 6}}
+                classifier:    {type: 'DCN32' , epoch: 10 , kwargs: {outnum: 3}}
         tail:
             *models
     - #toydata

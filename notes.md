@@ -41,3 +41,6 @@ Solution: add bias in pattern pass
 ### Tanh vs. Clipping
 - Tanh: no sparse gradients -> inabillity to learn cifar10
 - Clip: does not have the 'noisy pixels', since it can easily reach full colors
+
+
+## pattern tangens: clipped linear

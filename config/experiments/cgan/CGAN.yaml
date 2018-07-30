@@ -40,7 +40,7 @@ model: 'CGAN'
 net_file: '${root_dir}/${exp_dir}/net.py'
 nets:
     generator:
-        type: 'MYTCN32' #'MYTCN28
+        type: 'DTCN32' #'MYTCN28
         name: 'Gen'
         kwargs:
             numhid: 64 #64
@@ -56,7 +56,7 @@ nets:
             learning_rate: 0.00001 #0.00001
         top: 'discriminator'
     discriminator:
-        type: 'MSCN32'
+        type: 'DCN32'
         name: 'Dis'
         kwargs:
             numhid: 64
@@ -70,7 +70,7 @@ nets:
         optkwargs:
             learning_rate: 0.00001 #0.00001
     classifier:
-        type: 'MSCN32'
+        type: 'DCN32'
         name: 'Cls'
         active: False
         kwargs:

@@ -160,4 +160,14 @@ class Concat(Block):
 class Flatten(Block, nn.Flatten):
     pass
 
+class Reshape(Block):
+    def __init__(self, shape, *args, **kwargs):
+        super().__init__()
+        self._shape = shape
+
+    def forward(self, x):
+        return x.reshape(self._shape)
+
+
+
 

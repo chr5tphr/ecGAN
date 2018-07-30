@@ -10,14 +10,19 @@ def register_data_func(func):
     return func
 
 @register_data_func
-def mnist(train, ctx, bbox=(-1, 1), labels=None):
+def mnist(train, ctx, bbox=(-1, 1), labels=None, pad=True):
     def transform(data, label):
         data = ((data.astype('float32')/255.) * (bbox[1]-bbox[0]) + bbox[0]).reshape((1, 28, 28))
+        if pad:
+            data = nd.pad(data.reshape(1,1,28,28), 'constant', constant_value=bbox[0], pad_width=[0,0,0,0, 2,2,2,2])[0]
         label = label.astype('int32')
         return (data, label)
 
+    shape = [1,28,28]
+    if pad:
+        shape = [1,32,32]
     dataset = mx.gluon.data.vision.MNIST(train=train, transform=transform)
-    return PreloadedDataset(dataset, ctx, labels=labels, shape=(1, 28, 28), label_shape=[])
+    return PreloadedDataset(dataset, ctx, labels=labels, shape=shape, label_shape=[])
 
 @register_data_func
 def cifar10(train, ctx, bbox=(-1, 1), labels=None, grey=False):
@@ -33,7 +38,7 @@ def cifar10(train, ctx, bbox=(-1, 1), labels=None, grey=False):
     return PreloadedDataset(dataset, ctx, labels=labels, shape=(C, 32, 32), label_shape=[])
 
 @register_data_func
-def toydata(train, ctx, bbox=[-1., 1.], N=1000, F=[1,28,28], K=10, seed=0xdeadbeef, **kwargs):
+def toydata(train, ctx, bbox=[-1., 1.], N=1000, F=[1,32,32], K=10, seed=0xdeadbeef, **kwargs):
     rs = np.random.RandomState(seed)
     f = np.prod(F)
     means = rs.uniform(bbox[0], bbox[1], size=[K, f])

@@ -91,3 +91,6 @@ class Sequential(pattern.Sequential, layerwise.Sequential, GradBasedExplainable,
 class Flatten(pattern.Flatten, layerwise.Flatten):
     pass
 
+class Reshape(pattern.Reshape, layerwise.Reshape):
+    pass
+
