@@ -739,7 +739,8 @@ class CGAN(GAN):
         if self.config.genout:
             gen_n = '%s<%s>'%tuple([self.config.nets.generator.get(nam, '') for nam in ['name', 'type']])
             fpath = self.config.sub('genout', net_epoch=epoch, data_desc='trainlog', iter=0, ftype='png', net=self.config.nets.generator.name)
-            save_aligned_image(data=self.generate(num=30, cond=cond),
+            gen = data=self.generate(num=30, cond=cond)
+            save_aligned_image(gen,
                                fpath=fpath,
                                bbox=self.data_bbox,
                                what='%s(…) epoch %s'%(gen_n, epoch))

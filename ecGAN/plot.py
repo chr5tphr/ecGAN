@@ -63,7 +63,7 @@ def draw_heatmap(data, lo=0., hi=1., center=None, cmap='hot'):
     return cmaps[cmap](ndat.clip(0., 1.))
 
 def align_images(im, H, W, h, w, C=1):
-    return im.reshape(H, W, h, w, C).transpose(0, 2, 1, 3, 4).reshape(H*h, W*w, C)
+    return im.reshape(H, W, C, h, w).transpose(0, 3, 1, 4, 2).reshape(H*h, W*w, C)
 
 def save_colorized_image(data, fpath, center=None, cmap='hot', batchnorm=False, fullcmap=False, what='explanation'):
     N, C, H, W = data.shape
@@ -114,10 +114,14 @@ def save_cgan_visualization(noise, cond, fpath, what='visualization'):
     plt.close(fig)
     getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 
-def save_aligned_image(data, fpath, bbox, what='input data'):
+def save_aligned_image(data, fpath, bbox, what='input data', outshape=(5, 6)):
     N, C, H, W = data.shape
-    indat = ((data - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0, 255).astype(np.uint8)
-    indat = align_images(indat, 5, 6, H, W, C)
+    if outshape is None:
+        outshape = [int(N**0.5)]*2
+    crop = np.prod(outshape)
+    oH, oW = outshape
+    indat = ((data[:crop] - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0, 255).astype(np.uint8)
+    indat = align_images(indat, oH, oW, H, W, C)
     imwrite(fpath, indat)
     getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 

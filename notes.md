@@ -16,6 +16,28 @@ Solution: use clipping regimes
 Problem: Still inaccurate
 Solution: add bias in pattern pass
 
+## Questions
+
+### Why use even filters instead of odd ones?
+When deconvoluting odd filters with stride 2, result will always be odd, and output will have different amounts of connections:
+
+|  ksize 5, stride 2  |
+|---------------------|
+|    1   1   1   1    |
+|1 1 2 2 3 2 3 2 2 1 1|
+-----------------------
+
+however, this is not the case for even kernel sizes:
+
+| ksize 4, stride 2 |
+|-------------------|
+|   1   1   1   1   |
+|1 1 2 2 2 2 2 2 1 1|
+---------------------
+
+the problem of lower activations at the border remains.
+
+
 ## Experiments
 
 ### Datasets

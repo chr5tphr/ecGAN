@@ -8,7 +8,7 @@ tail:
             nets:
                 generator:     {type: 'MYTCN28', epoch: 100}
                 discriminator: {type: 'MSCN28' , epoch: 100}
-                classifier:    {type: 'MSCN28' , epoch: 10}
+                classifier:    {type: 'MSCN28' , epoch:  10}
         tail:
             &models
             - #GAN
@@ -98,9 +98,9 @@ tail:
                                 tag: 'linear'
                                 dict: &linear_pattern
                                     nets:
-                                        generator:     {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
-                                        discriminator: {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
-                                        classifier:    {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                                        generator:     {kwargs: {patest: {relu: 'linear', out: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                                        discriminator: {kwargs: {patest: {relu: 'linear', out: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                                        classifier:    {kwargs: {patest: {relu: 'linear', out: 'linear', pixel: 'linear', gauss: 'linear'}}}
                                     pattern: {name: 'linear'}
                                 tail: &explain_epochs
                                     -
@@ -118,19 +118,18 @@ tail:
                                 tag: 'relu'
                                 dict: &relu_pattern
                                     nets:
-                                        generator:     {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
-                                        discriminator: {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
-                                        classifier:    {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                                        generator:     {kwargs: {patest: {relu: 'relu', out: 'linear', pixel: 'relu', gauss: 'relu'}}}
+                                        discriminator: {kwargs: {patest: {relu: 'relu', out: 'linear', pixel: 'relu', gauss: 'relu'}}}
+                                        classifier:    {kwargs: {patest: {relu: 'relu', out: 'linear', pixel: 'relu', gauss: 'relu'}}}
                                     pattern: {name: 'relu'}
                                 tail: *explain_epochs
                             -
-                                # attribution only makes sense for relu
                                 tag: 'attribution'
                                 dict:
                                     nets:
-                                        generator:     {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
-                                        discriminator: {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
-                                        classifier:    {kwargs: {patest: {relu: 'positive', clip: 'cliptop', pixel: 'positive', gauss: 'positive'}}}
+                                        generator:     {kwargs: {patest: {relu: 'positive', out: 'linear', pixel: 'positive', gauss: 'positive'}}}
+                                        discriminator: {kwargs: {patest: {relu: 'positive', out: 'linear', pixel: 'positive', gauss: 'positive'}}}
+                                        classifier:    {kwargs: {patest: {relu: 'positive', out: 'linear', pixel: 'positive', gauss: 'positive'}}}
                                     pattern:
                                         type: 'attribution'
                                         name: 'relu'
@@ -159,11 +158,11 @@ tail:
     - #CIFAR10
         tag: 'cifar10'
         dict:
-            data: {func: 'cifar10', kwargs:{label: [0, 1, 2]}}
+            data: {func: 'cifar10'}
             nets:
-                generator:     {type: 'DTCN32', epoch: 400}
-                discriminator: {type: 'DCN32' , epoch: 400, kwargs: {outnum: 6}}
-                classifier:    {type: 'DCN32' , epoch: 10 , kwargs: {outnum: 3}}
+                generator:     {type: 'MYTCN32', epoch: 400}
+                discriminator: {type: 'MSCN32' , epoch: 400, kwargs: {outnum: 20}}
+                classifier:    {type: 'MSCN32' , epoch:  10, kwargs: {outnum: 20}}
         tail:
             *models
     - #toydata

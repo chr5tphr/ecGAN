@@ -27,7 +27,7 @@ def mnist(train, ctx, bbox=(-1, 1), labels=None, pad=True):
 @register_data_func
 def cifar10(train, ctx, bbox=(-1, 1), labels=None, grey=False):
     def transform(data, label):
-        data = ((data.astype('float32')/255.) * (bbox[1]-bbox[0]) + bbox[0]).reshape((3, 32, 32))
+        data = ((data.astype('float32')/255.) * (bbox[1]-bbox[0]) + bbox[0]).transpose([2,0,1]).reshape((3, 32, 32))
         if grey:
             data = data.mean(axis=0, keepdims=True)
         label = label.astype('int32')

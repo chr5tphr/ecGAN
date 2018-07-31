@@ -5,10 +5,11 @@ tail:
         tag: 'mnist'
         dict:
             data: {func: 'mnist', kwargs: {pad: True}}
+            nepochs: 100
             nets:
-                generator:     {type: 'DTCN32', epoch: 100}
-                discriminator: {type: 'DCN32' , epoch: 100}
-                classifier:    {type: 'DCN32' , epoch: 10}
+                generator:     {type: 'MYTCN32', epoch: 100}
+                discriminator: {type: 'MSCN32' , epoch: 100}
+                classifier:    {type: 'MSCN32' , epoch: 10}
         tail:
             &models
             - #GAN
@@ -151,9 +152,9 @@ tail:
             data: {func: 'cifar10', kwargs:{grey: False}}
             nepochs: 400
             nets:
-                generator:     {type: 'DTCN32', epoch: 400, kwargs: {outnum: 3}, optkwargs: {learning_rate: 1.e-3}}
-                discriminator: {type: 'DCN32' , epoch: 400,                      optkwargs: {learning_rate: 1.e-3}}
-                classifier:    {type: 'DCN32' , epoch: 10}
+                generator:     {type: 'MYTCN32', epoch: 400, kwargs: {outnum: 3}, optkwargs: {learning_rate: 1.e-4}}
+                discriminator: {type: 'MSCN32' , epoch: 400,                      optkwargs: {learning_rate: 1.e-4}}
+                classifier:    {type: 'MSCN32' , epoch: 10}
         tail:
             *models
     - #toydata
@@ -162,8 +163,8 @@ tail:
             data: {func: 'toydata'}
             nepochs: 10
             nets:
-                generator:     {type: 'DTCN32', epoch: 10}
-                discriminator: {type: 'DCN32' , epoch: 10}
-                classifier:    {type: 'DCN32' , epoch: 10}
+                generator:     {type: 'MYTCN32', epoch: 10}
+                discriminator: {type: 'MSCN32' , epoch: 10}
+                classifier:    {type: 'MSCN32' , epoch: 10}
         tail:
             *models
