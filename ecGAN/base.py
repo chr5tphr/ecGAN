@@ -19,12 +19,16 @@ class Block(nn.Block):
     def _forward(self, *args, **kwargs):
         raise NotImplementedError
 
-    def _weight(self):
-        raise NotImplementedError
-
 class Intermediate(Block):
     def forward(self, *args, depth=-1):
         return self.forward(self, *args)
+
+class Linear(Block):
+    def _weight(self, ctx=None):
+        return self.weight.data(ctx=ctx)
+
+    def _bias(self, ctx=None):
+        return self.bias.data(ctx=ctx)
 
 class BatchNormMergable(Block):
     _weight_axis = 0
@@ -56,7 +60,7 @@ class BatchNormMergable(Block):
         return True
 
 # Linear Layers
-class Dense(Block, nn.Dense):
+class Dense(Linear, nn.Dense):
     def _forward(self, data, weight, bias=None):
         weight = weight.reshape(self.weight.shape)
         return nd.FullyConnected(data, weight, bias,
@@ -64,28 +68,19 @@ class Dense(Block, nn.Dense):
                                  num_hidden=self._units,
                                  flatten=self._flatten)
 
-    def _weight(self, ctx=None):
-        return self.weight.data(ctx=ctx)
-
-class Conv2D(Block, nn.Conv2D):
+class Conv2D(Linear, nn.Conv2D):
     def _forward(self, data, weight, bias=None):
         kwargs = self._kwargs.copy()
         kwargs['no_bias'] = bias is None
         weight = weight.reshape(self.weight.shape)
         return nd.Convolution(data, weight, bias, name='fwd', **kwargs)
 
-    def _weight(self, ctx=None):
-        return self.weight.data(ctx=ctx)
-
-class Conv2DTranspose(Block, nn.Conv2DTranspose):
+class Conv2DTranspose(Linear, nn.Conv2DTranspose):
     def _forward(self, data, weight, bias=None):
         kwargs = self._kwargs.copy()
         kwargs['no_bias'] = True
         weight = weight.reshape(self.weight.shape)
         return nd.Deconvolution(data, weight, name='fwd', **kwargs)
-
-    def _weight(self, ctx=None):
-        return self.weight.data(ctx=ctx)
 
 # Activation (-esque) Layers
 class ReLU(Block):

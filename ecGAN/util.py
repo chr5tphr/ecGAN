@@ -5,6 +5,7 @@ import random
 import h5py
 import importlib.util
 import json
+import sys
 
 from types import FunctionType as function
 from lark import Lark, Transformer
@@ -321,19 +322,22 @@ class HashEncoder(json.JSONEncoder):
                 return conv(obj)
         return super().default(obj)
 
-def mkfilelogger(lname, fname, level=logging.INFO):
+def mkfilelogger(lname, fname=None, stream=sys.stderr, level=logging.INFO):
     logger = logging.getLogger(lname)
-    if not logger.hasHandlers():
-        logger.setLevel(level)
-        frmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    for hdlr in logger.handlers.copy():
+        logger.removeHandler(hdlr)
+    logger.setLevel(level)
+    frmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    if fname is not None:
         fhdl = logging.FileHandler(fname)
-        shdl = logging.StreamHandler()
         fhdl.setLevel(level)
-        shdl.setLevel(level)
         fhdl.setFormatter(frmt)
+        logger.addHandler(fhdl)
+    if stream is not None:
+        shdl = logging.StreamHandler()
+        shdl.setLevel(level)
         shdl.setFormatter(frmt)
         logger.addHandler(shdl)
-        logger.addHandler(fhdl)
     return logger
 
 def load_module_file(fname, module_name):

@@ -1,6 +1,7 @@
 import numpy as np
 import json
 import h5py
+from mxnet import nd
 from imageio import imwrite
 import matplotlib as mpl
 mpl.use('Agg')
@@ -46,44 +47,47 @@ def bwr(x):
     return hpos + hneg - 1.
 
 def draw_heatmap(data, lo=0., hi=1., center=None, cmap='hot'):
-    try:
-        dat = data.asnumpy()
-    except AttributeError:
-        dat = data
+    if isinstance(data, nd.NDArray):
+        data = data.asnumpy()
     if center is not None:
         with np.errstate(divide='ignore', invalid='ignore'):
-            lodat = (dat.clip(lo, center) - lo) / (center - lo) - 1.
+            lodat = (data.clip(lo, center) - lo) / (center - lo) - 1.
             lodat[~np.isfinite(lodat)] = 0.
-            hidat = (dat.clip(center, hi) - center) / (hi - center)
+            hidat = (data.clip(center, hi) - center) / (hi - center)
             hidat[~np.isfinite(hidat)] = 0.
         ndat = ((hidat + lodat) + 1.) / 2.
     else:
-        ndat = ((dat - lo)/(hi-lo))
+        ndat = ((data - lo)/(hi-lo))
 
     return cmaps[cmap](ndat.clip(0., 1.))
 
 def align_images(im, H, W, h, w, C=1):
-    return im.reshape(H, W, C, h, w).transpose(0, 3, 1, 4, 2).reshape(H*h, W*w, C)
+    # color channels must be last axis!
+    return im.reshape([H, W, h, w, C]).transpose([0, 2, 1, 3, 4]).reshape([H*h, W*w, C])
 
-def save_colorized_image(data, fpath, center=None, cmap='hot', batchnorm=False, fullcmap=False, what='explanation'):
+def save_colorized_image(data, fpath, center=None, cmap='hot', batchnorm=False, fullcmap=False, what='explanation', outshape=(5, 6)):
+    if isinstance(data, nd.NDArray):
+        data = data.asnumpy()
     N, C, H, W = data.shape
-    if C == 1:
-        if batchnorm:
-            lo, hi = data.min().asscalar(), data.max().asscalar()
-        else:
-            lo = data.min(axis=(2, 3), keepdims=True).asnumpy()
-            hi = data.max(axis=(2, 3), keepdims=True).asnumpy()
-        if not fullcmap:
-            hi = np.maximum(np.abs(lo), np.abs(hi))
-            lo = -hi
-        #getLogger('ecGAN').debug('%s min %f, max %f', what, lo.min(), hi.max())
-        data = draw_heatmap(data, lo, hi, center=center, cmap=cmap)
-        #getLogger('ecGAN').debug('data min %s, max %s', str(data.min()), str(data.max()))
-        data = (data * 255).clip(0, 255).astype(np.uint8)
-    elif C == 3:
-        data = data.transpose([0,2,3,1])
+    data = data.transpose([0, 2, 3, 1])
+
+    if outshape is None:
+        outshape = [int(N**0.5)]*2
+    crop = np.prod(outshape)
+    oH, oW = outshape
+    data = data[:crop].mean(axis=3)
+    if batchnorm:
+        lo, hi = data.min(), data.max()
     else:
-        raise RuntimeError("Useless number of channels.")
+        lo = data.min(axis=1, keepdims=True).min(axis=2, keepdims=True)
+        hi = data.max(axis=1, keepdims=True).max(axis=2, keepdims=True)
+    if not fullcmap:
+        hi = np.maximum(np.abs(lo), np.abs(hi))
+        lo = -hi
+    #getLogger('ecGAN').debug('%s min %f, max %f', what, lo.min(), hi.max())
+    data = draw_heatmap(data, lo, hi, center=center, cmap=cmap)
+    #getLogger('ecGAN').debug('data min %s, max %s', str(data.min()), str(data.max()))
+    data = (data * 255).clip(0, 255).astype(np.uint8)
 
     data = align_images(data, 5, 6, H, W, 3)
     imwrite(fpath, data)
@@ -115,12 +119,16 @@ def save_cgan_visualization(noise, cond, fpath, what='visualization'):
     getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 
 def save_aligned_image(data, fpath, bbox, what='input data', outshape=(5, 6)):
+    if isinstance(data, nd.NDArray):
+        data = data.asnumpy()
     N, C, H, W = data.shape
+    data = data.transpose([0, 2, 3, 1])
     if outshape is None:
         outshape = [int(N**0.5)]*2
     crop = np.prod(outshape)
+    data = data[:crop]
     oH, oW = outshape
-    indat = ((data[:crop] - bbox[0]) * 255/(bbox[1]-bbox[0])).asnumpy().clip(0, 255).astype(np.uint8)
+    indat = ((data - bbox[0]) * 255/(bbox[1]-bbox[0])).clip(0, 255).astype(np.uint8)
     indat = align_images(indat, oH, oW, H, W, C)
     imwrite(fpath, indat)
     getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)

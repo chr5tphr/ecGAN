@@ -167,7 +167,7 @@ class Sequential(PatternNet, base.Sequential):
         for block in self._children.values():
             block.compute_pattern()
 
-    def explain_pattern(self, data, attribution=False):
+    def explain_pattern(self, data, out=None, attribution=False):
         X = Mlist(data)
         X.attach_grad()
 
@@ -179,7 +179,9 @@ class Sequential(PatternNet, base.Sequential):
         else:
             self.overload_weight_pattern()
 
-        y.backward(out_grad=y)
+        if out is None:
+            out = y
+        y.backward(out_grad=out)
         self.overload_weight_reset()
         return X.grad
 

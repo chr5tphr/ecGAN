@@ -1,3 +1,2 @@
-b ecGAN/model.py:638
-
+alias imprint !from tctim import imprint;imprint(%1)
 alias imsave !from ecGAN.plot import save_aligned_image;save_aligned_image(%1,%2,[-1,1])

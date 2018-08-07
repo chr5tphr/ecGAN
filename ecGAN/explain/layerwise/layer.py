@@ -52,6 +52,12 @@ class Sequential(LayerwiseExplainable, base.Sequential):
             R = child.relevance(out=R, **kwargs)
         return R
 
+    def check_bias(self, ctx=None):
+        for child in self._children.values():
+            if isinstance(child, LinearLayerwiseExplainable) and not child.check_bias(ctx=ctx):
+                return False
+        return True
+
 class Concat(LayerwiseExplainable, base.Concat):
     def relevance_layerwise(self, data=None, out=None, **kwargs):
         if data is not None:

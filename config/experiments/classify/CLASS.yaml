@@ -2,70 +2,111 @@ root_dir: '/home/chrstphr/projects/ecGAN/result'
 exp_dir: 'classify'
 
 device: 'gpu'
-device_id: 'auto'
-debug: False
+device_id: 3
+#device_id: 'auto'
+debug: True
 
 batch_size: 64
-nepochs: 10
+nepochs: 400
 start_epoch: 0
 save_freq: 5
-gen_freq: 5
 
 init: False
 
-data:
-  func: 'mnist'
-  args: []
-  kwargs:
-    train: True
-    bbox: [0,1]
-    labels: NULL
-  bbox: [0,1]
+feature_matching: False
+semi_supervised: True
+fuzzy_labels: False
+#clip_penalty: 0.001
 
-model: 'Classifier'
+data:
+    func: 'cifar10' #'mnist'
+    args: []
+    kwargs:
+        train: True
+        bbox: [-1.,1.]
+        labels: NULL
+    bbox: [-1.,1.]
+
+#data:
+#    func: 'toydata'
+#    args: []
+#    kwargs:
+#        train: True
+#        N: 1000
+#        bbox: [0.,1.]
+#    bbox: [0.,1.]
+
+model: 'CLASS'
 net_file: '${root_dir}/${exp_dir}/net.py'
 nets:
-   classifier:
-    type: 'MSFC'
-    name: 'Cls'
-    kwargs:
-      numhid: 256
-      outact: NULL
-      outnum: 10
-      patest: 'linear'
-    param: '${root_dir}/${exp_dir}/params/${model}.${nets.classifier.type}.${nets.classifier.name}.${start_epoch}.params'
-    save: '${root_dir}/${exp_dir}/params/${model}.${nets.classifier.type}.${nets.classifier.name}.${epoch}.params'
-    optimizer: 'adam'
-    optkwargs:
-      learning_rate: 0.01
+    generator:
+        type: 'MYTCN32' #'MYTCN28
+        name: 'Gen'
+        kwargs:
+            numhid: 64 #64
+            outnum: 3 #1
+            use_bias: True
+            outact: 'tanh' # 'clip'
+            clip: [-1., 1.]
+        epoch: 400
+        param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.generator.type}.${nets.generator.name}.${nets.generator.epoch}.params'
+        save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.generator.type}.${nets.generator.name}.${epoch}.params'
+        optimizer: 'adam'
+        optkwargs:
+            learning_rate: 0.00001 #0.00001
+        top: 'discriminator'
+    discriminator:
+        type: 'MSCN32'
+        name: 'Dis'
+        kwargs:
+            numhid: 64
+            use_bias: True
+            outnum: 20 # 20
+            leakage: 0.2
+        epoch: 400
+        param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${nets.discriminator.epoch}.params'
+        save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.discriminator.type}.${nets.discriminator.name}.${epoch}.params'
+        optimizer: 'adam'
+        optkwargs:
+            learning_rate: 0.00001 #0.00001
+    classifier:
+        type: 'DCN32'
+        name: 'Cls'
+        active: False
+        kwargs:
+            numhid: 64
+            use_bias: True
+            outnum: 10
+            leakage: 0.0
+        epoch: 10
+        param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.classifier.type}.${nets.classifier.name}.${nets.classifier.epoch}.params'
+        save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.classifier.type}.${nets.classifier.name}.${epoch}.params'
+        optimizer: 'adam'
+        optkwargs:
+            learning_rate: 0.00001
 
-log: '${root_dir}/${exp_dir}/log/${model}.log'
+log: '${root_dir}/${exp_dir}/${data.func}/log/${model}.log'
+gen_freq: 1
+genout: '${root_dir}/${exp_dir}/${data.func}/gen/${model}.${net}.${net_epoch}.${data_desc}.${iter}.${ftype}'
 
 cmap: 'coldnhot'
 
 pattern:
-  top_net: 'classifier'
-  type: 'pattern'
-  name: 'linear'
-  save: '${root_dir}/${exp_dir}/params/${model}.${net_type}.${net_name}.${pattern.name}.${fit_epoch}.${ase_epoch}.pattern.params'
-  load: '${root_dir}/${exp_dir}/params/${model}.${net_type}.${net_name}.${pattern.name}.${pattern.start_epoch}.${pattern.aepoch}.pattern.params'
-  #output: '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${pattern.estimator}.${iter}.h5'
-  output: NULL
-  image:  '${root_dir}/${exp_dir}/rel/${pattern.type}/${model}.${nets.classifier.type}.${start_epoch}.${pattern.name}.${pattern.start_epoch}.${data_desc}.${cmap}.${iter}.png'
-  input:  '${root_dir}/${exp_dir}/rel/${pattern.type}/${model}.${data_desc}.${iter}.png'
-  start_epoch: 0
-  aepoch: 0
-  nepochs: 10
-  save_freq: 5
-  optimizer: 'adam'
-  optkwargs:
-      learning_rate: 0.0001
-      wd: 0.99
+    type: 'pattern'
+    name: 'linear'
+    save: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${fit_epoch}.${ase_epoch}.pattern.params'
+    load: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${pattern.start_epoch}.${pattern.aepoch}.pattern.params'
+    output: '${root_dir}/${exp_dir}/${data.func}/rel/${pattern.type}/${model}.${net}.${net_epoch}.${pattern.name}.${pattern.start_epoch}.${data_desc}.${iter}.${ftype}'
+    start_epoch: 0
+    aepoch: 0
+    nepochs: 10
+    save_freq: 5
+    optimizer: 'adam'
+    optkwargs:
+        learning_rate: 0.0001
 
 explanation:
-  method: 'dtd'
-  top_net: 'classifier'
-  # output: '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation.method}.${iter}.h5'
-  output: NULL
-  image:  '${root_dir}/${exp_dir}/rel/${model}.${nets.classifier.type}.${epoch}.${explanation.method}.${data_desc}.${iter}.png'
-  input:  '${root_dir}/${exp_dir}/rel/${model}.${data_desc}.${iter}.png'
+    kwargs:
+        method: 'layerwise'
+    desc: 'lrp'
+    output: '${root_dir}/${exp_dir}/${data.func}/rel/${explanation.desc}/${model}.${net}.${net_epoch}.${data_desc}.${iter}.${ftype}'

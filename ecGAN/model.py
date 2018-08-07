@@ -91,6 +91,9 @@ class Model(object):
     def test(self, data, batch_size):
         raise NotImplementedError('Not supported for class %s'%self.__class__)
 
+    def check_bias(self):
+        return all([net.check_bias(ctx=self.ctx) for net in self.nets.values()])
+
 @register_model
 class Classifier(Model):
     def __init__(self, **kwargs):
@@ -863,41 +866,63 @@ class CGAN(GAN):
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-    def explain(self, K, noise=None, cond=None, num=None, mkwargs={}):
+    def explain(self, K, noise=None, cond=None, num=None, single_out=False, mkwargs={}):
         noise, cond = self.sample_noise(K, noise, cond, num)
 
         net = Sequential()
         with net.name_scope():
             net.add(self.netG, self.netD)
-        Rn, Rc = net.relevance(data=[noise, cond], out=None, **mkwargs)
+
+        out = None
+        if single_out:
+            out = net.forward_logged([noise, cond])
+            out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+
+        Rn, Rc = net.relevance(data=[noise, cond], out=out, **mkwargs)
         self._out = net._out
 
         return Rn, Rc
 
-    def explain_pattern(self, K, noise=None, cond=None, num=None, attribution=False):
+    def explain_pattern(self, K, noise=None, cond=None, num=None, single_out=False, attribution=False):
         noise, cond = self.sample_noise(K, noise, cond, num)
 
         net = Sequential()
         with net.name_scope():
             net.add(self.netG, self.netD)
-        R = net.explain_pattern(data=[noise, cond], attribution=attribution)
+
+        out = None
+        if single_out:
+            out = net.forward_logged([noise, cond])
+            out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+
+        R = net.explain_pattern(data=[noise, cond], out=out, attribution=attribution)
         self._out = net._out
         return R
 
-    def explain_top(self, K, noise=None, cond=None, num=None, mkwargs={}):
+    def explain_top(self, K, noise=None, cond=None, num=None, single_out=False, mkwargs={}):
         noise, cond = self.sample_noise(K, noise, cond, num)
         data = self.netG([noise, cond])
 
-        R = self.netD.relevance(data=data, out=None, **mkwargs)
+        out = None
+        if single_out:
+            out = self.netD.forward_logged(data)
+            out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+
+        R = self.netD.relevance(data=data, out=out, **mkwargs)
         self._out = self.netD._out
 
         return R, data
 
-    def explain_pattern_top(self, K, noise=None, cond=None, num=None, attribution=False):
+    def explain_pattern_top(self, K, noise=None, cond=None, num=None, single_out=False, attribution=False):
         noise, cond = self.sample_noise(K, noise, cond, num)
         data = self.netG([noise, cond])
 
-        R = self.netD.explain_pattern(data=data, attribution=attribution)
+        out = None
+        if single_out:
+            out = self.netD.forward_logged(data)
+            out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+
+        R = self.netD.explain_pattern(data=data, out=out, attribution=attribution)
         self._out = self.netD._out
         return R, data
 

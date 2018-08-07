@@ -25,41 +25,59 @@ class LinearLayerwiseExplainable(LayerwiseExplainable):
         R = func(*args, **ekwargs)
         return R
 
-    def layerwise_relevance_zb(self, out, lo=-1, hi=1, **kwargs):
+    def check_bias(self, ctx=None):
+        return self.bias is not None and (self._bias(ctx) <= 0.).asnumpy().all()
+
+    def layerwise_relevance_zb(self, out, lo=-1, hi=1, use_bias=False, **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         R = out
         a = self._in[0]
-        weight = self._weight()
+        weight = self._weight(ctx=a.context)
         wplus = nd.maximum(0., weight)
         wminus = nd.minimum(0., weight)
+
+        bias = None
+        bplus = None
+        bminus = None
+        if use_bias is not None:
+            bias = self._bias(ctx=a.context)
+            bplus = nd.maximum(0., bias)
+            bminus = nd.minimum(0., bias)
+
         upper = nd.ones_like(a)*hi
         lower = nd.ones_like(a)*lo
         a.attach_grad()
         upper.attach_grad()
         lower.attach_grad()
         with autograd.record():
-            zlh = ( self._forward(a, weight)
-                  - self._forward(lower, wplus)
-                  - self._forward(upper, wminus)
+            zlh = ( self._forward(a, weight, bias)
+                  - self._forward(lower, wplus, bplus)
+                  - self._forward(upper, wminus, bminus)
                   )
         zlh.backward(out_grad=R/(zlh + (zlh == 0.)))
         return a*a.grad + upper*upper.grad + lower*lower.grad
 
-    def layerwise_relevance_zplus(self, out, **kwargs):
+    def layerwise_relevance_zplus(self, out, use_bias=False, **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         R = out
         a = self._in[0]
-        weight = self._weight()
+        weight = self._weight(ctx=a.context)
         wplus = nd.maximum(0., weight)
+
+        bplus = None
+        if use_bias is not None:
+            bias = self._bias(ctx=a.context)
+            bplus = nd.maximum(0., bias)
+
         a.attach_grad()
         with autograd.record():
-            z = self._forward(data=a, weight=wplus)
+            z = self._forward(data=a, weight=wplus, bias=bplus)
         c, = autograd.grad(z, a, head_grads=R/(z + (z == 0.)))
         return a*c
 
-    def layerwise_relevance_zclip(self, out, **kwargs):
+    def layerwise_relevance_zclip(self, out, use_bias=False, **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         R = out
@@ -68,34 +86,48 @@ class LinearLayerwiseExplainable(LayerwiseExplainable):
         weight = self._weight()
         wplus = nd.maximum(0., weight)
         wminus = nd.minimum(0., weight)
+
+        bplus = None
+        bminus = None
+        if use_bias is not None:
+            bias = self._bias(ctx=a.context)
+            bplus = nd.maximum(0., bias)
+            bminus = nd.minimum(0., bias)
+
         alpha = z > 0.
         beta = z < 0.
 
         a.attach_grad()
         with autograd.record():
-            zplus = self._forward(data=a, weight=wplus)
+            zplus = self._forward(data=a, weight=wplus, bias=bplus)
         cplus, = autograd.grad(zplus, a, head_grads=alpha*R/(zplus + (zplus == 0.)))
 
         with autograd.record():
-            zminus = self._forward(data=a, weight=wminus)
+            zminus = self._forward(data=a, weight=wminus, bias=bminus)
         cminus, = autograd.grad(zminus, a, head_grads=beta*R/(zminus + (zminus == 0.)))
 
         return a*(cplus - cminus)
 
-    def layerwise_relevance_wsquare(self, out, **kwargs):
+    def layerwise_relevance_wsquare(self, out, use_bias=False, **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         R = out
         a = self._in[0].ones_like()
         weight = self._weight()
         wsquare = weight**2
+        bsquare = None
+
+        if use_bias is not None:
+            bias = self._bias(ctx=a.context)
+            bsquare = bias**2
+
         a.attach_grad()
         with autograd.record():
-            z = self._forward(data=a, weight=wsquare)
+            z = self._forward(data=a, weight=wsquare, bias=bsquare)
         c, = autograd.grad(z, a, head_grads=R/(z + (z == 0.)))
         return c
 
-    def layerwise_relevance_alphabeta(self, out, alpha=1., beta=0., **kwargs):
+    def layerwise_relevance_alphabeta(self, out, alpha=1., beta=0., use_bias=False, **kwargs):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
         R = out
@@ -104,13 +136,20 @@ class LinearLayerwiseExplainable(LayerwiseExplainable):
         wplus = nd.maximum(0., weight)
         wminus = nd.minimum(0., weight)
 
+        bplus = None
+        bminus = None
+        if use_bias is not None:
+            bias = self._bias(ctx=a.context)
+            bplus = nd.maximum(0., bias)
+            bminus = nd.minimum(0., bias)
+
         a.attach_grad()
         with autograd.record():
-            zplus = self._forward(data=a, weight=wplus)
+            zplus = self._forward(data=a, weight=wplus, bias=bplus)
         cplus, = autograd.grad(zplus, a, head_grads=alpha*R/(zplus + (zplus == 0.)))
 
         with autograd.record():
-            zminus = self._forward(data=a, weight=wminus)
+            zminus = self._forward(data=a, weight=wminus, bias=bminus)
         cminus, = autograd.grad(zminus, a, head_grads=beta*R/(zminus + (zminus == 0.)))
 
         return a*(cplus - cminus)

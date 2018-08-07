@@ -1,76 +1,54 @@
 fname: '/home/chrstphr/projects/ecGAN/result/classify/CLASS.yaml'
+tag: 'root'
 tail:
-    - #Model Training
-        priority: 0
-        action: 'train'
+    - #MNIST
+        tag: 'mnist'
         dict:
-            start_epoch: 0
-            init: True
-            data: {kwargs: {train: True}}
-    - #Model Testing
-        priority: 0
-        action: 'test'
-        dict:
-            start_epoch: 10
-            data: {kwargs: {train: False}}
-    - # Fit PatternNet
-        dict:
-            start_epoch: 10
-            data: {kwargs: {train: True}}
-            pattern:
-                start_epoch: 0
-                init: True
-                aepoch: 0
-                nepochs: 10
-                optimizer: 'adam'
-                optkwargs:
-                    learning_rate: 0.0001
-                    wd: 0.99
+            data: {func: 'mnist', kwargs: {pad: True}}
+            nepochs: 100
+            nets:
+                classifier:    {type: 'MSCN32' , epoch:  10, kwargs: {outnum: 10}}
         tail:
-            -
-                priority: 1
-                action: 'fit_pattern'
-                dict: &linear_pattern
-                    nets: {classifier: {kwargs: {patest: 'linear'}}}
-                    pattern: {name: 'linear'}
-            -
-                priority: 1
-                action: 'fit_pattern'
-                dict: &relu_pattern
-                    nets: {classifier: {kwargs: {patest: 'relu'}}}
-                    pattern: {name: 'relu'}
-    - # Assess PatternNet Quality
+            - # Classifier
+                tag: 'classifier'
+                dict: &classifier
+                    model: 'Classifier'
+                tail:
+                    - # Model Training
+                        tag: 'train'
+                        dict:
+                            init: True
+                            nepochs: 10
+                            data: {kwargs: {train: True}}
+                        priority: 0
+                        action: 'train'
+                    - # Model Testing
+                        tag: 'test'
+                        dict:
+                            data: {kwargs: {train: False}}
+                        priority: 1
+                        action: 'test'
+                    - # Fit PatternNet
+                        *fitting
+                    - # Assess PatternNet Quality
+                        *assessing
+    - #CIFAR10
+        tag: 'cifar10'
         dict:
-            start_epoch: 10
-            data: {kwargs: {train: False}}
-            pattern:
-                init: False
-                start_epoch: 10
-                aepoch: 0
+            data: {func: 'cifar10', kwargs:{grey: False}}
+            nepochs: 400
+            nets:
+                classifier:    {type: 'MSCN32' , epoch:  10, kwargs: {outnum: 10}}
         tail:
-            -
-                dict: *linear_pattern
-                tail: &assess_epochs
-                    -
-                        dict:
-                            pattern: {start_epoch: 5}
-                        tail: &small_assess
-                            -
-                                priority: 2
-                                action: 'stats_assess_pattern'
-                            -
-                                priority: 3
-                                action: 'fit_assess_pattern'
-                            -
-                                priority: 4
-                                dict:
-                                    pattern: {aepoch: 10}
-                                action: 'assess_pattern'
-                    -
-                        dict:
-                            pattern: {start_epoch: 10}
-                        tail: *small_assess
-            -
-                dict: *relu_pattern
-                tail: *assess_epochs
-
+            *models
+    - #toydata
+        tag: 'toydata'
+        dict:
+            data: {func: 'toydata'}
+            nepochs: 10
+            nets:
+                generator:     {type: 'MYTCN32', epoch: 10, kwargs: {outnum:  1}}
+                discriminator: {type: 'MSCN32' , epoch: 10, kwargs: {outnum: 20}}
+                classifier:    {type: 'MSCN32' , epoch: 10, kwargs: {outnum: 10}}
+        tail:
+            *models

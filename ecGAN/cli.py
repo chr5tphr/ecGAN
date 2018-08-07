@@ -149,11 +149,14 @@ def chain(args, config):
         for leaf in ctree.leaves():
             if leaf._priority in args.pskip:
                 continue
+            ltags = leaf.tags()
             if args.tag is not None:
-                parser = get_logic_parser(lambda x: x in leaf.tags())
+                parser = get_logic_parser(lambda x: x in ltags)
                 if not parser.parse(args.tag):
                     continue
             lconf = leaf.fuse()
+            mkfilelogger('ecGAN', lconf.sub('log'), logging.DEBUG if lconf.get('debug') else logging.INFO)
+            getLogger('ecGAN').info('Running chain leaf "%s".'%('.'.join(ltags)))
             for ustr in args.update:
                 lconf.update(yaml.safe_load(ustr))
             net_module = ress(load_module_file, lconf.sub('net_file'), 'net_module')
@@ -296,7 +299,7 @@ def explain(args, config):
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        relevance = model.explain(data, mkwargs=config.explanation.get('kwargs', {}))
+        relevance = model.explain(data, single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
 
         save_aligned_image(data, config.exsub(templ, data_desc='input.%s'%config.data.func, ftype='png', **comkw), config.data.bbox)
         save_colorized_image(relevance,
@@ -325,8 +328,8 @@ def explain_cgan(args, config):
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        s_gen, gen = model.explain_top(K, noise, cond, mkwargs=config.explanation.get('kwargs', {}))
-        s_noise, s_cond = model.explain(K, noise, cond, mkwargs=config.explanation.get('kwargs', {}))
+        s_gen, gen = model.explain_top(K, noise, cond, single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
+        s_noise, s_cond = model.explain(K, noise, cond, single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
@@ -481,6 +484,9 @@ def explain_pattern(args, config):
     net_epoch = config.nets.classifier.epoch
     templ = config.pattern.output
 
+    if args.seed:
+        random.seed(args.seed)
+
     for i, (data, label) in enumerate(data_iter):
         if i >= args.iter:
             break
@@ -489,7 +495,7 @@ def explain_pattern(args, config):
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        relevance = model.explain_pattern(data, attribution=config.pattern.get('type') == 'attribution')
+        relevance = model.explain_pattern(data, single_out=config.pattern.get('single_out', False), attribution=config.pattern.get('type') == 'attribution')
 
         relevance = relevance.reshape(data.shape)
 
@@ -519,10 +525,13 @@ def explain_pattern_cgan(args, config):
     net_epoch = config.nets.get(config.nets.generator.top, 'discriminator').epoch
     templ = config.pattern.output
 
+    if args.seed:
+        random.seed(args.seed)
+
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        s_gen, gen = model.explain_pattern_top(K, noise, cond, attribution=config.pattern.get('type') == 'attribution')
-        s_noise, s_cond = model.explain_pattern(K, noise, cond, attribution=config.pattern.get('type') == 'attribution')
+        s_gen, gen = model.explain_pattern_top(K, noise, cond, single_out=config.pattern.get('single_out', False), attribution=config.pattern.get('type') == 'attribution')
+        s_noise, s_cond = model.explain_pattern(K, noise, cond, single_out=config.pattern.get('single_out', False), attribution=config.pattern.get('type') == 'attribution')
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
@@ -554,6 +563,23 @@ def predict(args, config):
         txt = '\n'.join([' '.join(['%.02f'%val for val in line]) for line in output])
 
         getLogger('ecGAN').info('Prediction for \'%s\':\n%s', config.nets[config.explanation.top_net].param, txt)
+
+@register_command
+def check_bias(args, config):
+    ctx = ress(make_ctx, config.device, config.device_id)
+
+    if config.log:
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+
+    model = models[config.model](ctx=ctx, config=config)
+
+    txt = 'At least one bias of nets %s is positive!'
+    if model.check_bias():
+        txt = 'All bias\' of nets %s are negative!'
+
+    nets = ', '.join(['%s<%s>'%(net.name, net.type) for net in config.nets.values()])
+
+    getLogger('ecGAN').info(txt, nets)
 
 if __name__ == '__main__':
     main()

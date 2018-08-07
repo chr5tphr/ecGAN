@@ -7,9 +7,9 @@ tail:
             data: {func: 'mnist', kwargs: {pad: True}}
             nepochs: 100
             nets:
-                generator:     {type: 'MYTCN32', epoch: 100}
-                discriminator: {type: 'MSCN32' , epoch: 100}
-                classifier:    {type: 'MSCN32' , epoch: 10}
+                generator:     {type: 'MYTCN32', epoch: 100, kwargs: {outnum:  1}}
+                discriminator: {type: 'MSCN32' , epoch: 100, kwargs: {outnum: 20}}
+                classifier:    {type: 'MSCN32' , epoch:  10, kwargs: {outnum: 10}}
         tail:
             &models
             - #GAN
@@ -40,6 +40,10 @@ tail:
                         tag: 'fit'
                         dict:
                             data: {kwargs: {train: True}}
+                            nets:
+                                classifier:    {merge_batchnorm: True}
+                                discriminator: {merge_batchnorm: True}
+                                generator:     {merge_batchnorm: True}
                             pattern:
                                 start_epoch: 0
                                 init: True
@@ -47,7 +51,7 @@ tail:
                                 nepochs: 10
                                 optimizer: 'adam'
                                 optkwargs:
-                                    learning_rate: 0.0001
+                                    learning_rate: 0.00001
                                     wd: 0.99
                         tail:
                             -
@@ -152,9 +156,9 @@ tail:
             data: {func: 'cifar10', kwargs:{grey: False}}
             nepochs: 400
             nets:
-                generator:     {type: 'MYTCN32', epoch: 400, kwargs: {outnum: 3}, optkwargs: {learning_rate: 1.e-4}}
-                discriminator: {type: 'MSCN32' , epoch: 400,                      optkwargs: {learning_rate: 1.e-4}}
-                classifier:    {type: 'MSCN32' , epoch: 10}
+                generator:     {type: 'MYTCN32', epoch: 400, kwargs: {outnum:  3}, optkwargs: {learning_rate: 1.e-4}}
+                discriminator: {type: 'MSCN32' , epoch: 400, kwargs: {outnum: 20}, optkwargs: {learning_rate: 1.e-4}}
+                classifier:    {type: 'MSCN32' , epoch:  10, kwargs: {outnum: 10}}
         tail:
             *models
     - #toydata
@@ -163,8 +167,8 @@ tail:
             data: {func: 'toydata'}
             nepochs: 10
             nets:
-                generator:     {type: 'MYTCN32', epoch: 10}
-                discriminator: {type: 'MSCN32' , epoch: 10}
-                classifier:    {type: 'MSCN32' , epoch: 10}
+                generator:     {type: 'MYTCN32', epoch: 10, kwargs: {outnum:  1}}
+                discriminator: {type: 'MSCN32' , epoch: 10, kwargs: {outnum: 20}}
+                classifier:    {type: 'MSCN32' , epoch: 10, kwargs: {outnum: 10}}
         tail:
             *models
