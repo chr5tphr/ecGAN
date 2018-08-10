@@ -43,7 +43,7 @@ class PatternNet(Block):
     def fit_pattern(self, x):
         raise NotImplementedError
 
-    def compute_pattern(self):
+    def compute_pattern(self, ctx=None):
         raise NotImplementedError
 
     def fit_assess_pattern(self, x):
@@ -168,16 +168,19 @@ class LinearPatternNet(PatternNet):
         y_cond = self._out
         return self._signal_pattern(y_sig, y_cond)
 
-    def compute_pattern(self):
-        weight = self._weight()
+    def compute_pattern(self, ctx=None):
+        weight = self._weight(ctx=ctx).flatten()
         for regime in self._regimes:
-            cov = regime.mean_xy.data() - nd.dot(self.mean_y.data(), regime.mean_x.data(), transpose_a=True)
+            cov = regime.mean_xy.data(ctx=ctx) - nd.dot(self.mean_y.data(ctx=ctx), regime.mean_x.data(ctx=ctx), transpose_a=True)
             var_y = (weight * cov).sum(axis=1, keepdims=True) + 1e-12
             pat = cov / var_y
             regime.pattern.set_data(pat)
 
-    def fit_pattern(self, x):
-        y = self(x)
+    def fit_pattern(self, x, xnb=None):
+        if xnb is None:
+            xnb = x
+        y   = self(x)
+        ynb = self._forward(x, self._weight(ctx=x.context))
         #computes only gradients for batch step!
         self._err = []
         for regime in self._regimes:
@@ -187,10 +190,10 @@ class LinearPatternNet(PatternNet):
                 pattern = regime.pattern.data(ctx=y.context)
                 pias = regime.pias.data(ctx=y.context)
                 signal = self._backward_pattern(y_reg, pattern, pias)
-                err = loss(signal, x)
+                err = loss(signal, xnb)
             err.backward()
             self._err.append(err)
-        return y
+        return y, ynb
         #y = self(x)
         ##computes only gradients for batch step!
         #loss = mx.gluon.loss.L2Loss()
@@ -256,10 +259,11 @@ class LinearPatternNet(PatternNet):
 
     def learn_pattern(self):
         for x, y in self._prepare_data_pattern():
+            ctx = x.context
             for regime in self._regimes:
-                mean_x = regime.mean_x.data()
-                mean_xy = regime.mean_xy.data()
-                num_y = regime.num_y.data()
+                mean_x = regime.mean_x.data(ctx=ctx)
+                mean_xy = regime.mean_xy.data(ctx=ctx)
+                num_y = regime.num_y.data(ctx=ctx)
                 num_x = num_y.sum()
 
                 cond_y = regime(y)
@@ -288,9 +292,9 @@ class LinearPatternNet(PatternNet):
                 regime.mean_x.set_data(mean_x)
                 regime.mean_xy.set_data(mean_xy)
 
-            num = self.num_samples.data()
+            num = self.num_samples.data(ctx=ctx)
             num_cur = x.shape[0]
-            mean_y = self.mean_y.data()
+            mean_y = self.mean_y.data(ctx=ctx)
             sum_y = y.sum(axis=0, keepdims=True)
             mean_y = (num * mean_y + sum_y) / (num + num_cur + 1e-12)
             num += num_cur
@@ -316,8 +320,8 @@ class ActPatternNet(PatternNet):
     def forward_pattern(self, *args):
         return self.forward(*args)
 
-    def fit_pattern(self, x):
-        return self(x)
+    def fit_pattern(self, x, xnb=None):
+        return (self(x), None if xnb is None else self(xnb))
 
     def fit_assess_pattern(self, x):
         return self(x)
@@ -344,7 +348,7 @@ class ActPatternNet(PatternNet):
     def stats_assess_pattern(self):
         pass
 
-    def compute_pattern(self):
+    def compute_pattern(self, ctx=None):
         pass
 
 class PatternRegime(object):

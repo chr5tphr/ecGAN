@@ -48,16 +48,16 @@ tail:
                                 start_epoch: 0
                                 init: True
                                 aepoch: 0
-                                nepochs: 10
+                                nepochs: 0
                                 optimizer: 'adam'
                                 optkwargs:
-                                    learning_rate: 0.00001
-                                    wd: 0.99
+                                    learning_rate: 1.e-4
+                                    wd: 0.1
                         tail:
                             -
                                 tag: 'linear'
                                 priority: 2
-                                action: 'fit_pattern'
+                                action: 'learn_pattern'
                                 dict: &linear_pattern
                                     nets:
                                         generator:     {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
@@ -67,7 +67,7 @@ tail:
                             -
                                 tag: 'relu'
                                 priority: 2
-                                action: 'fit_pattern'
+                                action: 'learn_pattern'
                                 dict: &relu_pattern
                                     nets:
                                         generator:     {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}

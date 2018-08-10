@@ -748,6 +748,42 @@ class CGAN(GAN):
                                bbox=self.data_bbox,
                                what='%s(…) epoch %s'%(gen_n, epoch))
 
+    def learn_pattern(self, dataset, batch_size):
+        K = len(dataset.classes)
+        data_iter = gluon.data.DataLoader(dataset, batch_size)
+
+        net = Sequential()
+        net.add(self.netG, self.netD)
+        for i, (data, label) in enumerate(data_iter):
+            data = data.as_in_context(self.ctx)
+            label = label.as_in_context(self.ctx)
+
+            num = data.shape[0]
+
+            # === Data Pass ===
+            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
+            cond = nd.one_hot(label, K).reshape((num, -1, 1, 1))
+
+            self.netG.forward_logged([noise, cond])
+            self.netD.forward_logged(data)
+
+            net.learn_pattern()
+
+            # === Fake Pass ===
+            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
+            rand_cond = nd.random.uniform(0,K,shape=num, ctx=self.ctx).floor()
+            cond = nd.one_hot(rand_cond, K).reshape((num, -1, 1, 1))
+
+            net.forward_logged([noise, cond])
+
+            net.learn_pattern()
+
+
+        net.compute_pattern(ctx=self.ctx)
+        self.save_pattern_params(fit_epoch='0',
+                                 ase_epoch=self.config.pattern.get('aepoch', 0))
+        getLogger('ecGAN').info('Learned pattern')
+
     def fit_pattern(self, data, batch_size):
         if not all([isinstance(net, PatternNet) for net in [self.netD, self.netG]]):
             raise NotImplementedError('At least one net is not a PatternNet!')
@@ -756,19 +792,28 @@ class CGAN(GAN):
         K = len(data.classes)
         one_hot = fuzzy_one_hot if self.config.fuzzy_labels else nd.one_hot
 
-        trainerD = gluon.Trainer(self.netD.collect_pparams(),
-            self.config.pattern.get('optimizer', 'SGD'),
-            self.config.pattern.get('optkwargs', {'learning_rate': 0.01}))
+        optkwargsD = self.config.pattern.get('optkwargs', {'learning_rate': 0.001})
+        optkwargsG = self.config.pattern.get('optkwargs', {'learning_rate': 0.001})
+
         trainerG = gluon.Trainer(self.netG.collect_pparams(),
-            self.config.pattern.get('optimizer', 'SGD'),
-            self.config.pattern.get('optkwargs', {'learning_rate': 0.01}))
+            self.config.pattern.get('optimizer', 'adam'), optkwargsG)
+        trainerD = gluon.Trainer(self.netD.collect_pparams(),
+            self.config.pattern.get('optimizer', 'adam'), optkwargsD)
+
 
         start_epoch = self.config.pattern.get('start_epoch', 0)
         nepochs = self.config.pattern.get('nepochs', 1)
         save_freq = self.config.pattern.get('save_freq', 1)
 
-        for epoch in range(start_epoch, start_epoch + nepochs):
+        epoch = self.start_epoch
+
+        max_epochs = self.start_epoch + nepochs
+
+        for epoch in range(start_epoch, max_epochs):
             tic = time()
+            lrmod = min(2.*(1. - epoch/max_epochs), 1.)
+            trainerD.set_learning_rate(optkwargsD['learning_rate'] * lrmod)
+            trainerG.set_learning_rate(optkwargsG['learning_rate'] * lrmod)
             for i, (data, label) in enumerate(data_iter):
                 data = data.as_in_context(self.ctx)
                 label = label.as_in_context(self.ctx)
@@ -790,8 +835,8 @@ class CGAN(GAN):
                 rand_cond = nd.random.uniform(0,K,shape=num, ctx=self.ctx).floor()
                 cond = one_hot(rand_cond, K).reshape((num, -1, 1, 1))
 
-                fake = self.netG.fit_pattern([noise, cond])
-                self.netD.fit_pattern(fake)
+                fake, fnb = self.netG.fit_pattern([noise, cond])
+                self.netD.fit_pattern(fake, fnb)
 
                 trainerD.step(num, ignore_stale_grad=True)
                 trainerG.step(num, ignore_stale_grad=True)
@@ -876,7 +921,8 @@ class CGAN(GAN):
         out = None
         if single_out:
             out = net.forward_logged([noise, cond])
-            out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+            #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
 
         Rn, Rc = net.relevance(data=[noise, cond], out=out, **mkwargs)
         self._out = net._out
@@ -893,7 +939,8 @@ class CGAN(GAN):
         out = None
         if single_out:
             out = net.forward_logged([noise, cond])
-            out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+            #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
 
         R = net.explain_pattern(data=[noise, cond], out=out, attribution=attribution)
         self._out = net._out
@@ -906,7 +953,8 @@ class CGAN(GAN):
         out = None
         if single_out:
             out = self.netD.forward_logged(data)
-            out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+            #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
 
         R = self.netD.relevance(data=data, out=out, **mkwargs)
         self._out = self.netD._out
@@ -920,7 +968,8 @@ class CGAN(GAN):
         out = None
         if single_out:
             out = self.netD.forward_logged(data)
-            out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+            #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
 
         R = self.netD.explain_pattern(data=data, out=out, attribution=attribution)
         self._out = self.netD._out

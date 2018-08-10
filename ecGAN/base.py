@@ -76,10 +76,14 @@ class Conv2D(Linear, nn.Conv2D):
         return nd.Convolution(data, weight, bias, name='fwd', **kwargs)
 
 class Conv2DTranspose(Linear, nn.Conv2DTranspose):
+    # Beware the transposed weight of Conv2D!
+    def _weight(self, ctx=None):
+        return self.weight.data(ctx=ctx).flatten().T
+
     def _forward(self, data, weight, bias=None):
         kwargs = self._kwargs.copy()
         kwargs['no_bias'] = True
-        weight = weight.reshape(self.weight.shape)
+        weight = weight.T.reshape(self.weight.shape)
         return nd.Deconvolution(data, weight, name='fwd', **kwargs)
 
 # Activation (-esque) Layers

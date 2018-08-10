@@ -38,7 +38,7 @@ def main():
     parser.add_argument('-u', '--update', action='append', default=[])
     parser.add_argument('--epoch_range', nargs=3, type=int)
     parser.add_argument('--iter', type=int, default=1)
-    parser.add_argument('--seed', type=int)
+    parser.add_argument('--seed', type=int, default=0xDEADBEEF)
     parser.add_argument('--classnum', type=int, default=10)
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--mkdirs', action='store_true')

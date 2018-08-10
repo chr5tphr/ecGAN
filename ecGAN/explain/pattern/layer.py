@@ -28,6 +28,9 @@ class Dense(LinearPatternNet, base.Dense):
         return nd.FullyConnected(y, pattern.T, pias, no_bias=(pias is None),
                                  num_hidden=pattern.shape[1], flatten=self._flatten)
 
+    def _mean(self, x, y):
+        return x.mean(axis=0), y.mean(axis=0)
+
 class Conv2D(LinearPatternNet, base.Conv2D):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,6 +59,18 @@ class Conv2D(LinearPatternNet, base.Conv2D):
         pattern = pattern.reshape(self.weight.shape)
         return nd.Deconvolution(y, pattern, name='fwd', **kwargs)
 
+    # def _mean(self, x, y):
+    #     ksize = list(self._kwargs['kernel_size'])
+    #     kfsize = np.prod(ksize)
+    #     idfilt = nd.one_hot(nd.arange(kfsize), kfsize).reshape([kfsize, 1] + ksize)
+    #     kwargs = self._kwargs.copy()
+    #     del kwargs['num_filter']
+    #     del kwargs['no_bias']
+
+    #     xfilts = [nd.Convolution(x[:,i:i+1], idfilt, no_bias=True, kernel=ksize, num_filter=kfsize **kwargs) for i in range(x.shape[0])]
+    #     xfilts = nd.concatenate(xfilts, axis=1)
+    #     return x.mean(axis=0), y.mean(axis=0)
+
 class Conv2DTranspose(LinearPatternNet, base.Conv2DTranspose):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -65,7 +80,7 @@ class Conv2DTranspose(LinearPatternNet, base.Conv2DTranspose):
     def _shape_pattern(self):
         chan = self.weight.shape[0]
         ksize = np.prod(self.weight.shape[1:])
-        return (chan, ksize)
+        return (ksize, chan)
 
     def _prepare_data_pattern(self):
         if self._in is None:
@@ -139,12 +154,14 @@ class Sequential(PatternNet, base.Sequential):
         for block in self._children.values():
             block.learn_pattern()
 
-    def fit_pattern(self, x):
+    def fit_pattern(self, x, xnb=None):
+        if xnb is None:
+            xnb = x
         self._err = []
         for block in self._children.values():
-            x = block.fit_pattern(x)
+            x, xnb = block.fit_pattern(x, xnb)
             self._err.append(block._err)
-        return x
+        return x, xnb
 
     def fit_assess_pattern(self, x):
         self._err = []
@@ -163,9 +180,9 @@ class Sequential(PatternNet, base.Sequential):
             quals.append(block.assess_pattern())
         return quals
 
-    def compute_pattern(self):
+    def compute_pattern(self, ctx=None):
         for block in self._children.values():
-            block.compute_pattern()
+            block.compute_pattern(ctx=ctx)
 
     def explain_pattern(self, data, out=None, attribution=False):
         X = Mlist(data)
@@ -240,9 +257,9 @@ class Parallel(PatternNet, base.Parallel):
             Q.append(child.assess_pattern())
         return Q
 
-    def compute_pattern(self):
+    def compute_pattern(self, ctx=None):
         for child in self._children.values():
-            child.compute_pattern()
+            child.compute_pattern(ctx=ctx)
 
     def backward_pattern(self, y_sig):
         S = []

@@ -101,7 +101,6 @@ tail:
                                 generator:     {merge_batchnorm: True}
                             pattern:
                                 init: False
-                                start_epoch: 10
                                 aepoch: 0
                         tail:
                             -
@@ -115,7 +114,7 @@ tail:
                                 tail: &explain_epochs
                                     -
                                         dict:
-                                            pattern: {start_epoch: 5}
+                                            pattern: {start_epoch: 0}
                                         tail: &explain_types
                                             -
                                                 tag: 'patternnet'
@@ -127,10 +126,10 @@ tail:
                                                 dict: {pattern: {type: 'attribution'}}
                                                 priority: 2
                                                 action: 'explain_pattern_cgan'
-                                    -
-                                        dict:
-                                            pattern: {start_epoch: 10}
-                                        tail: *explain_types
+                                    #-
+                                    #    dict:
+                                    #        pattern: {start_epoch: 100}
+                                    #    tail: *explain_types
                             -
                                 tag: 'relu'
                                 dict: &relu_pattern
