@@ -172,8 +172,8 @@ class LinearPatternNet(PatternNet):
         weight = self._weight(ctx=ctx).flatten()
         for regime in self._regimes:
             cov = regime.mean_xy.data(ctx=ctx) - nd.dot(self.mean_y.data(ctx=ctx), regime.mean_x.data(ctx=ctx), transpose_a=True)
-            var_y = (weight * cov).sum(axis=1, keepdims=True) + 1e-12
-            pat = cov / var_y
+            var_y = (weight * cov).sum(axis=1, keepdims=True)
+            pat = cov / (var_y + (var_y == 0.))
             regime.pattern.set_data(pat)
 
     def fit_pattern(self, x, xnb=None):
@@ -281,10 +281,10 @@ class LinearPatternNet(PatternNet):
 
                 #TODO more stable running mean
                 num_x_cur = num_n.sum()
-                mean_x = (num_x * mean_x + wsum_x) / (num_x + num_x_cur + 1e-12)
+                mean_x = (num_x * mean_x + wsum_x) / (num_x + num_x_cur + ((num_x + num_x_cur) == 0.))
 
                 num_y_cur = cond_y.sum(axis=0)
-                mean_xy = (num_y.T * mean_xy + sum_xy) / (num_y + num_y_cur + 1e-12).T
+                mean_xy = (num_y.T * mean_xy + sum_xy) / (num_y + num_y_cur + ((num_y + num_y_cur) == 0.)).T
 
                 num_y += num_y_cur
 
@@ -296,7 +296,7 @@ class LinearPatternNet(PatternNet):
             num_cur = x.shape[0]
             mean_y = self.mean_y.data(ctx=ctx)
             sum_y = y.sum(axis=0, keepdims=True)
-            mean_y = (num * mean_y + sum_y) / (num + num_cur + 1e-12)
+            mean_y = (num * mean_y + sum_y) / (num + num_cur + ((num + num_cur) == 0.))
             num += num_cur
             self.mean_y.set_data(mean_y)
             self.num_samples.set_data(num)
