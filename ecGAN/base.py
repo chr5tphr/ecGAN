@@ -124,6 +124,9 @@ class Clip(Block):
 class BatchNorm(Block, nn.BatchNorm):
     pass
 
+class Dropout(Block, nn.Dropout):
+    pass
+
 # Flow Layers
 class Sequential(Block, nn.Sequential):
     def forward_logged(self, x):
@@ -167,6 +170,5 @@ class Reshape(Block):
     def forward(self, x):
         return x.reshape(self._shape)
 
-
-
-
+class MaxPool2D(Block, nn.MaxPool2D):
+    pass

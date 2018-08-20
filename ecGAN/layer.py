@@ -43,6 +43,9 @@ class Clip(pattern.Clip, layerwise.Clip):
 class BatchNorm(pattern.BatchNorm, layerwise.BatchNorm):
     pass
 
+class Dropout(pattern.Dropout, layerwise.Dropout):
+    pass
+
 
 # Flow Layers
 class Concat(pattern.Concat, layerwise.Concat):
@@ -94,3 +97,5 @@ class Flatten(pattern.Flatten, layerwise.Flatten):
 class Reshape(pattern.Reshape, layerwise.Reshape):
     pass
 
+class MaxPool2D(pattern.MaxPool2D, layerwise.MaxPool2D):
+    pass

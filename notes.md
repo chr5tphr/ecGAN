@@ -37,6 +37,9 @@ however, this is not the case for even kernel sizes:
 
 the problem of lower activations at the border remains.
 
+#### REMEMBER
+when padding with strides, pads are multiplied by stride-width!
+
 
 ## Experiments
 

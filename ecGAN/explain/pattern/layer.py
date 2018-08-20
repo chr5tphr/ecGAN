@@ -123,6 +123,9 @@ class Clip(ActPatternNet, base.Clip):
 class BatchNorm(ActPatternNet, base.BatchNorm):
     pass
 
+class Dropout(ActPatternNet, base.Dropout):
+    pass
+
 
 # Flow Layers
 
@@ -276,4 +279,5 @@ class Flatten(ActPatternNet, base.Flatten):
 class Reshape(ActPatternNet, base.Reshape):
     pass
 
-
+class MaxPool2D(ActPatternNet, base.MaxPool2D):
+    pass

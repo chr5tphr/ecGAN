@@ -4,21 +4,29 @@ tail:
     - #MNIST
         tag: 'mnist'
         dict:
-            data: {func: 'mnist', kwargs: {pad: True}}
-            nepochs: 100
-            nets:
-                classifier:    {type: 'MSCN32' , epoch:  10, kwargs: {outnum: 10}}
+            data: {func: 'mnist', kwargs: {pad: False}}
         tail:
-            - # Classifier
-                tag: 'classifier'
-                dict: &classifier
-                    model: 'Classifier'
+            &models
+            - # MSCN28
+                tag: 'MSCN28'
+                dict:
+                    nepochs: 20
+                    nets:
+                        classifier:
+                            type: 'MSCN28'
+                            epoch:  20
+                            kwargs:
+                                outnum: 10
+                                numhid: 64
+                                leakage: 0.0
+                                use_bias: True
+                                use_bnorm: False
                 tail:
+                    &netactions
                     - # Model Training
                         tag: 'train'
                         dict:
                             init: True
-                            nepochs: 10
                             data: {kwargs: {train: True}}
                         priority: 0
                         action: 'train'
@@ -26,12 +34,57 @@ tail:
                         tag: 'test'
                         dict:
                             data: {kwargs: {train: False}}
+                            nets: {classifier: {kwargs: {droprate: 0.0}}}
                         priority: 1
                         action: 'test'
                     - # Fit PatternNet
-                        *fitting
-                    - # Assess PatternNet Quality
-                        *assessing
+                        &fitting
+                        tag: 'fit'
+                        dict:
+                            data: {kwargs: {train: True}}
+                            nets:
+                                classifier:    {merge_batchnorm: True, kwargs: {droprate: 0.0}}
+                            pattern:
+                                start_epoch: 0
+                                init: True
+                                aepoch: 0
+                                nepochs: 0
+                                optimizer: 'adam'
+                                optkwargs:
+                                    learning_rate: 1.e-4
+                                    wd: 0.1
+                        tail:
+                            -
+                                tag: 'linear'
+                                priority: 2
+                                action: 'learn_pattern'
+                                dict: &linear_pattern
+                                    nets:
+                                        classifier:    {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                                    pattern: {name: 'linear'}
+                            -
+                                tag: 'relu'
+                                priority: 2
+                                action: 'learn_pattern'
+                                dict: &relu_pattern
+                                    nets:
+                                        classifier:    {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                                    pattern: {name: 'relu'}
+            - # cnn_2convb_2dense
+                tag: 'cnn'
+                dict:
+                    nepochs: 20
+                    nets:
+                        classifier:
+                            type: 'cnn_2convb_2dense'
+                            epoch:  20
+                            kwargs:
+                                outnum: 10
+                                numhid: 512
+                                use_bias: True
+                                droprate: 0.25
+                tail:
+                    *netactions
     - #CIFAR10
         tag: 'cifar10'
         dict:

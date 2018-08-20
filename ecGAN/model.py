@@ -159,11 +159,17 @@ class Classifier(Model):
 
         return metric.get()
 
-    def explain(self, data, label=None, mkwargs={}):
+    def explain(self, data, single_out=False, mkwargs={}):
         if not isinstance(self.netC, Explainable):
             raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets.classifier.type)
 
-        R = self.netC.relevance(data=data, out=None, **mkwargs)
+        out = None
+        if single_out:
+            out = net.forward_logged([noise, cond])
+            #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
+
+        R = self.netC.relevance(data=data, out=out, **mkwargs)
 
 #        if self.config.debug:
 #            Rsums = []
@@ -272,9 +278,15 @@ class Classifier(Model):
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-    def explain_pattern(self, data, attribution=False):
+    def explain_pattern(self, data, single_out=False, attribution=False):
         if not isinstance(self.netC, PatternNet):
             raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets.classifier.type)
+
+        out = None
+        if single_out:
+            out = net.forward_logged([noise, cond])
+            #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
 
         R = self.netC.explain_pattern(data, attribution=attribution)
 

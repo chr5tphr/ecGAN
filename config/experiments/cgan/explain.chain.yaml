@@ -8,7 +8,7 @@ tail:
             nets:
                 generator:     {type: 'MYTCN32', epoch: 100, kwargs: {outnum:  1}}
                 discriminator: {type: 'MSCN32' , epoch: 100, kwargs: {outnum: 20}}
-                classifier:    {type: 'MSCN32' , epoch:  10, kwargs: {outnum: 10}}
+                classifier:    {type: 'MSCN32' , epoch:  20, kwargs: {outnum: 10}}
         tail:
             &models
             - #GAN
@@ -156,7 +156,7 @@ tail:
             nets:
                 generator:     {type: 'MYTCN32', epoch: 400, kwargs: {outnum:  3}}
                 discriminator: {type: 'MSCN32' , epoch: 400, kwargs: {outnum: 20}}
-                classifier:    {type: 'MSCN32' , epoch:  10, kwargs: {outnum: 10}}
+                classifier:    {type: 'MSCN32' , epoch:  20, kwargs: {outnum: 10}}
         tail:
             *models
     - #toydata

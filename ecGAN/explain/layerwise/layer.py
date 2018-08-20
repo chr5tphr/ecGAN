@@ -38,6 +38,9 @@ class Clip(ActLayerwiseExplainable, base.Clip):
 class BatchNorm(ActLayerwiseExplainable, base.BatchNorm):
     pass
 
+class Dropout(ActLayerwiseExplainable, base.Dropout):
+    pass
+
 
 # Flow Layers
 class Sequential(LayerwiseExplainable, base.Sequential):
@@ -93,3 +96,8 @@ class Flatten(LayerwiseExplainable, base.Flatten):
 class Reshape(LayerwiseExplainable, base.Reshape):
     def relevance_layerwise(self, out, *args, **kwargs):
         return out.reshape(self._in[0].shape)
+
+class MaxPool2D(ActLayerwiseExplainable, base.MaxPool2D):
+    def relevance_layerwise(self, out, *args, **kwargs):
+        #TODO
+        raise NotImplementedError
