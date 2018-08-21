@@ -8,12 +8,13 @@ tail:
         tail:
             &models
             - # MSCN28
-                tag: 'MSCN28'
+                tag: 'fcnn'
                 dict:
                     nepochs: 20
                     nets:
                         classifier:
                             type: 'MSCN28'
+                            name: 'fcnn'
                             epoch:  20
                             kwargs:
                                 outnum: 10
@@ -77,10 +78,27 @@ tail:
                     nets:
                         classifier:
                             type: 'cnn_2convb_2dense'
+                            name: 'cnn'
                             epoch:  20
                             kwargs:
                                 outnum: 10
                                 numhid: 512
+                                use_bias: True
+                                droprate: 0.25
+                tail:
+                    *netactions
+            - # mlp_3dense
+                tag: 'mlp'
+                dict:
+                    nepochs: 20
+                    nets:
+                        classifier:
+                            type: 'mlp_3dense'
+                            name: 'mlp'
+                            epoch:  20
+                            kwargs:
+                                outnum: 10
+                                numhid: 1024
                                 use_bias: True
                                 droprate: 0.25
                 tail:

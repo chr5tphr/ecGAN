@@ -1,6 +1,6 @@
 from mxnet import nd
 from mxnet.gluon import nn
-from .layer import Sequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, ReLU
+from .layer import Sequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, ReLU, Dropout, Flatten
 from .explain.pattern.regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime
 from .explain.pattern.estimator import estimators
 
@@ -40,6 +40,42 @@ class SOFC(Sequential):
             self.add(ReLU(regimes=estimators[self._patest]()))
             self.add(Dense(self._outnum, regimes=estimators[self._outest]()))
             self.add(Identity(regimes=estimators[self._outest]()))
+
+@register_net
+class mlp_3dense(Sequential):
+    def __init__(self, **kwargs):
+        outnum = kwargs.pop('outnum', 2)
+        outact = kwargs.pop('outact', None)
+        numhid = kwargs.pop('numhid', 512)
+        droprate = kwargs.pop('droprate', 0.25)
+        use_bias = kwargs.pop('use_bias', False)
+
+        # patest = dict(relu='relu', out='clip', pixel='relu', gauss='relu')
+        patest = dict(relu='linear', out='linear', pixel='linear', gauss='linear')
+        patest.update(kwargs.pop('patest', {}))
+        explain = dict(relu='zplus', out='zplus', pixel='zb', gauss='wsquare')
+        explain.update(kwargs.pop('explain', {}))
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self += Flatten()
+
+            self += Dense(numhid,
+                          explain=explain['relu'], regimes=estimators[patest['relu']]())
+            self += ReLU()
+            self += Dropout(droprate)
+
+            self += Dense(numhid,
+                          explain=explain['relu'], regimes=estimators[patest['relu']]())
+            self += ReLU()
+            self += Dropout(droprate)
+
+            self += Dense(outnum,
+                          explain=explain['relu'], regimes=estimators[patest['out']]())
+
+            if outact == 'relu':
+                self += ReLU()
+            else:
+                self += Identity()
 
 # @register_net
 # class YSFC(YSequential):

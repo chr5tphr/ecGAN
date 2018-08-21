@@ -4,7 +4,7 @@ tail:
     - #MNIST
         tag: 'mnist'
         dict:
-            data: {func: 'mnist', kwargs: {train: False}}
+            data: {func: 'mnist', kwargs: {train: False, pad: False}}
         tail:
             &models
             - # MSCN28
@@ -137,6 +137,22 @@ tail:
                             kwargs:
                                 outnum: 10
                                 numhid: 512
+                                use_bias: True
+                                droprate: 0.0
+                tail:
+                    *explaining
+            - # mlp_3dense
+                tag: 'mlp'
+                dict:
+                    nepochs: 20
+                    nets:
+                        classifier:
+                            type: 'mlp_3dense'
+                            name: 'mlp'
+                            epoch:  20
+                            kwargs:
+                                outnum: 10
+                                numhid: 1024
                                 use_bias: True
                                 droprate: 0.0
                 tail:

@@ -40,6 +40,17 @@ the problem of lower activations at the border remains.
 #### REMEMBER
 when padding with strides, pads are multiplied by stride-width!
 
+### Why use strides instead of MaxPool?
+When using MaxPool, gradients are one where the maximum was and zero elsewhere.
+Thus, gradients become very sparse, which in case of a discriminator, makes it very hard for the underlying generator to learn.
+
+## TODO
+- Compare iNNvestigate model and own
+    - export model from keras
+    - import model to mxnet
+    - get stats
+    - get stats in iNNvestigate
+    - compare!
 
 ## Experiments
 
