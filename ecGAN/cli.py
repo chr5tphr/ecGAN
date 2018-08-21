@@ -74,9 +74,11 @@ def main():
 
 def debug():
     import ipdb
+    import traceback
     try:
         ipdb.runcall(main)
     except Exception as e:
+        traceback.print_exc(file=sys.stderr)
         ipdb.post_mortem(e.__traceback__)
 
 @register_command
@@ -284,7 +286,7 @@ def explain(args, config):
     data_fp = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
 
-    netnam = config.nets.classifier.name
+    netnam = '%s<%s>'%(config.nets.classifier.name, config.nets.classifier.type)
     net_epoch = config.nets.classifier.epoch
     templ = config.explanation.output
 
@@ -480,7 +482,7 @@ def explain_pattern(args, config):
     data_fp = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
 
-    netnam = config.nets.classifier.name
+    netnam = '%s<%s>'%(config.nets.classifier.name, config.nets.classifier.type)
     net_epoch = config.nets.classifier.epoch
     templ = config.pattern.output
 
