@@ -116,7 +116,7 @@ class LinearPatternNet(PatternNet):
                                                                 grad_req='write'))
             for regime in self._regimes:
                 regime.mean_x = self.pparams.get('mean_x_%s'%str(regime),
-                                                 shape=(1, insize),
+                                                 shape=(outsize, insize),
                                                  init=mx.initializer.Zero(),
                                                  grad_req='null')
                 regime.mean_xy = self.pparams.get('mean_xy_%s'%str(regime),
@@ -171,7 +171,7 @@ class LinearPatternNet(PatternNet):
     def compute_pattern(self, ctx=None):
         weight = self._weight(ctx=ctx).flatten()
         for regime in self._regimes:
-            cov = regime.mean_xy.data(ctx=ctx) - nd.dot(self.mean_y.data(ctx=ctx), regime.mean_x.data(ctx=ctx), transpose_a=True)
+            cov = regime.mean_xy.data(ctx=ctx) - regime.mean_x.data(ctx=ctx) * self.mean_y.data(ctx=ctx).T
             var_y = (weight * cov).sum(axis=1, keepdims=True)
             pat = cov / (var_y + (var_y == 0.))
             regime.pattern.set_data(pat)
@@ -264,42 +264,33 @@ class LinearPatternNet(PatternNet):
                 mean_x = regime.mean_x.data(ctx=ctx)
                 mean_xy = regime.mean_xy.data(ctx=ctx)
                 num_y = regime.num_y.data(ctx=ctx)
-                num_x = num_y.sum()
 
                 cond_y = regime(y)
-                # number of times each sample's x for w.t dot x was inside the regime
-                num_n = cond_y.sum(axis=1, keepdims=True)
-                # => weighted sum over x
-                wsum_x = nd.dot(num_n, x, transpose_a=True)
-
                 # y's in regime
-                reg_y = y * cond_y
+                reg_y  = y * cond_y
+                # sum of x's per y in regime
+                sum_x  = nd.dot(cond_y, x, transpose_a=True)
                 # sum of xy's in regime
-                # sum_xy = (reg_y.expand_dims(axis=2) * x.expand_dims(axis=1)).sum(axis=0)
                 sum_xy = nd.dot(reg_y, x, transpose_a=True)
 
-
                 #TODO more stable running mean
-                num_x_cur = num_n.sum()
-                mean_x = (num_x * mean_x + wsum_x) / (num_x + num_x_cur + ((num_x + num_x_cur) == 0.))
+                num_y_new = num_y + cond_y.sum(axis=0, keepdims=True)
+                norm      = num_y_new + (num_y_new == 0.)
+                mean_x    = (num_y.T * mean_x  + sum_x ) / norm.T
+                mean_xy   = (num_y.T * mean_xy + sum_xy) / norm.T
 
-                num_y_cur = cond_y.sum(axis=0)
-                mean_xy = (num_y.T * mean_xy + sum_xy) / (num_y + num_y_cur + ((num_y + num_y_cur) == 0.)).T
-
-                num_y += num_y_cur
-
-                regime.num_y.set_data(num_y)
-                regime.mean_x.set_data(mean_x)
+                regime.num_y  .set_data(num_y_new)
+                regime.mean_x .set_data(mean_x)
                 regime.mean_xy.set_data(mean_xy)
 
-            num = self.num_samples.data(ctx=ctx)
-            num_cur = x.shape[0]
-            mean_y = self.mean_y.data(ctx=ctx)
-            sum_y = y.sum(axis=0, keepdims=True)
-            mean_y = (num * mean_y + sum_y) / (num + num_cur + ((num + num_cur) == 0.))
-            num += num_cur
+            num     = self.num_samples.data(ctx=ctx)
+            num_new = num + y.shape[0]
+            mean_y  = self.mean_y.data(ctx=ctx)
+            sum_y   = y.sum(axis=0, keepdims=True)
+            mean_y  = (num * mean_y + sum_y) / (num_new + (num_new == 0.))
+
             self.mean_y.set_data(mean_y)
-            self.num_samples.set_data(num)
+            self.num_samples.set_data(num_new)
 
     def _backward_pattern(self, y, pattern, pias=None):
         raise NotImplementedError
