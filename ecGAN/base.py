@@ -136,6 +136,10 @@ class Sequential(Block, nn.Sequential):
         self._out = x
         return x
 
+    def __iadd__(self, other):
+        self.add(other)
+        return self
+
 class Parallel(Block):
     def forward(self, X):
         Y = []
