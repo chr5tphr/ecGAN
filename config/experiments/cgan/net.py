@@ -1,5 +1,5 @@
 from ecGAN.net import register_net
-from ecGAN.layer import Sequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, ReLU, Concat, BatchNorm, Clip, Tanh, Flatten
+from ecGAN.layer import Sequential, Dense, Conv2D, Conv2DTranspose, Identity, BatchNorm, LeakyReLU, ReLU, Concat, BatchNorm, Clip, Tanh, Flatten, Dropout, MaxPool2D
 from ecGAN.explain.pattern.regimes import LinearPatternRegime, PositivePatternRegime, NegativePatternRegime
 from ecGAN.explain.pattern.estimator import estimators
 
@@ -321,6 +321,7 @@ class MSCN28(Sequential):
         outnum = kwargs.pop('outnum', 1)
         outact = kwargs.pop('outact', None)
         numhid = kwargs.pop('numhid', 64)
+        droprate = kwargs.pop('droprate', 0.0)
         leakage = kwargs.pop('leakage', 0.1)
         use_bias = kwargs.pop('use_bias', False)
 
@@ -425,6 +426,7 @@ class MSCN32(Sequential):
         outact = kwargs.pop('outact', None)
         numhid = kwargs.pop('numhid', 64)
         leakage = kwargs.pop('leakage', 0.1)
+        droprate = kwargs.pop('droprate', 0.0)
         use_bias = kwargs.pop('use_bias', False)
 
         # patest = dict(relu='relu', out='clip', pixel='relu', gauss='relu')
@@ -485,3 +487,96 @@ class MSFC(Sequential):
             self.add(Dense(outnum, regimes=estimators[outest]()))
             self.add(Identity(regimes=estimators[outest]()))
 
+@register_net
+class cnn_2convb_2dense(Sequential):
+    def __init__(self, **kwargs):
+        outnum = kwargs.pop('outnum', 1)
+        outact = kwargs.pop('outact', None)
+        numhid = kwargs.pop('numhid', 512)
+        droprate = kwargs.pop('droprate', 0.25)
+        leakage = kwargs.pop('leakage', 0.0)
+        use_bias = kwargs.pop('use_bias', False)
+
+        # patest = dict(relu='relu', out='clip', pixel='relu', gauss='relu')
+        patest = dict(relu='linear', out='linear', pixel='linear', gauss='linear')
+        patest.update(kwargs.pop('patest', {}))
+        explain = dict(relu='zplus', out='zplus', pixel='zb', gauss='wsquare')
+        explain.update(kwargs.pop('explain', {}))
+        super().__init__(**kwargs)
+        with self.name_scope():
+            # 28 x 28
+            self.add(Conv2D(128, 3, strides=1, padding=1, use_bias=use_bias,
+                            explain=explain['pixel'], regimes=estimators[patest['pixel']]()))
+            self.add(ReLU())
+            self.add(MaxPool2D(pool_size=2, strides=2))
+            # 14 x 14
+
+            self.add(Conv2D(128, 3, strides=1, padding=1, use_bias=use_bias,
+                            explain=explain['pixel'], regimes=estimators[patest['pixel']]()))
+            self.add(ReLU())
+            self.add(MaxPool2D(pool_size=2, strides=2))
+            #  7 x  7
+
+            self.add(Conv2D(128, 3, strides=1, padding=1, use_bias=use_bias,
+                            explain=explain['pixel'], regimes=estimators[patest['pixel']]()))
+            self.add(ReLU())
+            self.add(MaxPool2D(pool_size=2, strides=2))
+            #  3 x  3
+
+            self.add(Conv2D(128, 3, strides=1, padding=1, use_bias=use_bias,
+                            explain=explain['pixel'], regimes=estimators[patest['pixel']]()))
+            self.add(ReLU())
+            self.add(MaxPool2D(pool_size=2, strides=2))
+            #  2 x  2
+
+            self.add(Flatten())
+
+            self.add(Dense(numhid,
+                           explain=explain['relu'], regimes=estimators[patest['relu']]()))
+            self.add(ReLU())
+            self.add(Dropout(droprate))
+
+            self.add(Dense(outnum,
+                           explain=explain['relu'], regimes=estimators[patest['relu']]()))
+
+            if outact == 'relu':
+                self.add(ReLU())
+            else:
+                self.add(Identity())
+
+@register_net
+class mlp_3dense(Sequential):
+    def __init__(self, **kwargs):
+        outnum = kwargs.pop('outnum', 2)
+        outact = kwargs.pop('outact', None)
+        numhid = kwargs.pop('numhid', 512)
+        droprate = kwargs.pop('droprate', 0.25)
+        leakage = kwargs.pop('leakage', 0.0)
+        use_bias = kwargs.pop('use_bias', False)
+
+        # patest = dict(relu='relu', out='clip', pixel='relu', gauss='relu')
+        patest = dict(relu='linear', out='linear', pixel='linear', gauss='linear')
+        patest.update(kwargs.pop('patest', {}))
+        explain = dict(relu='zplus', out='zplus', pixel='zb', gauss='wsquare')
+        explain.update(kwargs.pop('explain', {}))
+        super().__init__(**kwargs)
+        with self.name_scope():
+            self += Flatten()
+
+            self += Dense(numhid,
+                          explain=explain['relu'], regimes=estimators[patest['relu']]())
+            self += ReLU()
+            self += Dropout(droprate)
+
+            self += Dense(numhid,
+                          explain=explain['relu'], regimes=estimators[patest['relu']]())
+            self += ReLU()
+            self += Dropout(droprate)
+
+            self += Dense(outnum,
+                          explain=explain['relu'], regimes=estimators[patest['relu']]())
+
+            if outact == 'relu':
+                self += ReLU()
+            else:
+                self += Identity()
