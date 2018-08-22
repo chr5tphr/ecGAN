@@ -276,6 +276,9 @@ def model_debug(args, config):
 
 @register_command
 def explain(args, config):
+    if config.model == 'CGAN':
+        return explain_cgan(args, config)
+
     ctx = ress(make_ctx, config.device, config.device_id)
 
     if config.log:
@@ -303,9 +306,9 @@ def explain(args, config):
 
         relevance = model.explain(data, single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
 
-        save_aligned_image(data, config.exsub(templ, data_desc='input.%s'%config.data.func, ftype='png', **comkw), config.data.bbox)
+        save_aligned_image(data, config.exsub(templ, data_desc='input<%s>'%config.data.func, ftype='png', **comkw), config.data.bbox)
         save_colorized_image(relevance,
-                               config.exsub(templ, data_desc=config.data.func, ftype='png', **comkw),
+                               config.exsub(templ, data_desc='relevance<%s>'%config.data.func, ftype='png', **comkw),
                                center=config.get('cmap_center'),
                                cmap=config.get('cmap', 'hot'))
 
@@ -339,18 +342,18 @@ def explain_cgan(args, config):
 
         #save_raw_image(noise.squeeze(), config.exsub(templ, iter=i, data_desc='input.noise', ftype='png'))
         save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(),
-                                config.exsub(templ, data_desc='input.bar', ftype='png', **comkw))
+                                config.exsub(templ, data_desc='input<bar>', ftype='png', **comkw))
 
-        save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='noise', ftype='h5', **comkw))
-        save_data_h5(s_cond.squeeze(), config.exsub(templ, data_desc='cond', ftype='h5', **comkw))
+        save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='relevance<noise>', ftype='h5', **comkw))
+        save_data_h5(s_cond.squeeze() , config.exsub(templ, data_desc='relevance<cond>' , ftype='h5', **comkw))
 
         save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(),
-                                config.exsub(templ, data_desc='bar', ftype='png', **comkw))
+                                config.exsub(templ, data_desc='relevance<bar>', ftype='png', **comkw))
 
 
-        save_aligned_image(gen, config.exsub(templ, data_desc='input.gen', ftype='png', **comkw), config.data.bbox, what='generated input data')
-        save_colorized_image(s_gen, config.exsub(templ, data_desc='gen', ftype='png', **comkw), center=0., cmap='bwr', what='top explanation')
-        save_data_h5(s_gen, config.exsub(templ, data_desc='gen', ftype='h5', **comkw))
+        save_aligned_image(gen, config.exsub(templ, data_desc='input<gen>', ftype='png', **comkw), config.data.bbox, what='generated input data')
+        save_colorized_image(s_gen, config.exsub(templ, data_desc='relevance<gen>', ftype='png', **comkw), center=0., cmap='bwr', what='top explanation')
+        save_data_h5(s_gen, config.exsub(templ, data_desc='relevance<gen>', ftype='h5', **comkw))
 
 @register_command
 def explain_gan(args, config):
@@ -471,6 +474,9 @@ def assess_pattern(args, config):
 
 @register_command
 def explain_pattern(args, config):
+    if config.model == 'CGAN':
+        return explain_pattern_cgan(args, config)
+
     ctx = ress(make_ctx, config.device, config.device_id)
 
     if config.log:
@@ -501,9 +507,9 @@ def explain_pattern(args, config):
 
         relevance = relevance.reshape(data.shape)
 
-        save_aligned_image(data, config.exsub(templ, data_desc='input.%s'%config.data.func, ftype='png', **comkw), config.data.bbox)
+        save_aligned_image(data, config.exsub(templ, data_desc='input<%s>'%config.data.func, ftype='png', **comkw), config.data.bbox)
         save_colorized_image(relevance,
-                               config.exsub(templ, data_desc=config.data.func, ftype='png', **comkw),
+                               config.exsub(templ, data_desc='pattern<%s>'%config.data.func, ftype='png', **comkw),
                                center=config.get('cmap_center'),
                                cmap=config.get('cmap', 'hot'))
 
@@ -540,16 +546,16 @@ def explain_pattern_cgan(args, config):
         save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
 
         #save_raw_image(noise.squeeze(), config.exsub(templ, iter=i, data_desc='input.noise', ftype='png'))
-        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.exsub(templ, data_desc='input.bar', ftype='png', **comkw))
+        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.exsub(templ, data_desc='input<bar>', ftype='png', **comkw))
 
-        save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='noise', ftype='h5', **comkw))
-        save_data_h5(s_cond.squeeze(), config.exsub(templ, data_desc='cond', ftype='h5', **comkw))
+        save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='pattern<noise>', ftype='h5', **comkw))
+        save_data_h5(s_cond.squeeze(), config.exsub(templ, data_desc='pattern<cond>', ftype='h5', **comkw))
 
-        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.exsub(templ, data_desc='bar', ftype='png', **comkw))
+        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.exsub(templ, data_desc='pattern<bar>', ftype='png', **comkw))
 
-        save_aligned_image(gen, config.exsub(templ, data_desc='input.gen', ftype='png', **comkw), config.data.bbox, what='generated input data')
-        save_colorized_image(s_gen, config.exsub(templ, data_desc='gen', ftype='png', **comkw), center=0., cmap='bwr', what='top explanation')
-        save_data_h5(s_gen, config.exsub(templ, data_desc='gen', ftype='h5', **comkw))
+        save_aligned_image(gen, config.exsub(templ, data_desc='input<gen>', ftype='png', **comkw), config.data.bbox, what='generated input data')
+        save_colorized_image(s_gen, config.exsub(templ, data_desc='pattern<gen>', ftype='png', **comkw), center=0., cmap='bwr', what='top explanation')
+        save_data_h5(s_gen, config.exsub(templ, data_desc='pattern<gen>', ftype='h5', **comkw))
 
 @register_command
 def predict(args, config):

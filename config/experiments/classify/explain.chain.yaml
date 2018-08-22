@@ -10,10 +10,10 @@ tail:
             - # MSCN28
                 tag: 'MSCN28'
                 dict:
-                    nepochs: 20
                     nets:
                         classifier:
                             type: 'MSCN28'
+                            name: 'fcnn'
                             epoch:  20
                             kwargs:
                                 outnum: 10
@@ -29,6 +29,8 @@ tail:
                         dict:
                             nets:
                                 classifier:    {merge_batchnorm: True}
+                            explanation:
+                                single_out: True
                         tail:
                             -
                                 tag: 'bias'
@@ -93,6 +95,7 @@ tail:
                             pattern:
                                 init: False
                                 aepoch: 0
+                                single_out: True
                         tail:
                             -
                                 tag: 'linear'
@@ -129,10 +132,10 @@ tail:
             - # cnn_2convb_2dense
                 tag: 'cnn'
                 dict:
-                    nepochs: 20
                     nets:
                         classifier:
                             type: 'cnn_2convb_2dense'
+                            name: 'cnn'
                             epoch:  20
                             kwargs:
                                 outnum: 10
@@ -144,7 +147,6 @@ tail:
             - # mlp_3dense
                 tag: 'mlp'
                 dict:
-                    nepochs: 20
                     nets:
                         classifier:
                             type: 'mlp_3dense'
@@ -157,7 +159,6 @@ tail:
                                 droprate: 0.0
                 tail:
                     *explaining
-
     - #CIFAR10
         tag: 'cifar10'
         dict:

@@ -165,9 +165,9 @@ class Classifier(Model):
 
         out = None
         if single_out:
-            out = net.forward_logged([noise, cond])
+            out = self.netC.forward_logged(data)
             #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
-            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1]) * out
 
         R = self.netC.relevance(data=data, out=out, **mkwargs)
 
@@ -284,9 +284,9 @@ class Classifier(Model):
 
         out = None
         if single_out:
-            out = net.forward_logged([noise, cond])
+            out = self.netC.forward_logged(data)
             #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
-            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1]) * out
 
         R = self.netC.explain_pattern(data, attribution=attribution)
 
@@ -923,7 +923,7 @@ class CGAN(GAN):
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-    def explain(self, K, noise=None, cond=None, num=None, single_out=False, mkwargs={}):
+    def explain(self, K, noise=None, cond=None, num=None, single_out=True, mkwargs={}):
         noise, cond = self.sample_noise(K, noise, cond, num)
 
         net = Sequential()
@@ -934,7 +934,7 @@ class CGAN(GAN):
         if single_out:
             out = net.forward_logged([noise, cond])
             #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
-            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1]) * out
 
         Rn, Rc = net.relevance(data=[noise, cond], out=out, **mkwargs)
         self._out = net._out
@@ -952,7 +952,7 @@ class CGAN(GAN):
         if single_out:
             out = net.forward_logged([noise, cond])
             #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
-            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1]) * out
 
         R = net.explain_pattern(data=[noise, cond], out=out, attribution=attribution)
         self._out = net._out
@@ -966,7 +966,7 @@ class CGAN(GAN):
         if single_out:
             out = self.netD.forward_logged(data)
             #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
-            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1]) * out
 
         R = self.netD.relevance(data=data, out=out, **mkwargs)
         self._out = self.netD._out
@@ -981,7 +981,7 @@ class CGAN(GAN):
         if single_out:
             out = self.netD.forward_logged(data)
             #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
-            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1])
+            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1]) * out
 
         R = self.netD.explain_pattern(data=data, out=out, attribution=attribution)
         self._out = self.netD._out
