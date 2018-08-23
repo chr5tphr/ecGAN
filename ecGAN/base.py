@@ -19,16 +19,20 @@ class Block(nn.Block):
     def _forward(self, *args, **kwargs):
         raise NotImplementedError
 
+    def sattr(self, name, value):
+        # Screw MXNet's messing with __setattr__ of Blocks!
+        # (Parameters are put into _reg_params when __setattr__ (see source of MXNet's Block's __setattr__))
+        return object.__setattr__(self, name, value)
+
 class Intermediate(Block):
     def forward(self, *args, depth=-1):
         return self.forward(self, *args)
 
 class Linear(Block):
-    def _weight(self, ctx=None):
-        return self.weight.data(ctx=ctx)
-
-    def _bias(self, ctx=None):
-        return self.bias.data(ctx=ctx)
+    def __init__(self, *args, **kwargs):
+        self.weight = None
+        self.bias = None
+        super().__init__(*args, **kwargs)
 
 class BatchNormMergable(Block):
     _weight_axis = 0
@@ -76,10 +80,6 @@ class Conv2D(Linear, nn.Conv2D):
         return nd.Convolution(data, weight, bias, name='fwd', **kwargs)
 
 class Conv2DTranspose(Linear, nn.Conv2DTranspose):
-    # Beware the transposed weight of Conv2D!
-    def _weight(self, ctx=None):
-        return self.weight.data(ctx=ctx).flatten().T
-
     def _forward(self, data, weight, bias=None):
         kwargs = self._kwargs.copy()
         kwargs['no_bias'] = True

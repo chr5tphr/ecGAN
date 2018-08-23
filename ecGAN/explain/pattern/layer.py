@@ -17,6 +17,12 @@ class Dense(LinearPatternNet, base.Dense):
     def _shape_pattern(self):
         return self.weight.shape
 
+    def _to_pattern(self, weight):
+        return weight.reshape(self._shape_pattern())
+
+    def _to_weight(self, pattern):
+        return pattern.reshape(self.weight.shape)
+
     def _prepare_data_pattern(self):
         if self._in is None:
             raise RuntimeError('Block has not yet executed forward_logged!')
@@ -41,6 +47,13 @@ class Conv2D(LinearPatternNet, base.Conv2D):
         chan = self.weight.shape[0]
         ksize = np.prod(self.weight.shape[1:])
         return (chan, ksize)
+
+    def _to_pattern(self, weight):
+        f, c, h, w = self.weight.shape
+        return weight.reshape([f, c*h*w])
+
+    def _to_weight(self, pattern):
+        return pattern.reshape(self.weight.shape)
 
     def _prepare_data_pattern(self):
         if self._in is None:
@@ -81,6 +94,13 @@ class Conv2DTranspose(LinearPatternNet, base.Conv2DTranspose):
         chan = self.weight.shape[0]
         ksize = np.prod(self.weight.shape[1:])
         return (ksize, chan)
+
+    def _to_pattern(self, weight):
+        f, c, h, w = self.weight.shape
+        return weight.reshape([f, c*h*w]).T
+
+    def _to_weight(self, pattern):
+        return pattern.T.reshape(self.weight.shape)
 
     def _prepare_data_pattern(self):
         if self._in is None:

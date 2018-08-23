@@ -1,4 +1,5 @@
 import re
+import numpy as np
 import mxnet as mx
 from mxnet import nd, autograd
 from mxnet.gluon import nn, ParameterDict
@@ -32,6 +33,9 @@ class PatternNet(Block):
         return ret
 
     def init_pattern(self, *args):
+        raise NotImplementedError
+
+    def init_pattern_assessment(self, *args):
         raise NotImplementedError
 
     def forward_pattern(self, *args):
@@ -80,87 +84,76 @@ class LinearPatternNet(PatternNet):
         self.num_samples = None
         self.mean_y = None
         self.w_qual = None
+        self._null_pattern = None
 
     def init_pattern(self):
         outsize, insize = self._shape_pattern()
         with self.name_scope():
+            self.sattr('num_samples', self.pparams.get('num_samples',
+                                                       shape=(1,),
+                                                       init=mx.initializer.Zero(),
+                                                       grad_req='null'))
+            self.sattr('mean_y'     , self.pparams.get('mean_y',
+                                                       shape=(1, outsize),
+                                                       init=mx.initializer.Zero(),
+                                                       grad_req='null'))
+            for regime in self._regimes:
+                regime.init_pattern(self.pparams, [outsize, insize])
+
+    def init_pattern_assessment(self):
+        outsize, insize = self._shape_pattern()
+        with self.name_scope():
             # Screw MXNet's messing with __setattr__ of Blocks!
             # (Parameters are put into _reg_params when __setattr__ (see source of MXNet's Block's __setattr__))
-            object.__setattr__(self, 'num_samples', self.pparams.get('num_samples',
-                                                                     shape=(1,),
-                                                                     init=mx.initializer.Zero(),
-                                                                     grad_req='null'))
-            object.__setattr__(self, 'mean_y', self.pparams.get('mean_y',
-                                                                shape=(1, outsize),
-                                                                init=mx.initializer.Zero(),
-                                                                grad_req='null'))
-            object.__setattr__(self, 'var_y', self.pparams.get('var_y',
-                                                               shape=(1, outsize),
-                                                               init=mx.initializer.Zero(),
-                                                               grad_req='null'))
-            object.__setattr__(self, 'mean_d', self.pparams.get('mean_d',
-                                                                shape=(1, insize),
-                                                                init=mx.initializer.Zero(),
-                                                                grad_req='null'))
-            object.__setattr__(self, 'cov_dd', self.pparams.get('cov_dd',
-                                                                shape=(insize, insize),
-                                                                init=mx.initializer.Zero(),
-                                                                grad_req='null'))
-            object.__setattr__(self, 'cov_dy', self.pparams.get('cov_dy',
-                                                                shape=(outsize, insize),
-                                                                init=mx.initializer.Zero(),
-                                                                grad_req='null'))
-            object.__setattr__(self, 'w_qual', self.pparams.get('w_qual',
-                                                                shape=(outsize, insize),
-                                                                init=mx.initializer.Xavier(),
-                                                                grad_req='write'))
-            for regime in self._regimes:
-                regime.mean_x = self.pparams.get('mean_x_%s'%str(regime),
-                                                 shape=(outsize, insize),
-                                                 init=mx.initializer.Zero(),
-                                                 grad_req='null')
-                regime.mean_xy = self.pparams.get('mean_xy_%s'%str(regime),
+            self.sattr('var_y' , self.pparams.get('var_y',
+                                                  shape=(1, outsize),
+                                                  init=mx.initializer.Zero(),
+                                                  grad_req='null'))
+            self.sattr('mean_d', self.pparams.get('mean_d',
+                                                  shape=(1, insize),
+                                                  init=mx.initializer.Zero(),
+                                                  grad_req='null'))
+            self.sattr('cov_dd', self.pparams.get('cov_dd',
+                                                  shape=(insize, insize),
+                                                  init=mx.initializer.Zero(),
+                                                  grad_req='null'))
+            self.sattr('cov_dy', self.pparams.get('cov_dy',
                                                   shape=(outsize, insize),
                                                   init=mx.initializer.Zero(),
-                                                  grad_req='null')
-                regime.num_y = self.pparams.get('num_y_%s'%str(regime),
-                                                shape=(1, outsize),
-                                                init=mx.initializer.Zero(),
-                                                grad_req='null')
-                regime.pattern = self.pparams.get('pattern_%s'%str(regime),
+                                                  grad_req='null'))
+            self.sattr('w_qual', self.pparams.get('w_qual',
                                                   shape=(outsize, insize),
-                                                  #init=mx.initializer.Constant(1.),
                                                   init=mx.initializer.Xavier(),
-                                                  grad_req='write')
-                regime.pias = self.pparams.get('pias_%s'%str(regime),
-                                               shape=(insize,),
-                                               init=mx.initializer.Zero(),
-                                               grad_req='write')
+                                                  grad_req='write'))
 
     def forward_pattern(self, x):
         z = None
         bias = self.bias.data(ctx=x.context) if self.bias is not None else None
+
+        self._null_pattern = self.weight.data(ctx=x.context).copy()
+        z = self._forward(x, self._null_pattern, bias)
+
         for regime in self._regimes:
-            regime.pattern_ref = self._weight(ctx=x.context).copy()
-            a_reg = regime.pattern_ref
-            z_reg = self._forward(x, a_reg, bias)
+            regime.pattern_ref = self.weight.data(ctx=x.context).copy()
+            z_reg = self._forward(x, regime.pattern_ref, bias)
             # regimes are assumed to be disjunct
-            if z is None:
-                z = nd.ones_like(z_reg) * self._noregconst
             z = nd.where(regime(z_reg), z_reg, z)
         return z
 
     def overload_weight_reset(self):
+        self._null_pattern[:] = self.weight.data(ctx=self._null_pattern.context).copy()
         for regime in self._regimes:
-            regime.pattern_ref[:] = self._weight(ctx=regime.pattern_ref.context).reshape(regime.pattern_ref.shape)
+            regime.pattern_ref[:] = self.weight.data(ctx=regime.pattern_ref.context).copy()
 
     def overload_weight_pattern(self):
+        self._null_pattern[:] = nd.zeros_like(self._null_pattern)
         for regime in self._regimes:
-            regime.pattern_ref[:] = regime.pattern.data(ctx=regime.pattern_ref.context).reshape(regime.pattern_ref.shape)
+            regime.pattern_ref[:] = self.to_weight(regime.pattern.data(ctx=regime.pattern_ref.context))
 
     def overload_weight_attribution_pattern(self):
+        self._null_pattern[:] = nd.zeros_like(self._null_pattern)
         for regime in self._regimes:
-            regime.pattern_ref *= regime.pattern.data(ctx=regime.pattern_ref.context).reshape(regime.pattern_ref.shape)
+            regime.pattern_ref *= self.to_weight(regime.pattern.data(ctx=regime.pattern_ref.context))
 
     def backward_pattern(self, y_sig):
         if self._out is None:
@@ -169,7 +162,7 @@ class LinearPatternNet(PatternNet):
         return self._signal_pattern(y_sig, y_cond)
 
     def compute_pattern(self, ctx=None):
-        weight = self._weight(ctx=ctx).flatten()
+        weight = self.to_pattern(self.weight.data(ctx=ctx))
         for regime in self._regimes:
             cov = regime.mean_xy.data(ctx=ctx) - regime.mean_x.data(ctx=ctx) * self.mean_y.data(ctx=ctx).T
             var_y = (weight * cov).sum(axis=1, keepdims=True)
@@ -295,7 +288,29 @@ class LinearPatternNet(PatternNet):
     def _backward_pattern(self, y, pattern, pias=None):
         raise NotImplementedError
 
+    def to_pattern(self, weight):
+        if (np.array(self.weight.shape) != np.array(weight.shape)).any():
+            raise ValueError('Weight shapes mismatch!')
+        pattern = self._to_pattern(weight)
+        if (np.array(self._shape_pattern()) != np.array(pattern.shape)).any():
+            raise ValueError('Weight to pattern shape mismatch!')
+        return pattern
+
+    def to_weight(self, pattern):
+        if (np.array(self._shape_pattern()) != np.array(pattern.shape)).any():
+            raise ValueError('Pattern shapes mismatch!')
+        weight = self._to_weight(pattern)
+        if (np.array(self.weight.shape) != np.array(weight.shape)).any():
+            raise ValueError('Pattern to weight shape mismatch!')
+        return weight
+
     def _shape_pattern(self):
+        raise NotImplementedError
+
+    def _to_pattern(self, weight):
+        raise NotImplementedError
+
+    def _to_weight(self, pattern):
         raise NotImplementedError
 
     @staticmethod
@@ -352,6 +367,26 @@ class PatternRegime(object):
         self.num_y = None
         self.pattern = None
         self.pattern_ref = None
+
+    def init_pattern(self, pparams, shape):
+        outsize, insize = shape
+        self.mean_x  = pparams.get('mean_x_%s'%str(self),
+                                   shape=(outsize, insize),
+                                   init=mx.initializer.Zero(),
+                                   grad_req='null')
+        self.mean_xy = pparams.get('mean_xy_%s'%str(self),
+                                   shape=(outsize, insize),
+                                   init=mx.initializer.Zero(),
+                                   grad_req='null')
+        self.num_y   = pparams.get('num_y_%s'%str(self),
+                                   shape=(1, outsize),
+                                   init=mx.initializer.Zero(),
+                                   grad_req='null')
+        self.pattern = pparams.get('pattern_%s'%str(self),
+                                   shape=(outsize, insize),
+                                   init=mx.initializer.Constant(1.),
+                                   #init=mx.initializer.Xavier(),
+                                   grad_req='write')
 
     def __str__(self):
         return self.name

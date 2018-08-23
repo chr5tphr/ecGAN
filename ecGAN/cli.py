@@ -32,19 +32,19 @@ ress = RessourceManager()
 def main():
     parser = ArgumentParser()
 
-    parser.add_argument('command', choices=commands.keys())
-    parser.add_argument('-f', '--config', action='append', default=[])
-    parser.add_argument('-c', '--chain', action='append', default=[])
-    parser.add_argument('-u', '--update', action='append', default=[])
-    parser.add_argument('--epoch_range', nargs=3, type=int)
-    parser.add_argument('--iter', type=int, default=1)
-    parser.add_argument('--seed', type=int, default=0xDEADBEEF)
-    parser.add_argument('--classnum', type=int, default=10)
-    parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--mkdirs', action='store_true')
-    parser.add_argument('--crash_chain', action='store_true')
-    parser.add_argument('-k', '--pskip', action='append', type=int, default=[])
-    parser.add_argument('-t', '--tag', type=str, default='', help='-t \'(tag1|!tag2)&tag3|tag4\' := ((tag1 or not tag2) and tag3) or tag4')
+    parser.add_argument(      'command'      , choices=commands.keys())
+    parser.add_argument('-f', '--config'     , action='append', default=[])
+    parser.add_argument('-c', '--chain'      , action='append', default=[])
+    parser.add_argument('-u', '--update'     , action='append', default=[])
+    parser.add_argument(      '--epoch_range', type=int, nargs=3)
+    parser.add_argument(      '--iter'       , type=int, default=1)
+    parser.add_argument(      '--seed'       , type=int, default=0xDEADBEEF)
+    parser.add_argument(      '--classnum'   , type=int, default=10)
+    parser.add_argument(      '--debug'      , action='store_true')
+    parser.add_argument(      '--mkdirs'     , action='store_true')
+    parser.add_argument(      '--crash_chain', action='store_true')
+    parser.add_argument('-k', '--pskip'      , action='append', type=int, default=[])
+    parser.add_argument('-t', '--tag'        , type=str, default='', help='-t \'(tag1|!tag2)&tag3|tag4\' := ((tag1 or not tag2) and tag3) or tag4')
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -127,12 +127,12 @@ def mkdirs(args, config):
         'pattern.outout',
         'pattern.save',
         'pattern.load',
-        'nets.discriminator.params',
-        'nets.discriminator.save',
-        'nets.generator.params',
-        'nets.generator.save',
-        'nets.classifier.params',
-        'nets.classifier.save',
+        'nets.dis.params',
+        'nets.dis.save',
+        'nets.gen.params',
+        'nets.gen.save',
+        'nets.cls.params',
+        'nets.cls.save',
         ]
     for key in explore:
         try:
@@ -181,46 +181,40 @@ def print_config(args, config):
 
 @register_command
 def train(args, config):
-    # print(yaml.safe_dump(config.raw(), default_flow_style=False))
-    ctx = ress(make_ctx, config.device, config.device_id)
-
-    batch_size = config.batch_size
-    nepochs = config.nepochs
-
-    data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
+    ctx   = ress(make_ctx, config.device, config.device_id)
+    data  = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
-    model.train(data, batch_size, nepochs)
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
+    model.train(data, config.batch_size, config.nepochs)
 
     del model
 
 
 @register_command
 def generate(args, config):
-    ctx = ress(make_ctx, config.device, config.device_id)
-
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
-
-    num = 30
-    K = args.classnum
-    cond = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
-    netnam = config.nets.generator.name
-    net_epoch = config.nets.generator.epoch
-    templ = config.genout
+    ctx       = ress(make_ctx, config.device, config.device_id)
+    model     = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
+    num       = 30
+    K         = args.classnum
+    cond      = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
+    net_desc  = config.nets[config.model.kwargs.generator]
+    netnam    = net_desc.name
+    net_epoch = net_desc.epoch
+    templ     = config.genout
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        gen = model.generate(cond=cond)
+        gen   = model.generate(cond=cond)
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        gen_n = '%s<%s>'%tuple([config.nets.generator.get(nam, '') for nam in ['name', 'type']])
+        gen_n = '%s<%s>'%tuple([config.nets[config.model.kwargs.generator].get(nam, '') for nam in ['name', 'type']])
         save_aligned_image(data=gen,
                            fpath=config.exsub(templ, data_desc='0to9', ftype='png', **comkw),
                            bbox=config.data.bbox,
@@ -228,70 +222,52 @@ def generate(args, config):
 
 @register_command
 def test(args, config):
-    ctx = ress(make_ctx, config.device, config.device_id)
-
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
+    ctx        = ress(make_ctx, config.device, config.device_id)
     batch_size = config.batch_size
-    data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data       = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
-    model = models[config.model](ctx=ctx, config=config)
-    metr, acc = model.test(data=data, batch_size=batch_size)
+    model      = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
+    metr, acc  = model.test(data=data, batch_size=batch_size)
 
-    top_n = '%s<%s>'%tuple([config.nets.classifier.get(nam, '') for nam in ['name', 'type']])
+    top_n      = '%s<%s>'%tuple([config.nets[config.model.kwargs.classifier].get(nam, '') for nam in ['name', 'type']])
     getLogger('ecGAN').info('%s("%s"): %s=%.4f', top_n, config.data.func, metr, acc)
 
 @register_command
 def test_gan(args, config):
-    ctx = ress(make_ctx, config.device, config.device_id)
-
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    batch_size = config.batch_size
-    #K = config.nets.get(config.nets.generator.top, 'discriminator').kwargs.get('outnum', 10)
-    K = 10
+    ctx        = ress(make_ctx, config.device, config.device_id)
+    K          = 10
+    model      = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
+    metr, acc  = model.test(K=K, num=10000, batch_size=config.batch_size)
 
-    model = models[config.model](ctx=ctx, config=config)
-    metr, acc = model.test(K=K, num=10000, batch_size=batch_size)
-
-    gen_n = '%s<%s>'%tuple([config.nets.generator.get(nam, '') for nam in ['name', 'type']])
-    top_n = '%s<%s>'%tuple([config.nets.get(config.nets.generator.get('top', 'discriminator')).get(nam, '') for nam in ['name', 'type']])
+    gen_n      = '%s<%s>'%tuple([config.nets[config.model.kwargs.generator]    .get(nam, '') for nam in ['name', 'type']])
+    top_n      = '%s<%s>'%tuple([config.nets[config.model.kwargs.discriminator].get(nam, '') for nam in ['name', 'type']])
     getLogger('ecGAN').info('%s(%s(…)): %s=%.4f', top_n, gen_n, metr, acc)
 
 @register_command
-def model_debug(args, config):
-    ctx = ress(make_ctx, config.device, config.device_id)
-
-    if config.log:
-        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
-
-    batch_size = config.batch_size
-    data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
-
-    model = models[config.model](ctx=ctx, config=config)
-
-    import ipdb; ipdb.set_trace()
-
-@register_command
 def explain(args, config):
-    if config.model == 'CGAN':
+    if config.model.type == 'CGAN':
         return explain_cgan(args, config)
 
-    ctx = ress(make_ctx, config.device, config.device_id)
-
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
+    ctx       = ress(make_ctx, config.device, config.device_id)
 
-    data_fp = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
+    model     = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
+
+    data_fp   = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
 
-    netnam = '%s<%s>'%(config.nets.classifier.name, config.nets.classifier.type)
-    net_epoch = config.nets.classifier.epoch
-    templ = config.explanation.output
+    net_desc  = config.nets[config.model.kwargs.classifier]
+    netnam    = '%s<%s>'%(net_desc.name, net_desc.type)
+    net_epoch = net_desc.epoch
+    templ     = config.explanation.output
 
     if args.seed:
         random.seed(args.seed)
@@ -299,10 +275,10 @@ def explain(args, config):
     for i, (data, label) in enumerate(data_iter):
         if i >= args.iter:
             break
-        data = data.as_in_context(ctx)
-        label = label.as_in_context(ctx)
+        data      = data.as_in_context(ctx)
+        label     = label.as_in_context(ctx)
 
-        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
+        comkw     = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
         relevance = model.explain(data, single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
 
@@ -319,28 +295,29 @@ def explain_cgan(args, config):
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
+    model     = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
 
-    num = 30
-    K = args.classnum
-    cond = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
-    netnam = config.nets.get(config.nets.generator.top, 'discriminator').name
-    net_epoch = config.nets.get(config.nets.generator.top, 'discriminator').epoch
-    templ = config.explanation.output
+    num       = 30
+    K         = args.classnum
+    cond      = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
+    top_desc  = config.nets[config.model.kwargs.discriminator]
+    netnam    = top_desc.name
+    net_epoch = top_desc.epoch
+    templ     = config.explanation.output
 
     if args.seed:
         random.seed(args.seed)
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        s_gen, gen = model.explain_top(K, noise, cond, single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
-        s_noise, s_cond = model.explain(K, noise, cond, single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
+        args   , kwargs = [K, noise, cond], dict(single_out=config.explanation.get('single_out', False),  mkwargs=config.explanation.get('kwargs', {}))
+        s_gen  , gen    = model.explain_top(*args, **kwargs)
+        s_noise, s_cond = model.explain    (*args, **kwargs)
 
-        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
+        comkw           = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
         save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
 
-        #save_raw_image(noise.squeeze(), config.exsub(templ, iter=i, data_desc='input.noise', ftype='png'))
         save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(),
                                 config.exsub(templ, data_desc='input<bar>', ftype='png', **comkw))
 
@@ -352,57 +329,8 @@ def explain_cgan(args, config):
 
 
         save_aligned_image(gen, config.exsub(templ, data_desc='input<gen>', ftype='png', **comkw), config.data.bbox, what='generated input data')
-        save_colorized_image(s_gen, config.exsub(templ, data_desc='relevance<gen>', ftype='png', **comkw), center=0., cmap='bwr', what='top explanation')
+        save_colorized_image(s_gen, config.exsub(templ, data_desc='relevance<gen>', ftype='png', **comkw), center=0., cmap=config.cmap, what='top explanation')
         save_data_h5(s_gen, config.exsub(templ, data_desc='relevance<gen>', ftype='h5', **comkw))
-
-@register_command
-def explain_gan(args, config):
-    ctx = ress(make_ctx, config.device, config.device_id)
-
-    if config.log:
-        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
-
-    model = models[config.model](ctx=ctx, config=config)
-
-    label = None
-    if config.model in ['CCGAN', 'CGAN', 'WCGAN']:
-        K = args.classnum
-        label = nd.one_hot(linspace(0, K, 30, ctx=ctx, dtype='int32'), K)
-
-    for i in range(args.iter):
-        relTop, Rtc, relG, Rc, noise, gen = model.explain(label=label)
-
-        # TODO FIX
-        save_explanation(relTop,
-                         data=gen,
-                         config=config,
-                         image=config.explanation.image,
-                         output=config.explanation.output,
-                         source=config.explanation.input,
-                         data_desc='%s.%s'%(config.nets.generator.type, config.start_epoch),
-                         net=config.explanation.top_net,
-                         i=i)
-        # TODO FIX
-        save_explanation(relG,
-                         data=noise,
-                         config=config,
-                         image=config.explanation.image,
-                         output=config.explanation.output,
-                         source=config.explanation.input,
-                         data_desc='noise',
-                         net='generator',
-                         i=i)
-
-        if Rc is not None:
-            save_explanation(Rc,
-                             data=label,
-                             config=config,
-                             image=config.explanation.image,
-                             output=config.explanation.output,
-                             source=config.explanation.input,
-                             data_desc='condition',
-                             net='generator',
-                             i=i)
 
 @register_command
 def learn_pattern(args, config):
@@ -413,20 +341,20 @@ def learn_pattern(args, config):
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
     model.load_pattern_params()
     model.learn_pattern(data, batch_size)
 
 @register_command
 def fit_pattern(args, config):
-    ctx = ress(make_ctx, config.device, config.device_id)
+    ctx        = ress(make_ctx, config.device, config.device_id)
     batch_size = config.batch_size
-    data = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data       = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
     model.load_pattern_params()
     model.fit_pattern(data, batch_size)
 
@@ -441,7 +369,7 @@ def stats_assess_pattern(args, config):
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
     model.load_pattern_params()
     model.stats_assess_pattern(data, batch_size)
 
@@ -454,7 +382,7 @@ def fit_assess_pattern(args, config):
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
     model.load_pattern_params()
     model.fit_assess_pattern(data, batch_size)
 
@@ -465,7 +393,7 @@ def assess_pattern(args, config):
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
     model.load_pattern_params()
     rho = model.assess_pattern()
 
@@ -474,7 +402,7 @@ def assess_pattern(args, config):
 
 @register_command
 def explain_pattern(args, config):
-    if config.model == 'CGAN':
+    if config.model.type == 'CGAN':
         return explain_pattern_cgan(args, config)
 
     ctx = ress(make_ctx, config.device, config.device_id)
@@ -482,14 +410,15 @@ def explain_pattern(args, config):
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
     model.load_pattern_params()
 
     data_fp = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
     data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
 
-    netnam = '%s<%s>'%(config.nets.classifier.name, config.nets.classifier.type)
-    net_epoch = config.nets.classifier.epoch
+    net_desc = config.nets[config.model.kwargs.classifier]
+    netnam = '%s<%s>'%(net_desc.name, net_desc.type)
+    net_epoch = net_desc.epoch
     templ = config.pattern.output
 
     if args.seed:
@@ -503,7 +432,7 @@ def explain_pattern(args, config):
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        relevance = model.explain_pattern(data, single_out=config.pattern.get('single_out', False), attribution=config.pattern.get('type') == 'attribution')
+        relevance = model.explain_pattern(data, single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
 
         relevance = relevance.reshape(data.shape)
 
@@ -522,24 +451,25 @@ def explain_pattern_cgan(args, config):
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
     model.load_pattern_params()
 
-    num = 30
-    K = args.classnum
-    cond = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
-    # save_raw_image(cond.squeeze(), config.exsub(templ, iter=0, data_desc='input.cond', ftype='png'))
-    netnam = config.nets.get(config.nets.generator.top, 'discriminator').name
-    net_epoch = config.nets.get(config.nets.generator.top, 'discriminator').epoch
-    templ = config.pattern.output
+    num       = 30
+    K         = args.classnum
+    cond      = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
+    net_desc  = config.nets[config.model.kwargs.discriminator]
+    netnam    = net_desc.name
+    net_epoch = net_desc.epoch
+    templ     = config.pattern.output
 
     if args.seed:
         random.seed(args.seed)
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        s_gen, gen = model.explain_pattern_top(K, noise, cond, single_out=config.pattern.get('single_out', False), attribution=config.pattern.get('type') == 'attribution')
-        s_noise, s_cond = model.explain_pattern(K, noise, cond, single_out=config.pattern.get('single_out', False), attribution=config.pattern.get('type') == 'attribution')
+        args   , kwargs = [K, noise, cond], dict(single_out=config.pattern.get('single_out', False), attribution=config.pattern.get('type') == 'attribution')
+        s_gen  , gen    = model.explain_pattern_top(*args, **kwargs)
+        s_noise, s_cond = model.explain_pattern    (*args, **kwargs)
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
@@ -554,7 +484,7 @@ def explain_pattern_cgan(args, config):
         save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.exsub(templ, data_desc='pattern<bar>', ftype='png', **comkw))
 
         save_aligned_image(gen, config.exsub(templ, data_desc='input<gen>', ftype='png', **comkw), config.data.bbox, what='generated input data')
-        save_colorized_image(s_gen, config.exsub(templ, data_desc='pattern<gen>', ftype='png', **comkw), center=0., cmap='bwr', what='top explanation')
+        save_colorized_image(s_gen, config.exsub(templ, data_desc='pattern<gen>', ftype='png', **comkw), center=0., cmap=config.cmap, what='top explanation')
         save_data_h5(s_gen, config.exsub(templ, data_desc='pattern<gen>', ftype='h5', **comkw))
 
 @register_command
@@ -564,7 +494,7 @@ def predict(args, config):
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
 
     for i in range(args.iter):
         output = model.predict().asnumpy()
@@ -579,13 +509,13 @@ def check_bias(args, config):
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model = models[config.model](ctx=ctx, config=config)
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
 
     txt = 'At least one bias of nets %s is positive!'
     if model.check_bias():
         txt = 'All bias\' of nets %s are negative!'
 
-    nets = ', '.join(['%s<%s>'%(net.name, net.type) for net in config.nets.values()])
+    nets = ', '.join(['%s<%s>'%(net.name, net.type) for net in config.nets.values() if net.active])
 
     getLogger('ecGAN').info(txt, nets)
 

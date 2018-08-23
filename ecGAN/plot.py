@@ -89,7 +89,7 @@ def save_colorized_image(data, fpath, center=None, cmap='hot', batchnorm=False, 
     #getLogger('ecGAN').debug('data min %s, max %s', str(data.min()), str(data.max()))
     data = (data * 255).clip(0, 255).astype(np.uint8)
 
-    data = align_images(data, 5, 6, H, W, 3)
+    data = align_images(data, oH, oW, H, W, 3)
     imwrite(fpath, data)
     getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 

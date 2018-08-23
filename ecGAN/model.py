@@ -97,8 +97,9 @@ class Model(object):
 @register_model
 class Classifier(Model):
     def __init__(self, **kwargs):
+        self._classifier    = kwargs.pop('classifier')
         super().__init__(**kwargs)
-        self.netC = self.nets['classifier']
+        self.netC = self.nets[self._classifier]
 
     def train(self, data, batch_size, nepochs):
         config = self.config
@@ -109,14 +110,14 @@ class Classifier(Model):
         data_iter = gluon.data.DataLoader(data, batch_size, shuffle=True)
         loss = gluon.loss.SoftmaxCrossEntropyLoss()
         trainer = gluon.Trainer(netC.collect_params(),
-            config.nets.classifier.get('optimizer', 'adam'),
-            config.nets.classifier.get('optkwargs', {'learning_rate': 0.01}))
+            config.nets[self._classifier].get('optimizer', 'adam'),
+            config.nets[self._classifier].get('optkwargs', {'learning_rate': 0.01}))
         epoch = self.start_epoch
 
         metric = mx.metric.Accuracy()
 
         getLogger('ecGAN').info('Starting training of model %s, classifier %s at epoch %d',
-                            config.model, config.nets.classifier.type, epoch)
+                            config.model.type, config.nets[self._classifier].type, epoch)
 
         try:
             for epoch in range(self.start_epoch, self.start_epoch + nepochs):
@@ -161,7 +162,7 @@ class Classifier(Model):
 
     def explain(self, data, single_out=False, mkwargs={}):
         if not isinstance(self.netC, Explainable):
-            raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets[self._classifier].type)
 
         out = None
         if single_out:
@@ -179,11 +180,11 @@ class Classifier(Model):
 
         return R
 
-    def learn_pattern(self, data, batch_size):
+    def learn_pattern(self, dataset, batch_size):
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets[self._classifier].type)
 
-        data_iter = gluon.data.DataLoader(data, batch_size)
+        data_iter = gluon.data.DataLoader(dataset, batch_size)
 
         for i, (data, label) in enumerate(data_iter):
             data = data.as_in_context(self.ctx)
@@ -196,11 +197,11 @@ class Classifier(Model):
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-        getLogger('ecGAN').info('Learned pattern for net %s', self.config.nets.classifier.type)
+        getLogger('ecGAN').info('Learned pattern for net %s', self.config.nets[self._classifier].type)
 
     def fit_pattern(self, data, batch_size):
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not a PatternNet!'%self.config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not a PatternNet!'%self.config.nets[self._classifier].type)
 
         data_iter = gluon.data.DataLoader(data, batch_size)
 
@@ -230,11 +231,11 @@ class Classifier(Model):
                                          ase_epoch=self.config.pattern.get('aepoch', 0))
 
         getLogger('ecGAN').info('Learned pattern for net %s',
-                             self.config.nets.classifier.type)
+                             self.config.nets[self._classifier].type)
 
     def fit_assess_pattern(self, data, batch_size):
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not a PatternNet!'%self.config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not a PatternNet!'%self.config.nets[self._classifier].type)
 
         data_iter = gluon.data.DataLoader(data, batch_size)
 
@@ -264,7 +265,7 @@ class Classifier(Model):
 
     def stats_assess_pattern(self, data, batch_size):
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not a PatterNet!'%self.config.nets[self._classifier].type)
 
         data_iter = gluon.data.DataLoader(data, batch_size)
 
@@ -280,7 +281,7 @@ class Classifier(Model):
 
     def explain_pattern(self, data, single_out=False, attribution=False):
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets[self._classifier].type)
 
         out = None
         if single_out:
@@ -288,13 +289,14 @@ class Classifier(Model):
             #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
             out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1]) * out
 
-        R = self.netC.explain_pattern(data, attribution=attribution)
+        R = self.netC.explain_pattern(data, out=out, attribution=attribution)
+        self._out = self.netC._out
 
         return R
 
     def assess_pattern(self):
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets[self._classifier].type)
 
         R = self.netC.assess_pattern()
 
@@ -302,7 +304,7 @@ class Classifier(Model):
 
     def backward_pattern(self, data):
         if not isinstance(self.netC, PatternNet):
-            raise NotImplementedError('\'%s\' is no PatternNet!'%self.config.nets.classifier.type)
+            raise NotImplementedError('\'%s\' is no PatternNet!'%self.config.nets[self._classifier].type)
 
         y = self.netC.forward_logged(data)
         R = self.netC.backward_pattern(y)
@@ -329,7 +331,7 @@ class Regressor(Model):
         metric = mx.metric.Loss()
 
         getLogger('ecGAN').info('Starting training of model %s, regressor %s at epoch %d',
-                            config.model, config.nets.regressor.type, epoch)
+                            config.model.type, config.nets.regressor.type, epoch)
 
         try:
             for epoch in range(self.start_epoch, self.start_epoch + nepochs):
@@ -438,9 +440,11 @@ class Regressor(Model):
 @register_model
 class GAN(Model):
     def __init__(self, **kwargs):
+        self._generator     = kwargs.pop('generator')
+        self._discriminator = kwargs.pop('discriminator')
         super().__init__(**kwargs)
-        self.netG = self.nets['generator']
-        self.netD = self.nets[self.config.nets.generator.get('top', 'discriminator')]
+        self.netG = self.nets[self._generator]
+        self.netD = self.nets[self._discriminator]
 
     def train(self, data, batch_size, nepochs):
 
@@ -463,11 +467,11 @@ class GAN(Model):
 
         # trainer for the generator and the discriminator
         trainerG = gluon.Trainer(netG.collect_params(),
-            config.nets.generator.get('optimizer', 'adam'),
-            config.nets.generator.get('optkwargs', {'learning_rate': 0.01}))
+            config.nets[self._generator].get('optimizer', 'adam'),
+            config.nets[self._generator].get('optkwargs', {'learning_rate': 0.01}))
         trainerD = gluon.Trainer(netD.collect_params(),
-            config.nets.discriminator.get('optimizer', 'adam'),
-            config.nets.discriminator.get('optkwargs', {'learning_rate': 0.05}))
+            config.nets[self._discriminator].get('optimizer', 'adam'),
+            config.nets[self._discriminator].get('optkwargs', {'learning_rate': 0.05}))
 
 
         if not config.semi_supervised:
@@ -486,7 +490,7 @@ class GAN(Model):
         K = len(data.classes)
 
         getLogger('ecGAN').info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
-                        config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
+                        config.model.type, config.nets[self._discriminator].type, config.nets[self._generator].type, epoch)
 
         try:
             for epoch in range(self.start_epoch, self.start_epoch + nepochs):
@@ -553,8 +557,8 @@ class GAN(Model):
 
     def save_generated(self, epoch):
         if self.config.genout:
-            gen_n = '%s<%s>'%tuple([self.config.nets.generator.get(nam, '') for nam in ['name', 'type']])
-            fpath = self.config.sub('genout', net_epoch=epoch, data_desc='trainlog', iter=0, ftype='png', net=self.config.nets.generator.name)
+            gen_n = '%s<%s>'%tuple([self.config.nets[self._generator].get(nam, '') for nam in ['name', 'type']])
+            fpath = self.config.sub('genout', net_epoch=epoch, data_desc='trainlog', iter=0, ftype='png', net=self.config.nets[self._generator].name)
             save_aligned_image(data=self.generate(num=30),
                                fpath=fpath,
                                bbox=self.data_bbox,
@@ -614,13 +618,13 @@ class CGAN(GAN):
         one_hot = fuzzy_one_hot if config.fuzzy_labels else nd.one_hot
 
         # trainer for the generator and the discriminator
-        optkwargsD = config.nets.discriminator.get('optkwargs', {'learning_rate': 0.05})
-        optkwargsG = config.nets.generator.get('optkwargs', {'learning_rate': 0.01})
+        optkwargsD = config.nets[self._discriminator].get('optkwargs', {'learning_rate': 0.05})
+        optkwargsG = config.nets[self._generator].get('optkwargs', {'learning_rate': 0.01})
 
         trainerG = gluon.Trainer(netG.collect_params(),
-            config.nets.generator.get('optimizer', 'adam'), optkwargsG)
+            config.nets[self._generator].get('optimizer', 'adam'), optkwargsG)
         trainerD = gluon.Trainer(netD.collect_params(),
-            config.nets.discriminator.get('optimizer', 'adam'), optkwargsD)
+            config.nets[self._discriminator].get('optimizer', 'adam'), optkwargsD)
 
         metric = mx.metric.Accuracy()
 
@@ -634,7 +638,7 @@ class CGAN(GAN):
         epoch = self.start_epoch
 
         getLogger('ecGAN').info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
-                        config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
+                        config.model.type, config.nets[self._discriminator].type, config.nets[self._generator].type, epoch)
 
         # iter_g = 0
         # ncritic = self.config.get('ncritic', 5)
@@ -671,7 +675,7 @@ class CGAN(GAN):
 
                         fake = netG([noise, cond])
                         if config.get('clip_penalty', None) is not None:
-                            lo, hi = config.nets.generator.kwargs.get('clip', [-1., 1.])
+                            lo, hi = config.nets[self._generator].kwargs.get('clip', [-1., 1.])
                             fake_nb = fake
                             fake = nd.clip(fake, lo, hi)
                         fake_output = netD(fake.detach())
@@ -752,8 +756,8 @@ class CGAN(GAN):
 
     def save_generated(self, epoch, cond=None):
         if self.config.genout:
-            gen_n = '%s<%s>'%tuple([self.config.nets.generator.get(nam, '') for nam in ['name', 'type']])
-            fpath = self.config.sub('genout', net_epoch=epoch, data_desc='trainlog', iter=0, ftype='png', net=self.config.nets.generator.name)
+            gen_n = '%s<%s>'%tuple([self.config.nets[self._generator].get(nam, '') for nam in ['name', 'type']])
+            fpath = self.config.sub('genout', net_epoch=epoch, data_desc='trainlog', iter=0, ftype='png', net=self.config.nets[self._generator].name)
             gen = data=self.generate(num=30, cond=cond)
             save_aligned_image(gen,
                                fpath=fpath,
@@ -1040,18 +1044,18 @@ class WGAN(GAN):
 
         # trainer for the generator and the discriminator
         trainerG = gluon.Trainer(netG.collect_params(),
-            config.nets.generator.get('optimizer', 'rmsprop'),
-            config.nets.generator.get('optkwargs', {'learning_rate': 0.00005}))
+            config.nets[self._generator].get('optimizer', 'rmsprop'),
+            config.nets[self._generator].get('optkwargs', {'learning_rate': 0.00005}))
         trainerD = gluon.Trainer(netD.collect_params(),
-            config.nets.discriminator.get('optimizer', 'rmsprop'),
-            config.nets.discriminator.get('optkwargs', {'learning_rate': 0.00005, 'clip_weights': 1e-2}))
+            config.nets[self._discriminator].get('optimizer', 'rmsprop'),
+            config.nets[self._discriminator].get('optkwargs', {'learning_rate': 0.00005, 'clip_weights': 1e-2}))
 
         metric = mx.metric.Loss()
 
         epoch = self.start_epoch
 
         getLogger('ecGAN').info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
-                                config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
+                                config.model.type, config.nets[self._discriminator].type, config.nets[self._generator].type, epoch)
 
         iter_g = 0
 
@@ -1127,11 +1131,11 @@ class WCGAN(WGAN):
 
         # trainer for the generator and the discriminator
         trainerG = gluon.Trainer(netG.collect_params(),
-            config.nets.generator.get('optimizer', 'rmsprop'),
-            config.nets.generator.get('optkwargs', {'learning_rate': 0.00005}))
+            config.nets[self._generator].get('optimizer', 'rmsprop'),
+            config.nets[self._generator].get('optkwargs', {'learning_rate': 0.00005}))
         trainerD = gluon.Trainer(netD.collect_params(),
-            config.nets.discriminator.get('optimizer', 'rmsprop'),
-            config.nets.discriminator.get('optkwargs', {'learning_rate': 0.00005, 'clip_weights': 1e-2}))
+            config.nets[self._discriminator].get('optimizer', 'rmsprop'),
+            config.nets[self._discriminator].get('optkwargs', {'learning_rate': 0.00005, 'clip_weights': 1e-2}))
 
         metric = mx.metric.Loss()
 
@@ -1140,7 +1144,7 @@ class WCGAN(WGAN):
         epoch = self.start_epoch
 
         getLogger('ecGAN').info('Starting training of model %s, discriminator %s, generator %s at epoch %d',
-                        config.model, config.nets.discriminator.type, config.nets.generator.type, epoch)
+                        config.model.type, config.nets[self._discriminator].type, config.nets[self._generator].type, epoch)
 
         iter_g = 0
 

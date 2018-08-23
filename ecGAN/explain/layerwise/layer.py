@@ -5,7 +5,7 @@ import numpy as np
 
 from ... import base
 from ...func import linspace, Mlist
-from .base import LayerwiseExplainable, LinearLayerwiseExplainable, ActLayerwiseExplainable
+from .base import LayerwiseExplainable, LinearLayerwiseExplainable, ActLayerwiseExplainable, PoolingLayerwiseExplainable
 from logging import getLogger
 
 # Linear Layers
@@ -97,7 +97,5 @@ class Reshape(LayerwiseExplainable, base.Reshape):
     def relevance_layerwise(self, out, *args, **kwargs):
         return out.reshape(self._in[0].shape)
 
-class MaxPool2D(ActLayerwiseExplainable, base.MaxPool2D):
-    def relevance_layerwise(self, out, *args, **kwargs):
-        #TODO
-        raise NotImplementedError
+class MaxPool2D(PoolingLayerwiseExplainable, base.MaxPool2D):
+    pass
