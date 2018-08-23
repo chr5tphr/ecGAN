@@ -1,5 +1,53 @@
-fname: '/home/chrstphr/projects/ecGAN/result/cgan/CGAN.yaml'
 tag: 'root'
+dict:
+    root_dir: '/home/chrstphr/projects/ecGAN/result'
+    exp_dir: 'cgan_pos' #'cgan'
+
+    device: 'gpu'
+    device_id: 3
+    debug: True
+
+    init: False
+
+    batch_size: 64
+    save_freq: 5
+
+    feature_matching: False
+    semi_supervised: True
+    fuzzy_labels: False
+    #clip_penalty: 0.001
+
+    data:
+        args: []
+        kwargs:
+            bbox: [-1.,1.]
+            labels: NULL
+        bbox: [-1.,1.]
+
+    net_file: '${root_dir}/${exp_dir}/net.py'
+    nets:
+        gen:
+            param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.gen.type}.${nets.gen.name}.${nets.gen.epoch}.params'
+            save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.gen.type}.${nets.gen.name}.${epoch}.params'
+        dis:
+            param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.dis.type}.${nets.dis.name}.${nets.dis.epoch}.params'
+            save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.dis.type}.${nets.dis.name}.${epoch}.params'
+        cls:
+            param: '${root_dir}/${exp_dir}/${data.func}/params/${nets.cls.type}.${nets.cls.name}.${nets.cls.epoch}.params'
+            save: '${root_dir}/${exp_dir}/${data.func}/params/${nets.cls.type}.${nets.cls.name}.${epoch}.params'
+
+    log: '${root_dir}/${exp_dir}/${data.func}/log/${model.type}.log'
+    genout: '${root_dir}/${exp_dir}/${data.func}/gen/${model.type}.${net}.${net_epoch}.${data_desc}.${iter}.${ftype}'
+    gen_freq: 1
+    cmap: 'bwr'
+
+    pattern:
+        save: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${fit_epoch}.${ase_epoch}.pattern.params'
+        load: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${pattern.start_epoch}.${pattern.aepoch}.pattern.params'
+        output: '${root_dir}/${exp_dir}/${data.func}/rel/${pattern.type}/${model.type}.${net}.${net_epoch}.${pattern.name}.${pattern.start_epoch}.${data_desc}.${iter}.${ftype}'
+
+    explanation:
+        output: '${root_dir}/${exp_dir}/${data.func}/rel/${explanation.desc}/${model.type}.${net}.${net_epoch}.${data_desc}.${iter}.${ftype}'
 tail:
     - #MNIST
         tag: 'mnist'
@@ -7,19 +55,45 @@ tail:
             data: {func: 'mnist', kwargs: {pad: True}}
             nepochs: 100
             nets:
-                generator:     {type: 'MYTCN32', epoch:  100, kwargs: {outnum:  1}}
-                discriminator: {type: 'MSCN32' , epoch:  100, kwargs: {outnum: 20}}
-                classifier:    {type:  NULL    , epoch: NULL, kwargs: {outnum: 10}}
+                gen: {epoch:  100, kwargs: {outnum:  1}}
+                dis: {epoch:  100, kwargs: {outnum: 20}}
+                cls: {epoch:   20, kwargs: {outnum: 10}}
         tail:
             &models
             - #GAN
                 tag: 'gan'
                 dict:
-                    model: 'CGAN'
+                    model:
+                        type: 'CGAN'
+                        kwargs:
+                            generator:     'gen'
+                            discriminator: 'dis'
                     nets:
-                        generator:     {active: True}
-                        discriminator: {active: True}
-                        classifier:    {active: False}
+                        gen: &generator
+                            active: True
+                            type:   'MYTCN32'
+                            name:   'gen'
+                            kwargs:
+                                numhid: 64
+                                use_bias: True
+                                outact: 'tanh'
+                                clip: [-1., 1.]
+                            optimizer: 'adam'
+                            optkwargs:
+                                learning_rate: 0.00001 #0.00001
+                        dis:
+                            active: True
+                            type:   'MSCN32'
+                            name:   'dis'
+                            kwargs:
+                                numhid: 64
+                                use_bias: True
+                                leakage: 0.2
+                            optimizer: 'adam'
+                            optkwargs:
+                                learning_rate: 0.00001 #0.00001
+                        cls:
+                            active: False
                 tail:
                     - # Model Training
                         &training
@@ -29,21 +103,35 @@ tail:
                             data: {kwargs: {train: True}}
                         priority: 0
                         action: 'train'
-                    - # Model Testing
+                    - # Model Testing Generated
                         tag: 'test'
                         dict:
                             data: {kwargs: {train: False}}
                         priority: 1
                         action: 'test_gan'
+                    - # Model Testing Discriminator on Data
+                        tag: 'testdis'
+                        dict:
+                            data: {kwargs: {train: False}}
+                            model:
+                                type: 'Classifier'
+                                kwargs:
+                                    classifier: 'dis'
+                            nets:
+                                gen: {active: False}
+                                dis: {active: True}
+                                cls: {active: False}
+                        priority: 1
+                        action: 'test'
                     - # Fit PatternNet
                         &fitting
                         tag: 'fit'
                         dict:
                             data: {kwargs: {train: True}}
                             nets:
-                                classifier:    {merge_batchnorm: True}
-                                discriminator: {merge_batchnorm: True}
-                                generator:     {merge_batchnorm: True}
+                                cls: {merge_batchnorm: True, kwargs: {droprate: 0.0}}
+                                dis: {merge_batchnorm: True}
+                                gen: {merge_batchnorm: True}
                             pattern:
                                 start_epoch: 0
                                 init: True
@@ -60,9 +148,9 @@ tail:
                                 action: 'learn_pattern'
                                 dict: &linear_pattern
                                     nets:
-                                        generator:     {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
-                                        discriminator: {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
-                                        classifier:    {kwargs: {patest: {relu: 'linear', clip: 'linear', pixel: 'linear', gauss: 'linear'}}}
+                                        gen: {kwargs: {patest: {relu: 'linear', out: 'linear'}}}
+                                        dis: {kwargs: {patest: {relu: 'linear', out: 'linear'}}}
+                                        cls: {kwargs: {patest: {relu: 'linear', out: 'linear'}}}
                                     pattern: {name: 'linear'}
                             -
                                 tag: 'relu'
@@ -70,19 +158,19 @@ tail:
                                 action: 'learn_pattern'
                                 dict: &relu_pattern
                                     nets:
-                                        generator:     {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
-                                        discriminator: {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
-                                        classifier:    {kwargs: {patest: {relu: 'relu', clip: 'clip', pixel: 'relu', gauss: 'relu'}}}
+                                        gen: {kwargs: {patest: {relu: 'relu', out: 'linear'}}}
+                                        dis: {kwargs: {patest: {relu: 'relu', out: 'linear'}}}
+                                        cls: {kwargs: {patest: {relu: 'relu', out: 'linear'}}}
                                     pattern: {name: 'relu'}
-                    - # Explaining model
+                    - # Explaining GAN
                         &explaining
                         tag: 'explain'
                         dict:
                             data: {kwargs: {train: False}}
                             nets:
-                                classifier:    {merge_batchnorm: True}
-                                discriminator: {merge_batchnorm: True}
-                                generator:     {merge_batchnorm: True}
+                                cls: {merge_batchnorm: True, kwargs: {droprate: 0.0}}
+                                dis: {merge_batchnorm: True}
+                                gen: {merge_batchnorm: True}
                         tail:
                             - # Layerwise
                                 &layerwise
@@ -95,9 +183,10 @@ tail:
                                     -
                                         tag: 'lrp'
                                         dict:
-                                            classifier:    {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
-                                            discriminator: {kwargs: {outact: 'relu', leakage: 0.2, explain: {relu: 'alphabeta'}}}
-                                            generator:     {kwargs: {                              explain: {relu: 'alphabeta'}}}
+                                            nets:
+                                                cls: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
+                                                dis: {kwargs: {outact: 'relu', leakage: 0.2, explain: {relu: 'alphabeta'}}}
+                                                gen: {kwargs: {                              explain: {relu: 'alphabeta'}}}
                                             explanation:
                                                 desc: 'lrp'
                                                 kwargs:
@@ -111,9 +200,9 @@ tail:
                                         tag: 'dtd'
                                         dict:
                                             nets:
-                                                classifier:    {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'zplus'}}}
-                                                discriminator: {kwargs: {outact: 'relu', leakage: 0.2, explain: {relu: 'zclip'}}}
-                                                generator:     {kwargs: {                              explain: {relu: 'zplus'}}}
+                                                cls: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'zplus'}}}
+                                                dis: {kwargs: {outact: 'relu', leakage: 0.2, explain: {relu: 'zclip'}}}
+                                                gen: {kwargs: {                              explain: {relu: 'zplus'}}}
                                             explanation:
                                                 desc: 'dtd'
                                                 kwargs:
@@ -177,21 +266,37 @@ tail:
                                         tag: 'relu'
                                         dict: *relu_pattern
                                         tail: *explain_epochs
+                    - # Explaining Discriminator
+                        tag: 'dis'
+                        dict:
+                            model:
+                                type: 'Classifier'
+                                kwargs:
+                                    classifier: 'dis'
+                            nets:
+                                gen: {active: False}
+                                dis: {active: True}
+                                cls: {active: False}
+                        tail:
+                            - *explaining
             - # Classifier
                 tag: 'classifier'
                 dict: &classifier
-                    model: 'Classifier'
+                    model:
+                        type: 'Classifier'
+                        kwargs:
+                            classifier: 'cls'
                     nets:
-                        generator:     {active: False}
-                        discriminator: {active: False}
-                        classifier:    {active: True}
+                        gen: {active: False}
+                        dis: {active: False}
+                        cls: {active: True}
                 tail:
                     - # MSCN32
                         tag: 'fcnn'
                         dict:
                             nepochs: 20
                             nets:
-                                classifier:
+                                cls:
                                     type: 'MSCN32'
                                     name: 'fcnn'
                                     epoch:  20
@@ -200,6 +305,9 @@ tail:
                                         numhid: 64
                                         leakage: 0.0
                                         use_bias: True
+                                    optimizer: 'adam'
+                                    optkwargs:
+                                        learning_rate: 0.001
                         tail:
                             &clsactions
                             - # Model Training
@@ -208,7 +316,7 @@ tail:
                                 tag: 'test'
                                 dict:
                                     data: {kwargs: {train: False}}
-                                    nets: {classifier: {kwargs: {droprate: 0.0}}}
+                                    nets: {cls: {kwargs: {droprate: 0.0}}}
                                 tail:
                                     -
                                         tag: 'tstcls'
@@ -218,8 +326,15 @@ tail:
                                         tag: 'tstgan'
                                         priority: 1
                                         dict:
-                                            model: 'CGAN'
-                                            nets: {generator: {active: True, top: 'classifier'}}
+                                            model:
+                                                type: 'CGAN'
+                                                kwargs:
+                                                    discriminator: 'cls'
+                                                    generator:     'gen'
+                                            nets:
+                                                gen: *generator
+                                                dis: {active: False}
+                                                cls: {active: True}
                                         action: 'test_gan'
                             - # Fit PatternNet
                                 *fitting
@@ -228,8 +343,15 @@ tail:
                             - # Explaining GANs
                                 tag: 'clsgan'
                                 dict:
-                                    model: 'CGAN'
-                                    nets: {generator: {active: True, top: 'classifier'}}
+                                    model:
+                                        type: 'CGAN'
+                                        kwargs:
+                                            discriminator: 'cls'
+                                            generator:     'gen'
+                                    nets:
+                                        gen: *generator
+                                        dis: {active: False}
+                                        cls: {active: True}
                                 tail:
                                     - *explaining
                     - # cnn_2convb_2dense
@@ -237,7 +359,7 @@ tail:
                         dict:
                             nepochs: 20
                             nets:
-                                classifier:
+                                cls:
                                     type: 'cnn_2convb_2dense'
                                     name: 'cnn'
                                     epoch:  20
@@ -246,6 +368,9 @@ tail:
                                         numhid: 512
                                         use_bias: True
                                         droprate: 0.25
+                                    optimizer: 'adam'
+                                    optkwargs:
+                                        learning_rate: 0.001
                         tail:
                             *clsactions
                     - # mlp_3dense
@@ -253,7 +378,7 @@ tail:
                         dict:
                             nepochs: 20
                             nets:
-                                classifier:
+                                cls:
                                     type: 'mlp_3dense'
                                     name: 'mlp'
                                     epoch:  20
@@ -262,6 +387,9 @@ tail:
                                         numhid: 1024
                                         use_bias: True
                                         droprate: 0.25
+                                    optimizer: 'adam'
+                                    optkwargs:
+                                        learning_rate: 0.001
                         tail:
                             *clsactions
     - #CIFAR10
@@ -270,9 +398,9 @@ tail:
             data: {func: 'cifar10', kwargs:{grey: False}}
             nepochs: 400
             nets:
-                generator:     {type: 'MYTCN32', epoch:  400, kwargs: {outnum:  3}, optkwargs: {learning_rate: 1.e-4}}
-                discriminator: {type: 'MSCN32' , epoch:  400, kwargs: {outnum: 20}, optkwargs: {learning_rate: 1.e-4}}
-                classifier:    {type:  NULL    , epoch: NULL, kwargs: {outnum: 10}}
+                gen: {type: 'MYTCN32', epoch:  400, kwargs: {outnum:  3}, optkwargs: {learning_rate: 1.e-4}}
+                dis: {type: 'MSCN32' , epoch:  400, kwargs: {outnum: 20}, optkwargs: {learning_rate: 1.e-4}}
+                cls: {type:  NULL    , epoch: NULL, kwargs: {outnum: 10}}
         tail:
             *models
     - #toydata
@@ -281,8 +409,8 @@ tail:
             data: {func: 'toydata'}
             nepochs: 10
             nets:
-                generator:     {type: 'MYTCN32', epoch:   10, kwargs: {outnum:  1}}
-                discriminator: {type: 'MSCN32' , epoch:   10, kwargs: {outnum: 20}}
-                classifier:    {type:  NULL    , epoch: NULL, kwargs: {outnum: 10}}
+                gen: {type: 'MYTCN32', epoch:   10, kwargs: {outnum:  1}}
+                dis: {type: 'MSCN32' , epoch:   10, kwargs: {outnum: 20}}
+                cls: {type:  NULL    , epoch: NULL, kwargs: {outnum: 10}}
         tail:
             *models

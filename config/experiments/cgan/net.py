@@ -376,7 +376,7 @@ class MYTCN32(Sequential):
         use_bias = kwargs.pop('use_bias', False)
 
         # patest = dict(relu='relu', out='clip', pixel='relu', gauss='relu')
-        patest = dict(relu='linear', out='linear', pixel='linear', gauss='linear')
+        patest = dict(relu='linear', out='linear')
         patest.update(kwargs.pop('patest', {}))
         explain = dict(relu='zplus', out='zclip', pixel='zb', gauss='wsquare')
         explain.update(kwargs.pop('explain', {}))
@@ -386,7 +386,7 @@ class MYTCN32(Sequential):
             self.add(Concat())
 
             self.add(Conv2DTranspose(numhid * 8, 4, strides=1, padding=0, use_bias=use_bias,
-                                     explain=explain['gauss'], regimes=estimators[patest['gauss']]()))
+                                     explain=explain['gauss'], regimes=estimators[patest['relu']]()))
             self.add(BatchNorm())
             self.add(ReLU())
             # _numhid x 4 x 4
@@ -430,7 +430,7 @@ class MSCN32(Sequential):
         use_bias = kwargs.pop('use_bias', False)
 
         # patest = dict(relu='relu', out='clip', pixel='relu', gauss='relu')
-        patest = dict(relu='linear', out='linear', pixel='linear', gauss='linear')
+        patest = dict(relu='linear', out='linear')
         patest.update(kwargs.pop('patest', {}))
         explain = dict(relu='zplus', out='zplus', pixel='zb', gauss='wsquare')
         explain.update(kwargs.pop('explain', {}))
@@ -438,7 +438,7 @@ class MSCN32(Sequential):
         with self.name_scope():
             # _numhid x 32 x 32
             self.add(Conv2D(numhid, 4, strides=2, padding=1, use_bias=use_bias,
-                            explain=explain['pixel'], regimes=estimators[patest['pixel']]()))
+                            explain=explain['pixel'], regimes=estimators[patest['relu']]()))
             self.add(LeakyReLU(leakage))
             # _numhid x 16 x 14
 
@@ -498,7 +498,7 @@ class cnn_2convb_2dense(Sequential):
         use_bias = kwargs.pop('use_bias', False)
 
         # patest = dict(relu='relu', out='clip', pixel='relu', gauss='relu')
-        patest = dict(relu='linear', out='linear', pixel='linear', gauss='linear')
+        patest = dict(relu='linear', out='linear')
         patest.update(kwargs.pop('patest', {}))
         explain = dict(relu='zplus', out='zplus', pixel='zb', gauss='wsquare')
         explain.update(kwargs.pop('explain', {}))
@@ -506,25 +506,25 @@ class cnn_2convb_2dense(Sequential):
         with self.name_scope():
             # 28 x 28
             self.add(Conv2D(128, 3, strides=1, padding=1, use_bias=use_bias,
-                            explain=explain['pixel'], regimes=estimators[patest['pixel']]()))
+                            explain=explain['pixel'], regimes=estimators[patest['relu']]()))
             self.add(ReLU())
             self.add(MaxPool2D(pool_size=2, strides=2))
             # 14 x 14
 
             self.add(Conv2D(128, 3, strides=1, padding=1, use_bias=use_bias,
-                            explain=explain['pixel'], regimes=estimators[patest['pixel']]()))
+                            explain=explain['relu'], regimes=estimators[patest['relu']]()))
             self.add(ReLU())
             self.add(MaxPool2D(pool_size=2, strides=2))
             #  7 x  7
 
             self.add(Conv2D(128, 3, strides=1, padding=1, use_bias=use_bias,
-                            explain=explain['pixel'], regimes=estimators[patest['pixel']]()))
+                            explain=explain['relu'], regimes=estimators[patest['relu']]()))
             self.add(ReLU())
             self.add(MaxPool2D(pool_size=2, strides=2))
             #  3 x  3
 
             self.add(Conv2D(128, 3, strides=1, padding=1, use_bias=use_bias,
-                            explain=explain['pixel'], regimes=estimators[patest['pixel']]()))
+                            explain=explain['relu'], regimes=estimators[patest['relu']]()))
             self.add(ReLU())
             self.add(MaxPool2D(pool_size=2, strides=2))
             #  2 x  2
@@ -537,7 +537,7 @@ class cnn_2convb_2dense(Sequential):
             self.add(Dropout(droprate))
 
             self.add(Dense(outnum,
-                           explain=explain['relu'], regimes=estimators[patest['relu']]()))
+                           explain=explain['out'], regimes=estimators[patest['out']]()))
 
             if outact == 'relu':
                 self.add(ReLU())
@@ -554,8 +554,7 @@ class mlp_3dense(Sequential):
         leakage = kwargs.pop('leakage', 0.0)
         use_bias = kwargs.pop('use_bias', False)
 
-        # patest = dict(relu='relu', out='clip', pixel='relu', gauss='relu')
-        patest = dict(relu='linear', out='linear', pixel='linear', gauss='linear')
+        patest = dict(relu='linear', out='linear')
         patest.update(kwargs.pop('patest', {}))
         explain = dict(relu='zplus', out='zplus', pixel='zb', gauss='wsquare')
         explain.update(kwargs.pop('explain', {}))
@@ -564,7 +563,7 @@ class mlp_3dense(Sequential):
             self += Flatten()
 
             self += Dense(numhid,
-                          explain=explain['relu'], regimes=estimators[patest['relu']]())
+                          explain=explain['pixel'], regimes=estimators[patest['relu']]())
             self += ReLU()
             self += Dropout(droprate)
 
@@ -574,7 +573,7 @@ class mlp_3dense(Sequential):
             self += Dropout(droprate)
 
             self += Dense(outnum,
-                          explain=explain['relu'], regimes=estimators[patest['relu']]())
+                          explain=explain['out'], regimes=estimators[patest['out']]())
 
             if outact == 'relu':
                 self += ReLU()
