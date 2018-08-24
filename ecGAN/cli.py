@@ -261,8 +261,9 @@ def explain(args, config):
 
     model     = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
 
-    data_fp   = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
-    data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
+    dataset   = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data_iter = gluon.data.DataLoader(dataset, 30, shuffle=False, last_batch='discard')
+    K         = len(dataset.classes)
 
     net_desc  = config.nets[config.model.kwargs.classifier]
     netnam    = '%s<%s>'%(net_desc.name, net_desc.type)
@@ -277,10 +278,11 @@ def explain(args, config):
             break
         data      = data.as_in_context(ctx)
         label     = label.as_in_context(ctx)
+        label_oh  = nd.one_hot(label, K)
 
         comkw     = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        relevance = model.explain(data, single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
+        relevance = model.explain(data, cond=label_oh, single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
 
         save_aligned_image(data, config.exsub(templ, data_desc='input<%s>'%config.data.func, ftype='png', **comkw), config.data.bbox)
         save_colorized_image(relevance,
@@ -413,8 +415,10 @@ def explain_pattern(args, config):
     model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
     model.load_pattern_params()
 
-    data_fp = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
-    data_iter = gluon.data.DataLoader(data_fp, 30, shuffle=False, last_batch='discard')
+    dataset = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data_iter = gluon.data.DataLoader(dataset, 30, shuffle=False, last_batch='discard')
+
+    K = len(dataset.classes)
 
     net_desc = config.nets[config.model.kwargs.classifier]
     netnam = '%s<%s>'%(net_desc.name, net_desc.type)
@@ -429,10 +433,11 @@ def explain_pattern(args, config):
             break
         data = data.as_in_context(ctx)
         label = label.as_in_context(ctx)
+        label_oh = nd.one_hot(label, K)
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        relevance = model.explain_pattern(data, single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
+        relevance = model.explain_pattern(data, label=label_oh, single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
 
         relevance = relevance.reshape(data.shape)
 
@@ -458,7 +463,7 @@ def explain_pattern_cgan(args, config):
     K         = args.classnum
     cond      = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
     net_desc  = config.nets[config.model.kwargs.discriminator]
-    netnam    = net_desc.name
+    netnam    = '%s<%s>'%(net_desc.name, net_desc.type)
     net_epoch = net_desc.epoch
     templ     = config.pattern.output
 
@@ -467,7 +472,7 @@ def explain_pattern_cgan(args, config):
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        args   , kwargs = [K, noise, cond], dict(single_out=config.pattern.get('single_out', False), attribution=config.pattern.get('type') == 'attribution')
+        args   , kwargs = [K, noise, cond], dict(single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
         s_gen  , gen    = model.explain_pattern_top(*args, **kwargs)
         s_noise, s_cond = model.explain_pattern    (*args, **kwargs)
 

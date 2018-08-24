@@ -7,14 +7,34 @@ When updating means, the mean simply does not change anymore, which is not that 
 ### Pattern: Mean of Signal cannot be restored
 since noise-mean + signal-mean cannot be decomposed
 
-### Problem: Zero-corners in MNIST conv PatternNet
-because corners are always zero in dataset
+### Zero-corners in MNIST conv PatternNet
+ - Solution: because corners are always zero in dataset
 
-### Problem: Attribution gives wrong predictions
-because we use relu where actually clipping (or something else) is used, output gets lost
-Solution: use clipping regimes
-Problem: Still inaccurate
-Solution: add bias in pattern pass
+### Attribution gives wrong predictions
+- Obsolete:
+    - Problem : because we use relu where actually clipping (or something else) is used, output gets lost
+    - Solution: use clipping regimes
+    - Problem : Still inaccurate
+    - Solution: add bias in pattern pass
+- New Solution:
+    - Have a Null-Pattern that forwards outputs for every output that does not lie in any regime
+
+
+### Broken PatternNet
+- Problem : I only computed one global mean of X
+- Solution: you have to compute the X's means wrt. every output, resulting in a mean of size out x in
+
+### Biases are not negative (LRP,DTD)
+- Problem : LRP and DTD need negative biases, but we do not enforce those for sake of a more performant model
+- Solution: introduce bias in denominator, effectively treating biases as weights and appending a '1' to X. Note that this results in the DTD methods not being conservative anymore!
+
+### LRP/DTD gives empty explanations
+- Problem : since we append a ReLU to networks before explaining, when the highest activation is negative, the explanation will be all zero.
+- Discuss : does negative highest activations, since we trained with softmax, correspond to low confidence?
+- Solution: cherry-pick?!
+
+### PatternAttribution is negative on Generated Data but positive on Test Data
+- Problem : possibly, confidence for the input data is low, resulting in negative output, which in effect flips the sign
 
 ## Questions
 
@@ -45,13 +65,6 @@ When using MaxPool, gradients are one where the maximum was and zero elsewhere.
 Thus, gradients become very sparse, which in case of a discriminator, makes it very hard for the underlying generator to learn.
 
 ## TODO
-- Compare iNNvestigate model and own
-    - export model from keras
-    - import model to mxnet
-    - get stats
-    - get stats in iNNvestigate
-    - compare!
-
 ## Experiments
 
 ### Datasets
@@ -77,6 +90,8 @@ Thus, gradients become very sparse, which in case of a discriminator, makes it v
 ### Tanh vs. Clipping
 - Tanh: no sparse gradients -> inabillity to learn cifar10
 - Clip: does not have the 'noisy pixels', since it can easily reach full colors
+
+- Cifar10 only works with Tanh! (sparse gradients)
 
 
 ## pattern tangens: clipped linear

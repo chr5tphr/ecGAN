@@ -166,7 +166,7 @@ class PoolingLayerwiseExplainable(LayerwiseExplainable):
         a.attach_grad()
         with autograd.record():
             z = nd.Pooling(a, **pkwargs)
-        z.backward(out_grad=R/(z * (z == 0.)))
+        z.backward(out_grad=R/(z + (z == 0.)))
         return a * a.grad
 
 class ActLayerwiseExplainable(LayerwiseExplainable):

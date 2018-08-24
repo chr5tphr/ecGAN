@@ -29,6 +29,8 @@ class GradBasedExplainable(Block):
             if len(ddat) == 1:
                 ddat = ddat[0]
             ret = self.relevance_sensitivity(data=ddat, out=out)
+            if isinstance(ret, nd.NDArray):
+                ret = [ret]
             for tar, val in zip(res, ret):
                 tar += val
 

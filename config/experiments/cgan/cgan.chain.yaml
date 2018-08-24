@@ -233,7 +233,7 @@ tail:
                                                 desc: 'intgrads'
                                                 kwargs:
                                                     method: 'intgrads'
-                                                    num: 100
+                                                    num: 1000
                                         priority: 3
                                         action: 'explain'
                             - # PatternNet
