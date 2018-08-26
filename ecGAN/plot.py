@@ -96,10 +96,16 @@ def save_colorized_image(data, fpath, center=None, cmap='hot', batchnorm=False, 
     imwrite(fpath, data)
     getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 
-def save_data_h5(relevance, fpath, what='explanation'):
+def save_data_h5(info_dict, fpath, what='results'):
     with h5py.File(fpath, 'w') as fp:
-        fp['heatmap'] = asnumpy(relevance)
+        fp.update(info_dict)
     getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
+
+def load_data_h5(keys, fpath, what='results'):
+    with h5py.File(fpath, 'r') as fp:
+        result = [fp[key][:] for key in keys]
+    getLogger('ecGAN').info('Loaded %s from \'%s\'.', what, fpath)
+    return result
 
 def save_cgan_visualization(noise, cond, fpath, what='visualization'):
     fig = plt.figure(figsize=(16, 9))
@@ -143,9 +149,10 @@ def save_raw_image(data, fpath, what='input data'):
     getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 
 def save_predictions(data, fpath):
+    if isinstance(data, nd.NDArray):
+        data = asnumpy(data)
     with open(fpath, 'w') as fp:
-        sdat = asnumpy(data)
-        json.dump(sdat.astype(int).tolist(), fp, indent=2)
+        json.dump(data.astype(int).tolist(), fp, indent=2)
         #json.dump([int(da.asscalar()) for da in data], fp, indent=2)
     getLogger('ecGAN').info('Saved predicted labels in \'%s\'.', fpath)
 

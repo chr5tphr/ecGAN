@@ -17,7 +17,7 @@ from .net import nets
 from .model import models
 from .data import data_funcs
 from .util import mkfilelogger, Config, config_ctx, make_ctx, load_module_file, ChainConfig, RessourceManager, get_logic_parser
-from .plot import plot_data, save_data_h5, save_colorized_image, save_aligned_image, save_raw_image, save_cgan_visualization, save_predictions
+from .plot import plot_data, save_data_h5, load_data_h5, save_colorized_image, save_aligned_image, save_raw_image, save_cgan_visualization, save_predictions
 from .func import linspace, asnumpy
 
 getLogger = logging.getLogger
@@ -192,34 +192,6 @@ def train(args, config):
 
     del model
 
-
-@register_command
-def generate(args, config):
-    if config.log:
-        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
-
-    ctx       = ress(make_ctx, config.device, config.device_id)
-    model     = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
-    num       = 30
-    K         = args.classnum
-    cond      = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
-    net_desc  = config.nets[config.model.kwargs.generator]
-    netnam    = net_desc.name
-    net_epoch = net_desc.epoch
-    templ     = config.genout
-
-    for i in range(args.iter):
-        noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        gen   = model.generate(cond=cond)
-
-        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
-
-        gen_n = '%s<%s>'%tuple([config.nets[config.model.kwargs.generator].get(nam, '') for nam in ['name', 'type']])
-        save_aligned_image(data=gen,
-                           fpath=config.exsub(templ, data_desc='0to9', ftype='png', **comkw),
-                           bbox=config.data.bbox,
-                           what='%s(…|0,…,9)'%(gen_n, epoch))
-
 @register_command
 def test(args, config):
     if config.log:
@@ -250,25 +222,64 @@ def test_gan(args, config):
     getLogger('ecGAN').info('%s(%s(…)): %s=%.4f', top_n, gen_n, metr, acc)
 
 @register_command
-def explain(args, config):
-    if config.model.type == 'CGAN':
-        return explain_cgan(args, config)
-
+def generate(args, config):
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
     ctx       = ress(make_ctx, config.device, config.device_id)
-
     model     = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
-
-    dataset   = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
-    data_iter = gluon.data.DataLoader(dataset, 30, shuffle=False, last_batch='discard')
-    K         = len(dataset.classes)
-
-    net_desc  = config.nets[config.model.kwargs.classifier]
-    netnam    = '%s<%s>'%(net_desc.name, net_desc.type)
+    num       = 30
+    K         = args.classnum
+    cond      = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
+    net_desc  = config.nets[config.model.kwargs.generator]
+    netnam    = net_desc.name
     net_epoch = net_desc.epoch
-    templ     = config.explanation.output
+    templ     = config.genout
+
+    for i in range(args.iter):
+        noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+        gen   = model.generate(cond=cond)
+
+        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
+
+        gen_n = '%s<%s>'%tuple([config.nets[config.model.kwargs.generator].get(nam, '') for nam in ['name', 'type']])
+        save_aligned_image(data=gen,
+                           fpath=config.exsub(templ, data_desc='0to9', ftype='png', **comkw),
+                           bbox=config.data.bbox,
+                           what='%s(…|0,…,9)'%(gen_n, epoch))
+
+
+@register_command
+def explain(args, config):
+    if config.model.type == 'CGAN':
+        return explain_cgan(args, config)
+    elif config.model.type == 'Classifier':
+        return explain_clss(args, config)
+    else:
+        raise NotImplementedError
+
+def explain_clss(args, config):
+    ctx = ress(make_ctx, config.device, config.device_id)
+
+    if config.log:
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
+    if config.use_pattern:
+        model.load_pattern_params()
+
+    dataset = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
+    data_iter = gluon.data.DataLoader(dataset, 30, shuffle=False, last_batch='discard')
+
+    K = len(dataset.classes)
+
+    net_desc = config.nets[config.model.kwargs.classifier]
+    netnam = '%s<%s>'%(net_desc.name, net_desc.type)
+    net_epoch = net_desc.epoch
+    if config.use_pattern:
+        templ = config.pattern.output
+    else:
+        templ = config.explanation.output
 
     if args.seed:
         random.seed(args.seed)
@@ -276,67 +287,156 @@ def explain(args, config):
     for i, (data, label) in enumerate(data_iter):
         if i >= args.iter:
             break
-        data      = data.as_in_context(ctx)
-        label     = label.as_in_context(ctx)
+        data = data.as_in_context(ctx)
+        label = label.as_in_context(ctx)
 
-        comkw     = dict(iter=i, net=netnam, net_epoch=net_epoch)
+        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        relevance = model.explain(data, cond=label.squeeze(), single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
+        if config.use_pattern:
+            relevance = model.explain_pattern(data, cond=label.squeeze(), single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
+        else:
+            relevance = model.explain(data, cond=label.squeeze(), single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
 
-        save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
-        save_predictions(label                    , config.exsub(templ, data_desc='truth'     , ftype='json', **comkw))
+        relevance = relevance.reshape(data.shape)
 
-        save_aligned_image(data, config.exsub(templ, data_desc='input<%s>'%config.data.func, ftype='png', **comkw), config.data.bbox)
-        save_colorized_image(relevance,
-                               config.exsub(templ, data_desc='relevance<%s>'%config.data.func, ftype='png', **comkw),
-                               center=config.get('cmap_center'),
-                               cmap=config.get('cmap', 'hot'))
+        info = {
+            'input'      : data                     .asnumpy(),
+            'prediction' : model._out.argmax(axis=1).asnumpy(),
+            'label'      : label                    .asnumpy(),
+            'relevance'  : relevance                .asnumpy(),
+        }
+        save_data_h5(info, config.exsub(templ, data_desc='result', ftype='h5', **comkw))
 
-@register_command
+    del model
+
 def explain_cgan(args, config):
     ctx = ress(make_ctx, config.device, config.device_id)
 
     if config.log:
         mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-    model     = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
+    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
+    if config.use_pattern:
+        model.load_pattern_params()
 
     num       = 30
     K         = args.classnum
     cond_flat = nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num]
     cond      = nd.one_hot(cond_flat, K).reshape((num, K, 1, 1))
-    top_desc  = config.nets[config.model.kwargs.discriminator]
-    netnam    = top_desc.name
-    net_epoch = top_desc.epoch
-    templ     = config.explanation.output
+    net_desc  = config.nets[config.model.kwargs.discriminator]
+    netnam    = '%s<%s>'%(net_desc.name, net_desc.type)
+    net_epoch = net_desc.epoch
+    if config.use_pattern:
+        templ     = config.pattern.output
+    else:
+        templ     = config.explanation.output
 
     if args.seed:
         random.seed(args.seed)
 
     for i in range(args.iter):
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        args   , kwargs = [K, noise, cond], dict(single_out=config.explanation.get('single_out', False),  mkwargs=config.explanation.get('kwargs', {}))
-        s_gen  , gen    = model.explain_top(*args, **kwargs)
-        s_noise, s_cond = model.explain    (*args, **kwargs)
+        if config.use_pattern:
+            args   , kwargs = [K, noise, cond], dict(single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
+            s_gen  , gen    = model.explain_pattern_top(*args, **kwargs)
+            s_noise, s_cond = model.explain_pattern    (*args, **kwargs)
+        else:
+            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+            args   , kwargs = [K, noise, cond], dict(single_out=config.explanation.get('single_out', False),  mkwargs=config.explanation.get('kwargs', {}))
+            s_gen  , gen    = model.explain_top(*args, **kwargs)
+            s_noise, s_cond = model.explain    (*args, **kwargs)
 
-        comkw           = dict(iter=i, net=netnam, net_epoch=net_epoch)
+        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
-        save_predictions(cond_flat                , config.exsub(templ, data_desc='truth'     , ftype='json', **comkw))
+        info = {
+            'input/noise'          : noise.squeeze()          .asnumpy(),
+            'input/cond'           : cond.squeeze()           .asnumpy(),
+            'generated'            : gen                      .asnumpy(),
+            'prediction'           : model._out.argmax(axis=1).asnumpy(),
+            'label'                : cond_flat                .asnumpy(),
+            'relevance/noise'      : s_noise.squeeze()        .asnumpy(),
+            'relevance/cond'       : s_cond.squeeze()         .asnumpy(),
+            'relevance/generated'  : s_gen                    .asnumpy(),
+        }
+        save_data_h5(info, config.exsub(templ, data_desc='result', ftype='h5', **comkw))
 
-        save_cgan_visualization(asnumpy(noise.squeeze()), asnumpy(cond.squeeze()),
-                                config.exsub(templ, data_desc='input<bar>', ftype='png', **comkw))
+@register_command
+def visualize(args, config):
+    if config.model.type == 'CGAN':
+        return visualize_cgan(args, config)
+    elif config.model.type == 'Classifier':
+        return visualize_clss(args, config)
+    else:
+        raise NotImplementedError
 
-        save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='relevance<noise>', ftype='h5', **comkw))
-        save_data_h5(s_cond.squeeze() , config.exsub(templ, data_desc='relevance<cond>' , ftype='h5', **comkw))
+def visualize_clss(args, config):
+    if config.log:
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
 
-        save_cgan_visualization(asnumpy(s_noise.squeeze()), asnumpy(s_cond.squeeze()),
-                                config.exsub(templ, data_desc='relevance<bar>', ftype='png', **comkw))
+    net_desc = config.nets[config.model.kwargs.classifier]
+    netnam = '%s<%s>'%(net_desc.name, net_desc.type)
+    net_epoch = net_desc.epoch
+    if config.use_pattern:
+        templ = config.pattern.output
+    else:
+        templ = config.explanation.output
 
+    if args.seed:
+        random.seed(args.seed)
+
+    for i in range(args.iter):
+        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
+
+        info_keys = [
+            'input',
+            'prediction',
+            'label',
+            'relevance',
+        ]
+        data, pred, label, relevance = load_data_h5(info_keys, config.exsub(templ, data_desc='result', ftype='h5', **comkw))
+
+        save_predictions(pred  , config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
+        save_predictions(label , config.exsub(templ, data_desc='truth'     , ftype='json', **comkw))
+
+        save_aligned_image(data, config.exsub(templ, data_desc='input<%s>'%config.data.func, ftype='png', **comkw), config.data.bbox)
+        save_colorized_image(relevance,
+                             config.exsub(templ, data_desc='relevance<%s>'%config.data.func, ftype='png', **comkw),
+                             center=config.get('cmap_center'),
+                             cmap=config.get('cmap', 'hot'))
+
+def visualize_cgan(args, config):
+    net_desc  = config.nets[config.model.kwargs.discriminator]
+    netnam    = '%s<%s>'%(net_desc.name, net_desc.type)
+    net_epoch = net_desc.epoch
+    if config.use_pattern:
+        templ     = config.pattern.output
+    else:
+        templ     = config.explanation.output
+
+    for i in range(args.iter):
+        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
+
+        info_keys = [
+            'input/noise',
+            'input/cond',
+            'generated',
+            'prediction',
+            'label',
+            'relevance/noise',
+            'relevance/cond',
+            'relevance/generated',
+        ]
+        noise, cond, gen, pred, label, s_noise, s_cond, s_gen = load_data_h5(info_keys, config.exsub(templ, data_desc='result', ftype='h5', **comkw))
+
+        save_predictions(pred  , config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
+        save_predictions(label , config.exsub(templ, data_desc='truth'     , ftype='json', **comkw))
+
+        save_cgan_visualization(noise, cond, config.exsub(templ, data_desc='input<bar>', ftype='png', **comkw))
+
+        save_cgan_visualization(s_noise, s_cond, config.exsub(templ, data_desc='relevance<bar>', ftype='png', **comkw))
 
         save_aligned_image(gen, config.exsub(templ, data_desc='input<gen>', ftype='png', **comkw), config.data.bbox, what='generated input data')
         save_colorized_image(s_gen, config.exsub(templ, data_desc='relevance<gen>', ftype='png', **comkw), center=0., cmap=config.cmap, what='top explanation')
-        save_data_h5(s_gen, config.exsub(templ, data_desc='relevance<gen>', ftype='h5', **comkw))
 
 @register_command
 def learn_pattern(args, config):
@@ -365,6 +465,7 @@ def fit_pattern(args, config):
     model.fit_pattern(data, batch_size)
 
     del model
+
 
 @register_command
 def stats_assess_pattern(args, config):
@@ -406,99 +507,6 @@ def assess_pattern(args, config):
     txt = ' '.join([str(elem.mean().asscalar()) for elem in rho if elem is not None])
     getLogger('ecGAN').info('Pattern Qualities rho(s) = %s'%txt)
 
-@register_command
-def explain_pattern(args, config):
-    if config.model.type == 'CGAN':
-        return explain_pattern_cgan(args, config)
-
-    ctx = ress(make_ctx, config.device, config.device_id)
-
-    if config.log:
-        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
-
-    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
-    model.load_pattern_params()
-
-    dataset = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
-    data_iter = gluon.data.DataLoader(dataset, 30, shuffle=False, last_batch='discard')
-
-    K = len(dataset.classes)
-
-    net_desc = config.nets[config.model.kwargs.classifier]
-    netnam = '%s<%s>'%(net_desc.name, net_desc.type)
-    net_epoch = net_desc.epoch
-    templ = config.pattern.output
-
-    if args.seed:
-        random.seed(args.seed)
-
-    for i, (data, label) in enumerate(data_iter):
-        if i >= args.iter:
-            break
-        data = data.as_in_context(ctx)
-        label = label.as_in_context(ctx)
-
-        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
-
-        relevance = model.explain_pattern(data, cond=label.squeeze(), single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
-
-        relevance = relevance.reshape(data.shape)
-
-        save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
-        save_predictions(label                    , config.exsub(templ, data_desc='truth'     , ftype='json', **comkw))
-
-        save_aligned_image(data, config.exsub(templ, data_desc='input<%s>'%config.data.func, ftype='png', **comkw), config.data.bbox)
-        save_colorized_image(relevance,
-                               config.exsub(templ, data_desc='pattern<%s>'%config.data.func, ftype='png', **comkw),
-                               center=config.get('cmap_center'),
-                               cmap=config.get('cmap', 'hot'))
-
-    del model
-
-@register_command
-def explain_pattern_cgan(args, config):
-    ctx = ress(make_ctx, config.device, config.device_id)
-
-    if config.log:
-        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
-
-    model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
-    model.load_pattern_params()
-
-    num       = 30
-    K         = args.classnum
-    cond_flat = nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num]
-    cond      = nd.one_hot(cond_flat, K).reshape((num, K, 1, 1))
-    net_desc  = config.nets[config.model.kwargs.discriminator]
-    netnam    = '%s<%s>'%(net_desc.name, net_desc.type)
-    net_epoch = net_desc.epoch
-    templ     = config.pattern.output
-
-    if args.seed:
-        random.seed(args.seed)
-
-    for i in range(args.iter):
-        noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        args   , kwargs = [K, noise, cond], dict(single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
-        s_gen  , gen    = model.explain_pattern_top(*args, **kwargs)
-        s_noise, s_cond = model.explain_pattern    (*args, **kwargs)
-
-        comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
-
-        save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
-        save_predictions(cond_flat                , config.exsub(templ, data_desc='truth'     , ftype='json', **comkw))
-
-        #save_raw_image(noise.squeeze(), config.exsub(templ, iter=i, data_desc='input.noise', ftype='png'))
-        save_cgan_visualization(asnumpy(noise.squeeze()), asnumpy(cond.squeeze()), config.exsub(templ, data_desc='input<bar>', ftype='png', **comkw))
-
-        save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='pattern<noise>', ftype='h5', **comkw))
-        save_data_h5(s_cond.squeeze(), config.exsub(templ, data_desc='pattern<cond>', ftype='h5', **comkw))
-
-        save_cgan_visualization(asnumpy(s_noise.squeeze()), asnumpy(s_cond.squeeze()), config.exsub(templ, data_desc='pattern<bar>', ftype='png', **comkw))
-
-        save_aligned_image(gen, config.exsub(templ, data_desc='input<gen>', ftype='png', **comkw), config.data.bbox, what='generated input data')
-        save_colorized_image(s_gen, config.exsub(templ, data_desc='pattern<gen>', ftype='png', **comkw), center=0., cmap=config.cmap, what='top explanation')
-        save_data_h5(s_gen, config.exsub(templ, data_desc='pattern<gen>', ftype='h5', **comkw))
 
 @register_command
 def predict(args, config):
@@ -531,6 +539,22 @@ def check_bias(args, config):
     nets = ', '.join(['%s<%s>'%(net.name, net.type) for net in config.nets.values() if net.active])
 
     getLogger('ecGAN').info(txt, nets)
+
+
+@register_command
+def analyze_explanation(args, config):
+    if config.log:
+        mkfilelogger('ecGAN', config.sub('log'), logging.DEBUG if config.get('debug') else logging.INFO)
+
+    comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
+    templ = config.pattern.output
+    with h5py.File(config.exsub(templ, data_desc='pattern<noise>', ftype='h5', **comkw)) as fp:
+        noise = fp['data']
+    with h5py.File(config.exsub(templ, data_desc='pattern<cond>', ftype='h5', **comkw)) as fp:
+        cond = fp['data']
+
+
+
 
 if __name__ == '__main__':
     main()

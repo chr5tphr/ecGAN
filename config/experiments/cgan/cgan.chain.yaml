@@ -164,7 +164,7 @@ tail:
                                     pattern: {name: 'relu'}
                     - # Explaining GAN
                         &explaining
-                        tag: 'explain'
+                        tag: 'analyze'
                         dict:
                             data: {kwargs: {train: False}}
                             nets:
@@ -187,6 +187,7 @@ tail:
                                                 cls: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
                                                 dis: {kwargs: {outact: 'relu', leakage: 0.2, explain: {relu: 'alphabeta'}}}
                                                 gen: {kwargs: {                              explain: {relu: 'alphabeta'}}}
+                                            use_pattern: False
                                             explanation:
                                                 desc: 'lrp'
                                                 kwargs:
@@ -216,6 +217,7 @@ tail:
                                 &gradbased
                                 dict:
                                     data: {kwargs: {train: False}}
+                                    use_pattern: False
                                 tail:
                                     -
                                         tag: 'sensitivity'
@@ -224,8 +226,15 @@ tail:
                                                 desc: 'sensitivity'
                                                 kwargs:
                                                     method: 'sensitivity'
-                                        priority: 3
-                                        action: 'explain'
+                                        tail: &anactions
+                                            -
+                                                tag: 'explain'
+                                                priority: 3
+                                                action: 'explain'
+                                            -
+                                                tag: 'visualize'
+                                                priority: 4
+                                                action: 'visualize'
                                     -
                                         tag: 'intgrads'
                                         dict:
@@ -234,12 +243,12 @@ tail:
                                                 kwargs:
                                                     method: 'intgrads'
                                                     num: 1000
-                                        priority: 3
-                                        action: 'explain'
+                                        tail: *anactions
                             - # PatternNet
                                 &patternnet
                                 tag: 'pattern'
                                 dict:
+                                    use_pattern: True
                                     pattern:
                                         init: False
                                         aepoch: 0
@@ -255,13 +264,11 @@ tail:
                                                     -
                                                         tag: 'patternnet'
                                                         dict: {pattern: {type: 'pattern'}}
-                                                        priority: 3
-                                                        action: 'explain_pattern'
+                                                        tail: *anactions
                                                     -
                                                         tag: 'attribution'
                                                         dict: {pattern: {type: 'attribution'}}
-                                                        priority: 3
-                                                        action: 'explain_pattern'
+                                                        tail: *anactions
                                     -
                                         tag: 'relu'
                                         dict: *relu_pattern
