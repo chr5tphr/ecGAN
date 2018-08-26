@@ -1,5 +1,6 @@
 import re
 from mxnet import nd, autograd
+from mxnet.base import MXNetError
 from mxnet.gluon import nn, ParameterDict
 
 class Mlist(list):
@@ -27,6 +28,16 @@ class Mlist(list):
         for obj in self:
             ret.append(obj(*args, **kwargs))
         return ret
+
+# retry asnumpy due to some weird mxnet bug
+def asnumpy(x, retries=0):
+    for r in range(retries):
+        try:
+            return x.asnumpy()
+        except MXNetError:
+            continue
+    return x.asnumpy()
+
 
 def get_im2col_indices(x_shape, field_height, field_width, padding=1, stride=1, ctx=None):
     # First figure out what the size of the output should be

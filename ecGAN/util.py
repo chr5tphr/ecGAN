@@ -14,6 +14,8 @@ import mxnet as mx
 from mxnet import nd
 from string import Template as STemplate
 
+from .func import asnumpy
+
 try:
     from .gpuman import nvidia_idle
     GPU_SUPPORT = True
@@ -313,7 +315,7 @@ class HashEncoder(json.JSONEncoder):
         ChainNode: lambda obj: obj.raw(),
         ConfigNode: lambda obj: obj.raw(),
         mx.context.Context: lambda obj: {'device': obj.device_type, 'device_id': obj.device_id},
-        nd.NDArray: lambda obj: obj.asnumpy(),
+        nd.NDArray: lambda obj: asnumpy(obj),
         np.ndarray: lambda obj: obj.tolist(),
     }
     def default(self, obj):

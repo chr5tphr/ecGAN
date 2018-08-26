@@ -18,7 +18,7 @@ from .model import models
 from .data import data_funcs
 from .util import mkfilelogger, Config, config_ctx, make_ctx, load_module_file, ChainConfig, RessourceManager, get_logic_parser
 from .plot import plot_data, save_data_h5, save_colorized_image, save_aligned_image, save_raw_image, save_cgan_visualization, save_predictions
-from .func import linspace
+from .func import linspace, asnumpy
 
 getLogger = logging.getLogger
 
@@ -278,11 +278,13 @@ def explain(args, config):
             break
         data      = data.as_in_context(ctx)
         label     = label.as_in_context(ctx)
-        label_oh  = nd.one_hot(label, K)
 
         comkw     = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        relevance = model.explain(data, cond=label_oh, single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
+        relevance = model.explain(data, cond=label.squeeze(), single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
+
+        save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
+        save_predictions(label                    , config.exsub(templ, data_desc='truth'     , ftype='json', **comkw))
 
         save_aligned_image(data, config.exsub(templ, data_desc='input<%s>'%config.data.func, ftype='png', **comkw), config.data.bbox)
         save_colorized_image(relevance,
@@ -301,7 +303,8 @@ def explain_cgan(args, config):
 
     num       = 30
     K         = args.classnum
-    cond      = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
+    cond_flat = nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num]
+    cond      = nd.one_hot(cond_flat, K).reshape((num, K, 1, 1))
     top_desc  = config.nets[config.model.kwargs.discriminator]
     netnam    = top_desc.name
     net_epoch = top_desc.epoch
@@ -319,14 +322,15 @@ def explain_cgan(args, config):
         comkw           = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
         save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
+        save_predictions(cond_flat                , config.exsub(templ, data_desc='truth'     , ftype='json', **comkw))
 
-        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(),
+        save_cgan_visualization(asnumpy(noise.squeeze()), asnumpy(cond.squeeze()),
                                 config.exsub(templ, data_desc='input<bar>', ftype='png', **comkw))
 
         save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='relevance<noise>', ftype='h5', **comkw))
         save_data_h5(s_cond.squeeze() , config.exsub(templ, data_desc='relevance<cond>' , ftype='h5', **comkw))
 
-        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(),
+        save_cgan_visualization(asnumpy(s_noise.squeeze()), asnumpy(s_cond.squeeze()),
                                 config.exsub(templ, data_desc='relevance<bar>', ftype='png', **comkw))
 
 
@@ -433,13 +437,15 @@ def explain_pattern(args, config):
             break
         data = data.as_in_context(ctx)
         label = label.as_in_context(ctx)
-        label_oh = nd.one_hot(label, K)
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
-        relevance = model.explain_pattern(data, label=label_oh, single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
+        relevance = model.explain_pattern(data, cond=label.squeeze(), single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
 
         relevance = relevance.reshape(data.shape)
+
+        save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
+        save_predictions(label                    , config.exsub(templ, data_desc='truth'     , ftype='json', **comkw))
 
         save_aligned_image(data, config.exsub(templ, data_desc='input<%s>'%config.data.func, ftype='png', **comkw), config.data.bbox)
         save_colorized_image(relevance,
@@ -461,7 +467,8 @@ def explain_pattern_cgan(args, config):
 
     num       = 30
     K         = args.classnum
-    cond      = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
+    cond_flat = nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num]
+    cond      = nd.one_hot(cond_flat, K).reshape((num, K, 1, 1))
     net_desc  = config.nets[config.model.kwargs.discriminator]
     netnam    = '%s<%s>'%(net_desc.name, net_desc.type)
     net_epoch = net_desc.epoch
@@ -479,14 +486,15 @@ def explain_pattern_cgan(args, config):
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
         save_predictions(model._out.argmax(axis=1), config.exsub(templ, data_desc='prediction', ftype='json', **comkw))
+        save_predictions(cond_flat                , config.exsub(templ, data_desc='truth'     , ftype='json', **comkw))
 
         #save_raw_image(noise.squeeze(), config.exsub(templ, iter=i, data_desc='input.noise', ftype='png'))
-        save_cgan_visualization(noise.squeeze().asnumpy(), cond.squeeze().asnumpy(), config.exsub(templ, data_desc='input<bar>', ftype='png', **comkw))
+        save_cgan_visualization(asnumpy(noise.squeeze()), asnumpy(cond.squeeze()), config.exsub(templ, data_desc='input<bar>', ftype='png', **comkw))
 
         save_data_h5(s_noise.squeeze(), config.exsub(templ, data_desc='pattern<noise>', ftype='h5', **comkw))
         save_data_h5(s_cond.squeeze(), config.exsub(templ, data_desc='pattern<cond>', ftype='h5', **comkw))
 
-        save_cgan_visualization(s_noise.squeeze().asnumpy(), s_cond.squeeze().asnumpy(), config.exsub(templ, data_desc='pattern<bar>', ftype='png', **comkw))
+        save_cgan_visualization(asnumpy(s_noise.squeeze()), asnumpy(s_cond.squeeze()), config.exsub(templ, data_desc='pattern<bar>', ftype='png', **comkw))
 
         save_aligned_image(gen, config.exsub(templ, data_desc='input<gen>', ftype='png', **comkw), config.data.bbox, what='generated input data')
         save_colorized_image(s_gen, config.exsub(templ, data_desc='pattern<gen>', ftype='png', **comkw), center=0., cmap=config.cmap, what='top explanation')
@@ -502,7 +510,7 @@ def predict(args, config):
     model = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
 
     for i in range(args.iter):
-        output = model.predict().asnumpy()
+        output = asnumpy(model.predict())
         txt = '\n'.join([' '.join(['%.02f'%val for val in line]) for line in output])
 
         getLogger('ecGAN').info('Prediction for \'%s\':\n%s', config.nets[config.explanation.top_net].param, txt)

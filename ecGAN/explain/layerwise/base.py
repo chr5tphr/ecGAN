@@ -4,7 +4,7 @@ from mxnet.gluon import nn
 import numpy as np
 from logging import getLogger
 
-from ...func import Mlist
+from ...func import Mlist, asnumpy
 from ..base import Explainable
 from ...base import Linear
 
@@ -27,7 +27,7 @@ class LinearLayerwiseExplainable(LayerwiseExplainable, Linear):
         return R
 
     def check_bias(self, ctx=None):
-        return self.bias is not None and (self.bias.data(ctx=ctx) <= 0.).asnumpy().all()
+        return self.bias is not None and asnumpy(self.bias.data(ctx=ctx) <= 0.).all()
 
     def layerwise_relevance_zb(self, out, lo=-1, hi=1, use_bias=False, **kwargs):
         if self._in is None:

@@ -1,12 +1,15 @@
 import numpy as np
 import json
 import h5py
+from mxnet.base import MXNetError
 from mxnet import nd
 from imageio import imwrite
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 from logging import getLogger
+
+from .func import asnumpy
 
 
 cmaps = {}
@@ -48,7 +51,7 @@ def bwr(x):
 
 def draw_heatmap(data, lo=0., hi=1., center=None, cmap='hot'):
     if isinstance(data, nd.NDArray):
-        data = data.asnumpy()
+        data = asnumpy(data)
     if center is not None:
         with np.errstate(divide='ignore', invalid='ignore'):
             lodat = (data.clip(lo, center) - lo) / (center - lo) - 1.
@@ -67,7 +70,7 @@ def align_images(im, H, W, h, w, C=1):
 
 def save_colorized_image(data, fpath, center=None, cmap='hot', batchnorm=False, fullcmap=False, what='explanation', outshape=(5, 6)):
     if isinstance(data, nd.NDArray):
-        data = data.asnumpy()
+        data = asnumpy(data)
     N, C, H, W = data.shape
     data = data.transpose([0, 2, 3, 1])
 
@@ -95,7 +98,7 @@ def save_colorized_image(data, fpath, center=None, cmap='hot', batchnorm=False, 
 
 def save_data_h5(relevance, fpath, what='explanation'):
     with h5py.File(fpath, 'w') as fp:
-        fp['heatmap'] = relevance.asnumpy()
+        fp['heatmap'] = asnumpy(relevance)
     getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 
 def save_cgan_visualization(noise, cond, fpath, what='visualization'):
@@ -120,7 +123,7 @@ def save_cgan_visualization(noise, cond, fpath, what='visualization'):
 
 def save_aligned_image(data, fpath, bbox, what='input data', outshape=(5, 6)):
     if isinstance(data, nd.NDArray):
-        data = data.asnumpy()
+        data = asnumpy(data)
     N, C, H, W = data.shape
     data = data.transpose([0, 2, 3, 1])
     if outshape is None:
@@ -141,14 +144,16 @@ def save_raw_image(data, fpath, what='input data'):
 
 def save_predictions(data, fpath):
     with open(fpath, 'w') as fp:
-        json.dump(data.asnumpy().astype(int).tolist(), fp, indent=2)
+        sdat = asnumpy(data)
+        json.dump(sdat.astype(int).tolist(), fp, indent=2)
+        #json.dump([int(da.asscalar()) for da in data], fp, indent=2)
     getLogger('ecGAN').info('Saved predicted labels in \'%s\'.', fpath)
 
 
 def plot_data(data):
     snum = int(len(data)**.5)
     if type(data) is nd.NDArray:
-        data = data.asnumpy()
+        data = asnumpy(data)
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.imshow(data[:snum**2].reshape(snum, snum, 28, 28).transpose(0, 2, 1, 3).reshape(snum*28, snum*28), cmap='Greys')

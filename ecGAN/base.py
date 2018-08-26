@@ -139,7 +139,8 @@ class Sequential(Block, nn.Sequential):
     def forward_single_out(self, data, cond=None, logged=False):
         out = (self.forward_logged if logged else self)(data)
         if cond is None:
-            cond = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
+            cond = nd.argmax(out, axis=1)
+        cond = nd.one_hot(cond, out.shape[1])
         return cond * out
 
     def __iadd__(self, other):

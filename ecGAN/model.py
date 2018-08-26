@@ -160,12 +160,13 @@ class Classifier(Model):
 
         return metric.get()
 
-    def explain(self, data, label=None, single_out=True, mkwargs={}):
+    def explain(self, data, cond=None, single_out=True, mkwargs={}):
         if not isinstance(self.netC, Explainable):
             raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets[self._classifier].type)
 
-        out = self.netC.forward_single_out(data, cond=label, logged=True) if single_out else None
+        out = self.netC.forward_single_out(data, cond=cond, logged=True) if single_out else None
         R = self.netC.relevance(data=data, out=out, **mkwargs)
+        self._out = self.netC._out
 
         return R
 
@@ -268,11 +269,11 @@ class Classifier(Model):
         self.save_pattern_params(fit_epoch=self.config.pattern.get('start_epoch', 0),
                                  ase_epoch=self.config.pattern.get('aepoch', 0))
 
-    def explain_pattern(self, data, label=None, single_out=False, attribution=False):
+    def explain_pattern(self, data, cond=None, single_out=False, attribution=False):
         if not isinstance(self.netC, PatternNet):
             raise NotImplementedError('\'%s\' is not yet Explainable!'%self.config.nets[self._classifier].type)
 
-        out = self.netC.forward_single_out(data, cond=label, logged=True) if single_out else None
+        out = self.netC.forward_single_out(data, cond=cond, logged=True) if single_out else None
         R = self.netC.explain_pattern(data, out=out, attribution=attribution)
         self._out = self.netC._out
 
@@ -918,7 +919,7 @@ class CGAN(GAN):
         with net.name_scope():
             net.add(self.netG, self.netD)
 
-        out = net.forward_single_out([noise, cond], cond=cond.flatten(), logged=True) if single_out else None
+        out = net.forward_single_out([noise, cond], cond=cond.flatten().argmax(axis=1), logged=True) if single_out else None
         Rn, Rc = net.relevance(data=[noise, cond], out=out, **mkwargs)
         self._out = net._out
 
@@ -931,7 +932,7 @@ class CGAN(GAN):
         with net.name_scope():
             net.add(self.netG, self.netD)
 
-        out = net.forward_single_out([noise, cond], cond=cond.flatten(), logged=True) if single_out else None
+        out = net.forward_single_out([noise, cond], cond=cond.flatten().argmax(axis=1), logged=True) if single_out else None
         R = net.explain_pattern(data=[noise, cond], out=out, attribution=attribution)
         self._out = net._out
         return R
@@ -940,7 +941,7 @@ class CGAN(GAN):
         noise, cond = self.sample_noise(K, noise, cond, num)
         data = self.netG([noise, cond])
 
-        out = net.forward_single_out(data, cond=cond.flatten(), logged=True) if single_out else None
+        out = net.forward_single_out(data, cond=cond.flatten().argmax(axis=1), logged=True) if single_out else None
         R = self.netD.relevance(data=data, out=out, **mkwargs)
         self._out = self.netD._out
 
@@ -950,12 +951,7 @@ class CGAN(GAN):
         noise, cond = self.sample_noise(K, noise, cond, num)
         data = self.netG([noise, cond])
 
-        out = None
-        if single_out:
-            out = self.netD.forward_logged(data)
-            #out = nd.one_hot(nd.argmax(out, axis=1), out.shape[1])
-            out = nd.one_hot(nd.argmax(cond, axis=1), out.shape[1]) * out
-
+        out = self.netD.forward_single_out(data, cond=cond.flatten().argmax(axis=1), logged=True) if single_out else None
         R = self.netD.explain_pattern(data=data, out=out, attribution=attribution)
         self._out = self.netD._out
         return R, data

@@ -31,6 +31,33 @@ class ve_build_ext(build_ext):
 #########################################
 
 def run_setup(gpu_support):
+    requires = [
+            ['astroid>=1.6.1'],
+            ['certifi>=2018.1.18'],
+            ['chardet>=3.0.4'],
+            ['cycler>=0.10.0'],
+            ['graphviz>=0.8.1'],
+            ['greenlet>=0.4.13'],
+            ['h5py>=2.7.1'],
+            ['idna>=2.6'],
+            ['imageio>=2.2.0'],
+            ['lark-parser>=0.6.2'],
+            ['lazy-object-proxy>=1.3.1'],
+            ['matplotlib>=2.1.0'],
+            ['msgpack>=0.5.4'],
+            ['numpy>=1.13.3'],
+            ['olefile>=0.45.1'],
+            ['parso>=0.1.1'],
+            ['Pillow>=4.3.0'],
+            ['pyparsing>=2.2.0'],
+            ['python-dateutil>=2.6.1'],
+            ['pytz>=2017.3'],
+            ['PyYAML>=3.12'],
+            ['requests>=2.18.4'],
+            ['six>=1.11.0'],
+            ['urllib3>=1.22'],
+            ['wrapt>=1.10.11'],
+    ]
     if gpu_support:
         setup_kw = dict(
             ext_modules = [
@@ -47,8 +74,10 @@ def run_setup(gpu_support):
                 build_ext = ve_build_ext,
             )
         )
+        requires += [['mxnet-cu90>=1.2.0']]
     else:
         setup_kw = dict()
+        requires += [['mxnet>=1.2.0']]
 
     setup(
         name="ecGAN",
@@ -60,34 +89,7 @@ def run_setup(gpu_support):
                 'ecgan_pdb = ecGAN.cli:debug'
             ]
         },
-        install_requires=[
-            ['astroid>=1.6.1'],
-            ['certifi>=2018.1.18'],
-            ['chardet>=3.0.4'],
-            ['cycler>=0.10.0'],
-            ['graphviz>=0.8.1'],
-            ['greenlet>=0.4.13'],
-            ['h5py>=2.7.1'],
-            ['idna>=2.6'],
-            ['imageio>=2.2.0'],
-            ['lark-parser>=0.6.2'],
-            ['lazy-object-proxy>=1.3.1'],
-            ['matplotlib>=2.1.0'],
-            ['msgpack>=0.5.4'],
-            ['mxnet>=1.1.0'],
-            ['numpy>=1.13.3'],
-            ['olefile>=0.45.1'],
-            ['parso>=0.1.1'],
-            ['Pillow>=4.3.0'],
-            ['pyparsing>=2.2.0'],
-            ['python-dateutil>=2.6.1'],
-            ['pytz>=2017.3'],
-            ['PyYAML>=3.12'],
-            ['requests>=2.18.4'],
-            ['six>=1.11.0'],
-            ['urllib3>=1.22'],
-            ['wrapt>=1.10.11'],
-        ],
+        install_requires=requires
         **setup_kw)
 
 try:
