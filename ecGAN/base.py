@@ -66,7 +66,6 @@ class BatchNormMergable(Block):
 # Linear Layers
 class Dense(Linear, nn.Dense):
     def _forward(self, data, weight, bias=None):
-        weight = weight.reshape(self.weight.shape)
         return nd.FullyConnected(data, weight, bias,
                                  no_bias=(bias is None),
                                  num_hidden=self._units,
