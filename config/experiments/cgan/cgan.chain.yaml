@@ -9,6 +9,8 @@ dict:
 
     init: False
 
+    iterations: 50
+    overwrite: False
     batch_size: 64
     save_freq: 5
 
@@ -40,6 +42,7 @@ dict:
     genout: '${root_dir}/${exp_dir}/${data.func}/gen/${model.type}.${net}.${net_epoch}.${data_desc}.${iter}.${ftype}'
     gen_freq: 1
     cmap: 'bwr'
+    visualizer: 'PlainVisualizer'
 
     pattern:
         save: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${fit_epoch}.${ase_epoch}.pattern.params'
@@ -58,6 +61,9 @@ tail:
                 gen: {epoch:  100, kwargs: {outnum:  1}}
                 dis: {epoch:  100, kwargs: {outnum: 20}}
                 cls: {epoch:   20, kwargs: {outnum: 10}}
+            explanation:
+                iterations:  50
+                batch_size: 200
         tail:
             &models
             - #GAN
@@ -175,6 +181,8 @@ tail:
                             - # Layerwise
                                 &layerwise
                                 tag: 'layerwise'
+                                dict:
+                                    use_pattern: False
                                 tail:
                                     -
                                         tag: 'bias'
@@ -187,7 +195,6 @@ tail:
                                                 cls: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
                                                 dis: {kwargs: {outact: 'relu', leakage: 0.2, explain: {relu: 'alphabeta'}}}
                                                 gen: {kwargs: {                              explain: {relu: 'alphabeta'}}}
-                                            use_pattern: False
                                             explanation:
                                                 desc: 'lrp'
                                                 kwargs:
@@ -195,8 +202,15 @@ tail:
                                                     use_bias: True
                                                     alpha: 2.0
                                                     beta:  1.0
-                                        priority: 3
-                                        action: 'explain'
+                                        tail: &anactions
+                                            -
+                                                tag: 'explain'
+                                                priority: 3
+                                                action: 'explain'
+                                            -
+                                                tag: 'visualize'
+                                                priority: 4
+                                                action: 'visualize'
                                     -
                                         tag: 'dtd'
                                         dict:
@@ -211,8 +225,7 @@ tail:
                                                     use_bias: True
                                                     lo: -1.0
                                                     hi: 1.0
-                                        priority: 3
-                                        action: 'explain'
+                                        tail: *anactions
                             - # GradBased
                                 &gradbased
                                 dict:
@@ -226,15 +239,7 @@ tail:
                                                 desc: 'sensitivity'
                                                 kwargs:
                                                     method: 'sensitivity'
-                                        tail: &anactions
-                                            -
-                                                tag: 'explain'
-                                                priority: 3
-                                                action: 'explain'
-                                            -
-                                                tag: 'visualize'
-                                                priority: 4
-                                                action: 'visualize'
+                                        tail: *anactions
                                     -
                                         tag: 'intgrads'
                                         dict:
@@ -404,10 +409,14 @@ tail:
         dict:
             data: {func: 'cifar10', kwargs:{grey: False}}
             nepochs: 400
+            iterations: 100
             nets:
                 gen: {type: 'MYTCN32', epoch:  400, kwargs: {outnum:  3}, optkwargs: {learning_rate: 1.e-4}}
                 dis: {type: 'MSCN32' , epoch:  400, kwargs: {outnum: 20}, optkwargs: {learning_rate: 1.e-4}}
                 cls: {type:  NULL    , epoch: NULL, kwargs: {outnum: 10}}
+            explanation:
+                iterations:  50
+                batch_size: 100
         tail:
             *models
     - #toydata

@@ -89,7 +89,7 @@ def run_setup(gpu_support):
                 'ecgan_pdb = ecGAN.cli:debug'
             ]
         },
-        install_requires=requires
+        install_requires=requires,
         **setup_kw)
 
 try:
