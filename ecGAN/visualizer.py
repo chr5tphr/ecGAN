@@ -40,9 +40,10 @@ class Visualizer(object):
 
 @register_visualizer
 class PlainVisualizer(Visualizer):
-    def __init__(self, *args, outshape=[5, 6], **kwargs):
+    def __init__(self, *args, outshape=[5, 6], iterations=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.outshape = outshape
+        self.iterations = iterations
 
     def __enter__(self):
         if self.config.model.type == 'Classifier':
@@ -64,6 +65,9 @@ class PlainVisualizer(Visualizer):
         return self
 
     def feed(self):
+        if self.comkw['iter'] >= self.iterations:
+            getLogger('ecGAN').info('Skipping visualization iteration %d.', self.comkw['iter'])
+            return
         if self.config.model.type == 'CGAN':
             return self._feed_cgan()
         elif self.config.model.type == 'Classifier':
@@ -247,7 +251,6 @@ class MeanVisualizer(Visualizer):
         getLogger('ecGAN').info('Saved %s in \'%s\'.', 'mean cond result', fpath)
 
     def _save_figure(self, fpath):
-        fig = plt.figure(figsize=(16, 9))
         num = len(self._acc['noise'])
 
         anoi = self._acc['noise_a']
@@ -256,6 +259,8 @@ class MeanVisualizer(Visualizer):
 
         nlen = len(anoi)
         clen = len(acon)
+
+        fig = plt.figure(figsize=(9*2, 3*(num//2+2)))
         ax = fig.add_subplot(num//2+1, 1, 1)
         ax.set_title('Global Mean')
         ax.bar(np.arange(nlen), anoi/acnt, color='b')

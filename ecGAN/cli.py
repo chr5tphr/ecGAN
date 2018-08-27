@@ -286,7 +286,7 @@ def explain_clss(args, config):
         random.seed(args.seed)
 
     for i, (data, label) in enumerate(data_iter):
-        if i >= config.iterations:
+        if i >= config.explanation.iterations:
             break
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
@@ -379,11 +379,12 @@ def visualize(args, config):
     if args.seed:
         random.seed(args.seed)
 
-    Visualizer = visualizers[config.visualizer.type]
+    for vdesc in config.visualizers:
+        Visualizer = visualizers[vdesc['type']]
 
-    with Visualizer(config, *config.visualizer.get('args', []), **config.visualizer.get('kwargs', {})) as vs:
-        for i in range(config.explanation.iterations):
-            vs.feed()
+        with Visualizer(config, *vdesc.get('args', []), **vdesc.get('kwargs', {})) as vs:
+            for i in range(config.explanation.iterations):
+                vs.feed()
 
 @register_command
 def learn_pattern(args, config):

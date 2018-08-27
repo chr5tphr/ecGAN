@@ -9,7 +9,7 @@ dict:
 
     init: False
 
-    iterations: 50
+    #iterations: 1
     overwrite: False
     batch_size: 64
     save_freq: 5
@@ -47,10 +47,15 @@ dict:
     #    args:   []
     #    kwargs:
     #        outshape: [5, 6]
-    visualizer:
-        type:   'MeanVisualizer'
-        args:   []
-        kwargs: {}
+    visualizers:
+        -
+            type:   'PlainVisualizer'
+            args:   []
+            kwargs: {iterations: 1, outshape: [10, 10]}
+        -
+            type:   'MeanVisualizer'
+            args:   []
+            kwargs: {pred_cond: False}
 
     pattern:
         save: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${fit_epoch}.${ase_epoch}.pattern.params'
@@ -70,8 +75,8 @@ tail:
                 dis: {epoch:  100, kwargs: {outnum: 20}}
                 cls: {epoch:   20, kwargs: {outnum: 10}}
             explanation:
-                iterations:  50
-                batch_size: 200
+                iterations: 100
+                batch_size: 100
         tail:
             &models
             - #GAN
@@ -423,7 +428,7 @@ tail:
                 dis: {type: 'MSCN32' , epoch:  400, kwargs: {outnum: 20}, optkwargs: {learning_rate: 1.e-4}}
                 cls: {type:  NULL    , epoch: NULL, kwargs: {outnum: 10}}
             explanation:
-                iterations:  50
+                iterations: 100
                 batch_size: 100
         tail:
             *models
@@ -437,7 +442,7 @@ tail:
                 dis: {type: 'MSCN32' , epoch:   10, kwargs: {outnum: 20}}
                 cls: {type:  NULL    , epoch: NULL, kwargs: {outnum: 10}}
             explanation:
-                iterations:   1
+                iterations:   2
                 batch_size: 100
         tail:
             *models

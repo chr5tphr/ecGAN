@@ -108,16 +108,17 @@ def load_data_h5(keys, fpath, what='results'):
     return result
 
 def save_cgan_visualization(noise, cond, fpath, what='visualization', outshape=[5, 6]):
-    fig = plt.figure(figsize=(16, 9))
-    #combo = np.concatenate([noise, cond], axis=1)
-    #amin = combo.min()
-    #amax = combo.max()
     hei, wid = outshape
     num = np.prod(outshape)
     noise = noise[:num]
     cond = cond[:num]
     _, nlen = noise.shape
     _, clen = cond.shape
+
+    fig = plt.figure(figsize=(9 * wid, 3 * hei))
+    #combo = np.concatenate([noise, cond], axis=1)
+    #amin = combo.min()
+    #amax = combo.max()
     for i, (noi, con) in enumerate(zip(noise, cond)):
         ax = fig.add_subplot(hei, wid, i+1)
         ax.bar(np.arange(nlen), noi, color='b')
