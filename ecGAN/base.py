@@ -76,15 +76,13 @@ class Conv2D(Linear, nn.Conv2D):
     def _forward(self, data, weight, bias=None):
         kwargs = self._kwargs.copy()
         kwargs['no_bias'] = bias is None
-        weight = weight.reshape(self.weight.shape)
         return nd.Convolution(data, weight, bias, name='fwd', **kwargs)
 
 class Conv2DTranspose(Linear, nn.Conv2DTranspose):
     def _forward(self, data, weight, bias=None):
         kwargs = self._kwargs.copy()
-        kwargs['no_bias'] = True
-        weight = weight.T.reshape(self.weight.shape)
-        return nd.Deconvolution(data, weight, name='fwd', **kwargs)
+        kwargs['no_bias'] = bias is None
+        return nd.Deconvolution(data, weight, bias, name='fwd', **kwargs)
 
 # Activation (-esque) Layers
 class ReLU(Block):

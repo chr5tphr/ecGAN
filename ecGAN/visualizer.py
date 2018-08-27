@@ -1,9 +1,6 @@
-import matplotlib as mpl
-import yaml
-import json
+import matplotlib.pyplot as plt
 import mxnet as mx
 import numpy as np
-import sys
 import os
 import logging
 import h5py
@@ -18,6 +15,12 @@ def register_visualizer(func):
     visualizers[func.__name__] = func
     return func
 
+def check_write(overwrite, fpath, func, args=[], kwargs={}):
+    if not overwrite and os.path.isfile(fpath):
+        getLogger('ecGAN').info('File already exits, skipping \'%s\'...', fpath)
+    else:
+        func(*args, fpath=fpath, **kwargs)
+
 class Visualizer(object):
     def __init__(self, config):
         self.config = config
@@ -27,6 +30,8 @@ class Visualizer(object):
     def feed(self):
         raise NotImplementedError
 
+    @staticmethod
+
     def __enter__(self):
         pass
 
@@ -35,17 +40,14 @@ class Visualizer(object):
 
 @register_visualizer
 class PlainVisualizer(Visualizer):
-    @staticmethod
-    def _check_write(fpath, func, args={}, kwargs={}):
-        if not config.overwrite and os.path.isfile(fpath):
-            getLogger('ecGAN').info('\'%s\' already exits, skipping...', fpath)
-        else:
-            func(*args, fpath=fpath, **kwargs)
+    def __init__(self, *args, outshape=[5, 6], **kwargs):
+        super().__init__(*args, **kwargs)
+        self.outshape = outshape
 
     def __enter__(self):
-        if self.config.model == 'Classifier':
+        if self.config.model.type == 'Classifier':
             top_net = 'classifier'
-        elif self.config.model == 'CGAN':
+        elif self.config.model.type == 'CGAN':
             top_net = 'discriminator'
         else:
             raise NotImplementedError
@@ -59,16 +61,19 @@ class PlainVisualizer(Visualizer):
             self.templ = self.config.pattern.output
         else:
             self.templ = self.config.explanation.output
+        return self
 
     def feed(self):
-        if self.config.model == 'CGAN':
+        if self.config.model.type == 'CGAN':
             return self._feed_cgan()
-        elif self.config.model == 'Classifier':
+        elif self.config.model.type == 'Classifier':
             return self._feed_clss()
         else:
             raise NotImplementedError
 
     def _feed_cgan(self):
+        h, w = self.outshape
+        n = np.prod(self.outshape)
         info_keys = [
             'input/noise',
             'input/cond',
@@ -94,35 +99,35 @@ class PlainVisualizer(Visualizer):
                 'kwargs' : {},
             },
             'input'     : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='input<bar>', ftype='png', **self.comkw)
+                'fpath'  : self.config.exsub(self.templ, data_desc='input<bar>', ftype='png', **self.comkw),
                 'func'   : save_cgan_visualization,
                 'args'   : [noise, cond],
-                'kwargs' : {},
+                'kwargs' : {'outshape': self.outshape},
             },
             'relevance' : {
                 'fpath'  : self.config.exsub(self.templ, data_desc='relevance<bar>', ftype='png', **self.comkw),
                 'func'   : save_cgan_visualization,
                 'args'   : [s_noise, s_cond],
-                'kwargs' : {},
+                'kwargs' : {'outshape': self.outshape},
             },
             'gen'     : {
                 'fpath'  : self.config.exsub(self.templ, data_desc='input<gen>', ftype='png', **self.comkw),
                 'func'   : save_aligned_image,
-                'args'   : [gen, self.config.data.bbox],
-                'kwargs' : {'what': 'generated input data'},
+                'args'   : [gen],
+                'kwargs' : {'bbox': self.config.data.bbox, 'what': 'generated input data', 'outshape': self.outshape},
             },
             'genrel' : {
                 'fpath'  : self.config.exsub(self.templ, data_desc='relevance<gen>', ftype='png', **self.comkw),
                 'func'   : save_colorized_image,
                 'args'   : [s_gen],
-                'kwargs' : {'center': self.config.get('cmap_center'), 'cmap': self.config.get('cmap', 'bwr'), 'what': 'top explanation'},
+                'kwargs' : {'center': self.config.get('cmap_center'), 'cmap': self.config.get('cmap', 'bwr'), 'what': 'top explanation', 'outshape': self.outshape},
             },
         }
         for key, val in files.items():
-            self.check_write(val['fpath'], val['func'], val['args'], val['kwargs'])
+            check_write(self.config.overwrite, val['fpath'], val['func'], val['args'], val['kwargs'])
         self.comkw['iter'] += 1
 
-    def _feed_cls(self):
+    def _feed_clss(self):
         info_keys = [
             'input',
             'prediction',
@@ -147,38 +152,31 @@ class PlainVisualizer(Visualizer):
             'input'     : {
                 'fpath'  : self.config.exsub(self.templ, data_desc='input<%s>'%self.config.data.func, ftype='png', **self.comkw),
                 'func'   : save_aligned_image,
-                'args'   : [data, self.config.data.bbox],
-                'kwargs' : {},
+                'args'   : [data],
+                'kwargs' : {'bbox': self.config.data.bbox, 'outshape': self.outshape},
             },
             'relevance' : {
                 'fpath'  : self.config.exsub(self.templ, data_desc='relevance<%s>'%self.config.data.func, ftype='png', **self.comkw),
                 'func'   : save_colorized_image,
                 'args'   : [relevance],
-                'kwargs' : {'center': self.config.get('cmap_center'), 'cmap': self.config.get('cmap', 'bwr')},
+                'kwargs' : {'center': self.config.get('cmap_center'), 'cmap': self.config.get('cmap', 'bwr'), 'outshape': self.outshape},
             },
         }
         for key, val in files.items():
-            self.check_write(val['fpath'], val['func'], val['args'], val['kwargs'])
+            check_write(self.config.overwrite, val['fpath'], val['func'], val['args'], val['kwargs'])
 
         self.comkw['iter'] += 1
 
 @register_visualizer
 class MeanVisualizer(Visualizer):
-    def __init__(self, *args, pred_cond=True, **kwargs):
+    def __init__(self, *args, pred_cond=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.pred_cond = pred_cond
 
-    @staticmethod
-    def _check_write(fpath, func, args={}, kwargs={}):
-        if not config.overwrite and os.path.isfile(fpath):
-            getLogger('ecGAN').info('\'%s\' already exits, skipping...', fpath)
-        else:
-            func(*args, fpath=fpath, **kwargs)
-
     def __enter__(self):
-        if self.config.model == 'Classifier':
+        if self.config.model.type == 'Classifier':
             top_net = 'classifier'
-        elif self.config.model == 'CGAN':
+        elif self.config.model.type == 'CGAN':
             top_net = 'discriminator'
         else:
             raise NotImplementedError
@@ -194,10 +192,12 @@ class MeanVisualizer(Visualizer):
             self.templ = self.config.explanation.output
         self._acc = {}
 
+        return self
+
     def feed(self):
-        if self.config.model == 'CGAN':
+        if self.config.model.type == 'CGAN':
             return self._feed_cgan()
-        elif self.config.model == 'Classifier':
+        elif self.config.model.type == 'Classifier':
             return self._feed_clss()
         else:
             raise NotImplementedError
@@ -230,24 +230,25 @@ class MeanVisualizer(Visualizer):
         self.comkw['iter'] += 1
 
 
-    def _feed_cls(self):
-        raise NotImplementedError
+    def _feed_clss(self):
+        pass
 
     def _save_data(self, fpath):
         info = {
-            'noise/all': self._acc('noise_a'),
-            'cond/all': self._acc('cond_a'),
-            'count/all': self._acc('count_a'),
+            'noise/all': self._acc['noise_a'],
+            'cond/all' : self._acc['cond_a' ],
+            'count/all': self._acc['count_a'],
         }
-        for (key, noise), (_, cond), (_, count) in zip(*[self._acc[mk].items() for mk in ['noise', 'cond', 'count']):
+        for (key, noise), (_, cond), (_, count) in zip(*[self._acc[mk].items() for mk in ['noise', 'cond', 'count']]):
             info['noise/%s'%key] = noise
             info['cond/%s'%key]  = cond
             info['count/%s'%key] = count
         save_data_h5(info, fpath)
+        getLogger('ecGAN').info('Saved %s in \'%s\'.', 'mean cond result', fpath)
 
     def _save_figure(self, fpath):
         fig = plt.figure(figsize=(16, 9))
-        num = len(self._acc['noise']) + 1
+        num = len(self._acc['noise'])
 
         anoi = self._acc['noise_a']
         acon = self._acc['cond_a']
@@ -256,17 +257,18 @@ class MeanVisualizer(Visualizer):
         nlen = len(anoi)
         clen = len(acon)
         ax = fig.add_subplot(num//2+1, 1, 1)
-        ax.title('Global Mean')
+        ax.set_title('Global Mean')
         ax.bar(np.arange(nlen), anoi/acnt, color='b')
         ax.bar(np.arange(nlen, nlen + clen), acon/acnt, color='r')
         ax.set_xlim(-1, nlen + clen)
         #ax.set_xticks([])
         #ax.set_yticks([])
 
-        for i, [noise, cond, count] in list(zip(self._acc['noise'], self._acc['cond'], self._acc['count'])) + []:
+        for i, ((key, noise), (_, cond), (_, count)) in enumerate(zip(*[sorted(self._acc[mk].items()) for mk in ['noise', 'cond', 'count']])):
             nlen = len(noise)
             clen = len(cond)
-            ax = fig.add_subplot(num, 1, i+1)
+            ax = fig.add_subplot(num//2+1, 2, i+1+2)
+            ax.set_title('Mean with %s: %s'%(['label', 'predicted label'][self.pred_cond], key))
             ax.bar(np.arange(nlen), noise/count, color='b')
             ax.bar(np.arange(nlen, nlen + clen), cond/count, color='r')
             ax.set_xlim(-1, nlen + clen)
@@ -275,6 +277,7 @@ class MeanVisualizer(Visualizer):
         fig.tight_layout()
         fig.savefig(fpath)
         plt.close(fig)
+        getLogger('ecGAN').info('Saved %s in \'%s\'.', 'mean cond figure', fpath)
 
     def _save_all(self):
         files = {
@@ -292,10 +295,12 @@ class MeanVisualizer(Visualizer):
             },
         }
         for key, val in files.items():
-            self.check_write(val['fpath'], val['func'], val['args'], val['kwargs'])
-            getLogger('ecGAN').info('Saved %s in \'%s\'.', 'mean cond relevance', fpath)
+            check_write(self.config.overwrite, val['fpath'], val['func'], val['args'], val['kwargs'])
 
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is not None:
             return
-        self._save_all()
+        if self.config.model.type == 'CGAN':
+            self._save_all()
+        else:
+            getLogger('ecGAN').info('MeanVisualizer is not defined for other model than CGAN.')

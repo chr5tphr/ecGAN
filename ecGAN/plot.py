@@ -68,7 +68,7 @@ def align_images(im, H, W, h, w, C=1):
     # color channels must be last axis!
     return im.reshape([H, W, h, w, C]).transpose([0, 2, 1, 3, 4]).reshape([H*h, W*w, C])
 
-def save_colorized_image(data, fpath, center=None, cmap='hot', batchnorm=False, fullcmap=False, what='explanation', outshape=(5, 6)):
+def save_colorized_image(data, fpath, center=None, cmap='hot', batchnorm=False, fullcmap=False, what='explanation', outshape=[5, 6]):
     if isinstance(data, nd.NDArray):
         data = asnumpy(data)
     N, C, H, W = data.shape
@@ -107,15 +107,19 @@ def load_data_h5(keys, fpath, what='results'):
     getLogger('ecGAN').info('Loaded %s from \'%s\'.', what, fpath)
     return result
 
-def save_cgan_visualization(noise, cond, fpath, what='visualization'):
+def save_cgan_visualization(noise, cond, fpath, what='visualization', outshape=[5, 6]):
     fig = plt.figure(figsize=(16, 9))
     #combo = np.concatenate([noise, cond], axis=1)
     #amin = combo.min()
     #amax = combo.max()
-    num, nlen = noise.shape
+    hei, wid = outshape
+    num = np.prod(outshape)
+    noise = noise[:num]
+    cond = cond[:num]
+    _, nlen = noise.shape
     _, clen = cond.shape
     for i, (noi, con) in enumerate(zip(noise, cond)):
-        ax = fig.add_subplot(num//3, 3, i+1)
+        ax = fig.add_subplot(hei, wid, i+1)
         ax.bar(np.arange(nlen), noi, color='b')
         ax.bar(np.arange(nlen, nlen + clen), con, color='r')
         ax.set_xlim(-1, nlen + clen)
@@ -127,7 +131,7 @@ def save_cgan_visualization(noise, cond, fpath, what='visualization'):
     plt.close(fig)
     getLogger('ecGAN').info('Saved %s in \'%s\'.', what, fpath)
 
-def save_aligned_image(data, fpath, bbox, what='input data', outshape=(5, 6)):
+def save_aligned_image(data, fpath, bbox, what='input data', outshape=[5, 6]):
     if isinstance(data, nd.NDArray):
         data = asnumpy(data)
     N, C, H, W = data.shape

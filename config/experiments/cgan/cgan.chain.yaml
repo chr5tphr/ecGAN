@@ -42,7 +42,15 @@ dict:
     genout: '${root_dir}/${exp_dir}/${data.func}/gen/${model.type}.${net}.${net_epoch}.${data_desc}.${iter}.${ftype}'
     gen_freq: 1
     cmap: 'bwr'
-    visualizer: 'PlainVisualizer'
+    #visualizer:
+    #    type:   'PlainVisualizer'
+    #    args:   []
+    #    kwargs:
+    #        outshape: [5, 6]
+    visualizer:
+        type:   'MeanVisualizer'
+        args:   []
+        kwargs: {}
 
     pattern:
         save: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${fit_epoch}.${ase_epoch}.pattern.params'
@@ -428,5 +436,8 @@ tail:
                 gen: {type: 'MYTCN32', epoch:   10, kwargs: {outnum:  1}}
                 dis: {type: 'MSCN32' , epoch:   10, kwargs: {outnum: 20}}
                 cls: {type:  NULL    , epoch: NULL, kwargs: {outnum: 10}}
+            explanation:
+                iterations:   1
+                batch_size: 100
         tail:
             *models

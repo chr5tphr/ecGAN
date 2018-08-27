@@ -81,6 +81,9 @@ Thus, gradients become very sparse, which in case of a discriminator, makes it v
 - constant weights
 - random weights?
 
+### Ideas
+- test explanations with same noise but different conds
+
 ## Questions
 
 ### Does no clipping result in better explanations?
