@@ -76,7 +76,7 @@ class PlainVisualizer(Visualizer):
 
     def feed(self):
         if self.comkw['iter'] >= self.iterations:
-            getLogger('ecGAN').info('Skipping visualization iteration %d.', self.comkw['iter'])
+            getLogger('ecGAN').info('Maximum visualization iteration reached, skipping.')
             return
         if self.config.model.type == 'CGAN':
             return self._feed_cgan()
@@ -98,40 +98,41 @@ class PlainVisualizer(Visualizer):
             'relevance/cond',
             'relevance/generated',
         ]
-        noise, cond, gen, pred, label, s_noise, s_cond, s_gen = load_data_h5(info_keys, self.config.exsub(self.templ, data_desc='result', ftype='h5', **self.comkw))
+        noise, cond, gen, pred, label, s_noise, s_cond, s_gen = load_data_h5(info_keys, self.config.exsub(self.templ, data_desc='result<%s>'%self.config.sampler.type, ftype='h5', **self.comkw))
+        desc = self.config.sampler.type
         files = {
             'pred'      : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='prediction', ftype='json', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='prediction<%s>'%desc, ftype='json', **self.comkw),
                 'func'   : save_predictions,
                 'args'   : [pred],
                 'kwargs' : {},
             },
             'label'     : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='truth'     , ftype='json', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='truth<%s>'%desc     , ftype='json', **self.comkw),
                 'func'   : save_predictions,
                 'args'   : [label],
                 'kwargs' : {},
             },
             'input'     : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='input<bar>', ftype='png', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='input<%s>'%desc, ftype='png', **self.comkw),
                 'func'   : save_cgan_visualization,
                 'args'   : [noise, cond],
                 'kwargs' : {'outshape': self.outshape},
             },
             'relevance' : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='relevance<bar>', ftype='png', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='relevance<%s>'%desc, ftype='png', **self.comkw),
                 'func'   : save_cgan_visualization,
                 'args'   : [s_noise, s_cond],
                 'kwargs' : {'outshape': self.outshape},
             },
             'gen'     : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='input<gen>', ftype='png', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='gen<%s>'%desc, ftype='png', **self.comkw),
                 'func'   : save_aligned_image,
                 'args'   : [gen],
                 'kwargs' : {'bbox': self.config.data.bbox, 'what': 'generated input data', 'outshape': self.outshape},
             },
             'genrel' : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='relevance<gen>', ftype='png', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='genrel<%s>'%desc, ftype='png', **self.comkw),
                 'func'   : save_colorized_image,
                 'args'   : [s_gen],
                 'kwargs' : {'center': self.config.get('cmap_center'), 'cmap': self.config.get('cmap', 'bwr'), 'what': 'top explanation', 'outshape': self.outshape},
@@ -148,29 +149,30 @@ class PlainVisualizer(Visualizer):
             'label',
             'relevance',
         ]
-        data, pred, label, relevance = load_data_h5(info_keys, self.config.exsub(self.templ, data_desc='result', ftype='h5', **self.comkw))
+        data, pred, label, relevance = load_data_h5(info_keys, self.config.exsub(self.templ, data_desc='result<%s>'%self.config.data.func, ftype='h5', **self.comkw))
 
+        desc = self.config.data.func
         files = {
             'pred'      : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='prediction', ftype='json', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='prediction<%s>'%desc, ftype='json', **self.comkw),
                 'func'   : save_predictions,
                 'args'   : [pred],
                 'kwargs' : {},
             },
             'label'     : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='truth'     , ftype='json', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='truth<%s>'%desc     , ftype='json', **self.comkw),
                 'func'   : save_predictions,
                 'args'   : [label],
                 'kwargs' : {},
             },
             'input'     : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='input<%s>'%self.config.data.func, ftype='png', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='input<%s>'%desc, ftype='png', **self.comkw),
                 'func'   : save_aligned_image,
                 'args'   : [data],
                 'kwargs' : {'bbox': self.config.data.bbox, 'outshape': self.outshape},
             },
             'relevance' : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='relevance<%s>'%self.config.data.func, ftype='png', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='relevance<%s>'%desc, ftype='png', **self.comkw),
                 'func'   : save_colorized_image,
                 'args'   : [relevance],
                 'kwargs' : {'center': self.config.get('cmap_center'), 'cmap': self.config.get('cmap', 'bwr'), 'outshape': self.outshape},
@@ -183,15 +185,20 @@ class PlainVisualizer(Visualizer):
 
 @register_visualizer
 class MeanVisualizer(Visualizer):
-    def __init__(self, *args, pred_cond=False, load=False, **kwargs):
+    def __init__(self, *args, cond='label', load=True, center=True, outshape=[5,2], **kwargs):
         super().__init__(*args, **kwargs)
-        self.pred_cond = pred_cond
+        self.cond = cond
         self.load = load
+        self._loaded = False
+        self.center = center
+        self.outshape = outshape
 
     def __enter__(self):
         if self.config.model.type == 'Classifier':
             top_net = 'classifier'
+            desc = self.config.data.func
         elif self.config.model.type == 'CGAN':
+            desc = self.config.sampler.type
             top_net = 'discriminator'
         else:
             raise NotImplementedError
@@ -207,12 +214,19 @@ class MeanVisualizer(Visualizer):
             self.templ = self.config.explanation.output
         self._acc = {}
 
+        if self.load:
+            ckw = self.comkw.copy()
+            ckw['iter'] = self.config.explanation.iterations
+            fpath = self.config.exsub(self.templ, data_desc='mean<%s>'%desc, ftype='h5', **ckw)
+            if os.path.isfile(fpath):
+                self._load_data(fpath)
+                self.comkw = ckw
+
         return self
 
     def feed(self):
-        if self.load:
-            getLogger('ecGAN').info('Counting iteration %d for loading.', self.comkw['iter'])
-            self.comkw['iter'] += 1
+        if self._loaded:
+            getLogger('ecGAN').info('Loaded data, skipping feed.')
             return
         if self.config.model.type == 'CGAN':
             return self._feed_cgan()
@@ -225,11 +239,12 @@ class MeanVisualizer(Visualizer):
         info_keys = [
             'prediction',
             'label',
+            'input/cond',
             'relevance/noise',
             'relevance/cond',
         ]
-        vals = load_data_h5(info_keys, self.config.exsub(self.templ, data_desc='result', ftype='h5', **self.comkw))
-        for pred, label, s_noise, s_cond in zip(*vals):
+        vals = load_data_h5(info_keys, self.config.exsub(self.templ, data_desc='result<%s>'%self.config.sampler.type, ftype='h5', **self.comkw))
+        for ind, (pred, label, in_cond, s_noise, s_cond) in enumerate(zip(*vals)):
             noise_all = self._acc.setdefault('noise_a', np.zeros_like(s_noise))
             cond_all  = self._acc.setdefault('cond_a', np.zeros_like(s_cond))
             count_all = self._acc.setdefault('count_a', np.zeros([1]))
@@ -238,13 +253,19 @@ class MeanVisualizer(Visualizer):
             cond_all  += s_cond
             count_all += 1
 
-            alpha = pred if self.pred_cond else label
+            alpha = {
+                'label': label,
+                'prediction': pred,
+                'index': ind,
+            }[self.cond]
             noise_one = self._acc.setdefault('noise', {}).setdefault('%02d'%alpha, np.zeros_like(s_noise))
             cond_one  = self._acc.setdefault('cond',  {}).setdefault('%02d'%alpha, np.zeros_like(s_cond))
+            input_one = self._acc.setdefault('input', {}).setdefault('%02d'%alpha, np.zeros_like(in_cond))
             count_one = self._acc.setdefault('count', {}).setdefault('%02d'%alpha, np.zeros([1], dtype=int))
 
             noise_one += s_noise
             cond_one  += s_cond
+            input_one += in_cond
             count_one += 1
         self.comkw['iter'] += 1
 
@@ -253,34 +274,38 @@ class MeanVisualizer(Visualizer):
         pass
 
     def _save_data(self, fpath):
+        if self._loaded:
+            getLogger('ecGAN').info('File has been loaded for this visualization, not saving %s in \'%s\'.', 'mean cond result', fpath)
+            return
+
         info = {
             'noise/all': self._acc['noise_a'],
             'cond/all' : self._acc['cond_a' ],
             'count/all': self._acc['count_a'],
         }
-        for (key, noise), (_, cond), (_, count) in zip(*[self._acc[mk].items() for mk in ['noise', 'cond', 'count']]):
+        for (key, noise), (_, cond), (_, count), (_, incond) in zip(*[self._acc[mk].items() for mk in ['noise', 'cond', 'count', 'input']]):
             info['noise/%s'%key] = noise
             info['cond/%s'%key]  = cond
+            info['input/%s'%key] = incond
             info['count/%s'%key] = count
         save_data_h5(info, fpath)
         getLogger('ecGAN').info('Saved %s in \'%s\'.', 'mean cond result', fpath)
 
     def _load_data(self, fpath):
         with h5py.File(fpath, 'r') as fp:
-            items = fp.items()
-
-            self._acc['noise_a'] = items.pop('noise/all')
-            self._acc['cond_a' ] = items.pop('cond/all')
-            self._acc['count_a'] = items.pop('cont/all')
-
-            for key, val in items:
-                base, num = key.split('/')
-                self._acc.setdefault(base, {})[num] = val[:]
+            for base, top in fp.items():
+                for num, val in top.items():
+                    if num == 'all':
+                        self._acc[base + '_a'] = val[:]
+                    else:
+                        self._acc.setdefault(base, {})[num] = val[:]
+        self._loaded = True
         getLogger('ecGAN').info('Loaded %s from \'%s\'.', 'mean cond result', fpath)
 
 
     def _save_figure(self, fpath):
         num = len(self._acc['noise'])
+        hei, wid = self.outshape
 
         anoi = self._acc['noise_a']
         acon = self._acc['cond_a']
@@ -289,36 +314,39 @@ class MeanVisualizer(Visualizer):
         nlen = len(anoi)
         clen = len(acon)
 
-        fig = plt.figure(figsize=(9*2, 3*(num//2+2)))
-        ax = fig.add_subplot(num//2+1, 1, 1)
+        fig = plt.figure(figsize=(9*wid, 3*(num//wid+1)))
+        ax = fig.add_subplot(num//wid+1, 1, 1)
         ax.set_title('Global Mean')
-        ax.bar(np.arange(nlen), anoi/acnt, color='b')
-        ax.bar(np.arange(nlen, nlen + clen), acon/acnt, color='r')
-        ax.set_xlim(-1, nlen + clen)
+        ax.bar(0.05 + np.arange(nlen)/10          , anoi/acnt, width=0.1, color='b')
+        ax.bar(0.5 + nlen/10 + np.arange(clen), acon/acnt, width=1.0, color='r')
+        ax.set_xlim(0., nlen/10 + clen)
         #ax.set_xticks([])
         #ax.set_yticks([])
 
-        for i, ((key, noise), (_, cond), (_, count)) in enumerate(zip(*[sorted(self._acc[mk].items()) for mk in ['noise', 'cond', 'count']])):
+        for i, ((key, noise), (_, cond), (_, count), (_, incond)) in enumerate(zip(*[sorted(self._acc[mk].items()) for mk in ['noise', 'cond', 'count', 'input']])):
             mnoise = noise/count
             mcond  = cond/count
+            minput = incond/count
             if self.center:
                 mnoise -= anoi/acnt
                 mcond  -= acon/acnt
             nlen = len(noise)
             clen = len(cond)
-            ax = fig.add_subplot(num//2+1, 2, i+1+2)
-            ax.set_title('Mean with %s: %s'%(['label', 'predicted label'][self.pred_cond], key))
+            ax = fig.add_subplot(num//wid+1, wid, i+1+wid)
+            cname = {
+                'label'     : 'label',
+                'prediction': 'predicted label',
+                'index'     : 'index',
+            }[self.cond]
+            ax.set_title('Mean with %s: %s'%(cname, key))
             # noise
-            ax.bar(np.arange(nlen), mnoise, color='b')
+            ax.bar(0.05 + np.arange(nlen)/10, mnoise, width=0.1, color='b')
 
             # cond
-            if i < 0:
-                ax.bar(nlen + np.arange(i), mcond[:i], color='r')
-            ax.bar([nlen + i], [mcond[i]], color='k')
-            if i < nlen:
-                ax.bar(nlen + np.arange(i+1, clen), mcond[i+1:], color='r')
+            color = np.array([1, 0, 0])[None] - minput[:,None].clip(0,1) * np.array([1, 0, 0])[None]
+            ax.bar(0.5 + nlen/10 + np.arange(clen), mcond , width=1.0, color=color)
 
-            ax.set_xlim(-1, nlen + clen)
+            ax.set_xlim(0., nlen/10 + clen)
             #ax.set_xticks([])
             #ax.set_yticks([])
         fig.tight_layout()
@@ -327,15 +355,16 @@ class MeanVisualizer(Visualizer):
         getLogger('ecGAN').info('Saved %s in \'%s\'.', 'mean cond figure', fpath)
 
     def _save_all(self):
+        desc = self.config.sampler.type
         files = {
             'data'   : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='mean_cond_result', ftype='h5', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='mean<%s>'%desc, ftype='h5', **self.comkw),
                 'func'   : self._save_data,
                 'args'   : [],
                 'kwargs' : {},
             },
             'figure' : {
-                'fpath'  : self.config.exsub(self.templ, data_desc='mean_cond_relevance', ftype='png', **self.comkw),
+                'fpath'  : self.config.exsub(self.templ, data_desc='mean<%s>'%desc, ftype='png', **self.comkw),
                 'func'   : self._save_figure,
                 'args'   : [],
                 'kwargs' : {},

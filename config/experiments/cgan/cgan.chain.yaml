@@ -47,9 +47,9 @@ dict:
         type: 'random_counter'
 
     pattern:
-        save: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${fit_epoch}.${ase_epoch}.pattern.params'
-        load: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${pattern.start_epoch}.${pattern.aepoch}.pattern.params'
-        output: '${root_dir}/${exp_dir}/${data.func}/rel/${pattern.type}/${model.type}.${net}.${net_epoch}.${pattern.name}.${pattern.start_epoch}.${data_desc}.${iter}.${ftype}'
+        save: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.0.0.pattern.params'
+        load: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.0.0.pattern.params'
+        output: '${root_dir}/${exp_dir}/${data.func}/rel/${pattern.type}/${model.type}.${net}.${net_epoch}.${pattern.name}.0.${data_desc}.${iter}.${ftype}'
 
     explanation:
         output: '${root_dir}/${exp_dir}/${data.func}/rel/${explanation.desc}/${model.type}.${net}.${net_epoch}.${data_desc}.${iter}.${ftype}'
@@ -331,7 +331,6 @@ tail:
                                                 priority: 4
                                                 action: 'visualize'
                                     - # PatternNet
-                                        &patternnet
                                         tag: 'pattern'
                                         dict:
                                             use_pattern: True
@@ -366,7 +365,7 @@ tail:
                             visualizer:
                                 type:   'MeanVisualizer'
                                 args:   []
-                                kwargs: {pred_cond: False, center: True}
+                                kwargs: {cond: 'label', center: True, outshape: [5, 2]}
                         tail:
                             - *visualizing
                     - # Explaining Discriminator
@@ -385,34 +384,40 @@ tail:
                             - *plainvis
                     - # Explaining GAN with different samplers
                         &multisampler
+                        tag: 'multisampler'
                         tail:
                             -
                                 tag: 'counter'
                                 dict:
                                     sampler: {type: 'counter'}
-                                    explanation:
-                                        iterations: 1
                                 tail:
                                     - *explaining
                                     - *plainvis
+                                    - &indmeanvis
+                                        tag: 'indmean'
+                                        dict:
+                                            visualizer:
+                                                type:   'MeanVisualizer'
+                                                args:   []
+                                                kwargs: {cond: 'index', center: True, outshape: [10, 10]}
+                                        tail:
+                                            - *visualizing
                             -
                                 tag: 'grow'
                                 dict:
                                     sampler: {type: 'grow'}
-                                    explanation:
-                                        iterations: 1
                                 tail:
                                     - *explaining
                                     - *plainvis
+                                    - *indmeanvis
                             -
                                 tag: 'transform'
                                 dict:
                                     sampler: {type: 'transform'}
-                                    explanation:
-                                        iterations: 1
                                 tail:
                                     - *explaining
                                     - *plainvis
+                                    - *indmeanvis
             - # Classifier
                 tag: 'classifier'
                 dict: &classifier

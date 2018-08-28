@@ -98,8 +98,14 @@ def fuzzy_one_hot(arr, size):
                     nd.uniform(low=0.7, high=1.2, shape=(x.shape[0], size), ctx=x.context),
                     nd.uniform(low=0.0, high=0.3, shape=(x.shape[0], size), ctx=x.context))
 
-def linspace(start=0., stop=1., num=1, ctx=None, dtype=None):
-    return nd.arange(start, stop, (stop-start)/num, ctx=ctx, dtype='float32').astype(dtype)
+def linspace(start=0., stop=1., num=1, end=False, ctx=None, dtype=None):
+    if end and num > 1:
+        num -= 1
+        step = (stop-start)/num
+        stop += step
+    else:
+        step = (stop-start)/num
+    return nd.arange(start, stop, step, ctx=ctx, dtype='float32').astype(dtype)
 
 def randint(low=0., high=1., shape=(1, ), ctx=None, dtype='int32'):
     return nd.uniform(low=low, high=high, shape=shape, ctx=ctx).astype(dtype)

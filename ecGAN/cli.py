@@ -238,7 +238,7 @@ def generate(args, config):
     templ     = config.genout
 
     for i in range(config.iterations):
-        noise, cond = samplers[config.sampler.type](num, K)
+        noise, cond = samplers[config.sampler.type](num, K, ctx)
         gen   = model.generate(noise=noise, cond=cond)
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
@@ -290,7 +290,7 @@ def explain_clss(args, config):
             break
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
-        fpath = config.exsub(templ, data_desc='result', ftype='h5', **comkw)
+        fpath = config.exsub(templ, data_desc='result<%s>'%config.data.func, ftype='h5', **comkw)
         if not config.overwrite and os.path.isfile(fpath):
             getLogger('ecGAN').info('File already exits, skipping \'%s\'...', fpath)
             continue
@@ -302,8 +302,6 @@ def explain_clss(args, config):
             relevance = model.explain_pattern(data, cond=label.squeeze(), single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
         else:
             relevance = model.explain(data, cond=label.squeeze(), single_out=config.explanation.get('single_out', False), mkwargs=config.explanation.get('kwargs', {}))
-
-        relevance = relevance.reshape(data.shape)
 
         info = {
             'input'      : data                     .asnumpy(),
@@ -346,7 +344,7 @@ def explain_cgan(args, config):
             getLogger('ecGAN').info('File already exits, skipping \'%s\'...', fpath)
             continue
 
-        noise, cond = samplers[config.sampler.type](num, K)
+        noise, cond = samplers[config.sampler.type](num, K, ctx)
 
         args = [K] + asim(noise, cond)
         if config.use_pattern:
@@ -368,7 +366,7 @@ def explain_cgan(args, config):
             'relevance/cond'       : s_cond.squeeze()         .asnumpy(),
             'relevance/generated'  : s_gen                    .asnumpy(),
         }
-        save_data_h5(info, config.exsub(templ, data_desc='result', ftype='h5', **comkw))
+        save_data_h5(info, fpath)
 
 @register_command
 def visualize(args, config):

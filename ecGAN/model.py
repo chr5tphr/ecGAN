@@ -14,6 +14,7 @@ from .util import Config, config_ctx
 from .net import nets
 from .data import ArrayDataset
 from .plot import save_aligned_image
+from .sampler import samplers, asim
 
 models = {}
 def register_model(obj):
@@ -984,7 +985,7 @@ class CGAN(GAN):
                 K = cond.shape[0]
             else:
                 raise RuntimeError('Either number of classes or labels have to be supplied!')
-        nsam, csam = asim(samplers[config.sampler.type](num, K))
+        nsam, csam = asim(*samplers[self.config.sampler.type](num, K, self.ctx))
         if noise is None:
             noise = nsam
         if cond is None:
