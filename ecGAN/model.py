@@ -984,11 +984,11 @@ class CGAN(GAN):
                 K = cond.shape[0]
             else:
                 raise RuntimeError('Either number of classes or labels have to be supplied!')
+        nsam, csam = asim(samplers[config.sampler.type](num, K))
         if noise is None:
-            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
+            noise = nsam
         if cond is None:
-            cond = nd.random.uniform(0, K, shape=num, ctx=self.ctx).floor()
-            cond = nd.one_hot(cond, K).reshape((num, -1, 1, 1))
+            cond = csam
         return noise, cond
 
 @register_model

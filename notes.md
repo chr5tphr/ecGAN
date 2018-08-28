@@ -65,6 +65,10 @@ When using MaxPool, gradients are one where the maximum was and zero elsewhere.
 Thus, gradients become very sparse, which in case of a discriminator, makes it very hard for the underlying generator to learn.
 
 ## TODO
+- test explanations with same noise but different conds
+- move input condition and see how heatmaps change
+
+- substract global mean from gen input heatmaps
 ## Experiments
 
 ### Datasets
@@ -82,7 +86,6 @@ Thus, gradients become very sparse, which in case of a discriminator, makes it v
 - random weights?
 
 ### Ideas
-- test explanations with same noise but different conds
 
 ## Questions
 

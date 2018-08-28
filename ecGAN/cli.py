@@ -19,6 +19,7 @@ from .data import data_funcs
 from .util import mkfilelogger, Config, config_ctx, make_ctx, load_module_file, ChainConfig, RessourceManager, get_logic_parser
 from .plot import plot_data, save_data_h5, load_data_h5, save_colorized_image, save_aligned_image, save_raw_image, save_cgan_visualization, save_predictions
 from .func import linspace, asnumpy
+from .sampler import samplers, asim
 from .visualizer import visualizers
 
 getLogger = logging.getLogger
@@ -231,23 +232,22 @@ def generate(args, config):
     model     = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
     num       = 30
     K         = args.classnum
-    cond      = nd.one_hot(nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num], K).reshape((num, K, 1, 1))
     net_desc  = config.nets[config.model.kwargs.generator]
     netnam    = net_desc.name
     net_epoch = net_desc.epoch
     templ     = config.genout
 
     for i in range(config.iterations):
-        noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-        gen   = model.generate(cond=cond)
+        noise, cond = samplers[config.sampler.type](num, K)
+        gen   = model.generate(noise=noise, cond=cond)
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
 
         gen_n = '%s<%s>'%tuple([config.nets[config.model.kwargs.generator].get(nam, '') for nam in ['name', 'type']])
         save_aligned_image(data=gen,
-                           fpath=config.exsub(templ, data_desc='0to9', ftype='png', **comkw),
+                           fpath=config.exsub(templ, data_desc='%s'%config.sampler.type, ftype='png', **comkw),
                            bbox=config.data.bbox,
-                           what='%s(…|0,…,9)'%(gen_n, epoch))
+                           what='%s(%s(…))'%(gen_n, config.sampler.type))
 
 
 @register_command
@@ -327,8 +327,6 @@ def explain_cgan(args, config):
 
     num       = config.explanation.batch_size
     K         = args.classnum
-    cond_flat = nd.repeat(nd.arange(K, ctx=ctx), (num-1)//K+1)[:num]
-    cond      = nd.one_hot(cond_flat, K).reshape((num, K, 1, 1))
     net_desc  = config.nets[config.model.kwargs.discriminator]
     netnam    = '%s<%s>'%(net_desc.name, net_desc.type)
     net_epoch = net_desc.epoch
@@ -343,28 +341,29 @@ def explain_cgan(args, config):
     for i in range(config.explanation.iterations):
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
-        fpath = config.exsub(templ, data_desc='result', ftype='h5', **comkw)
+        fpath = config.exsub(templ, data_desc='result<%s>'%config.sampler.type, ftype='h5', **comkw)
         if not config.overwrite and os.path.isfile(fpath):
             getLogger('ecGAN').info('File already exits, skipping \'%s\'...', fpath)
             continue
 
-        noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
+        noise, cond = samplers[config.sampler.type](num, K)
+
+        args = [K] + asim(noise, cond)
         if config.use_pattern:
-            args   , kwargs = [K, noise, cond], dict(single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
+            kwargs = dict(single_out=config.pattern.get('single_out', True), attribution=config.pattern.get('type') == 'attribution')
             s_gen  , gen    = model.explain_pattern_top(*args, **kwargs)
             s_noise, s_cond = model.explain_pattern    (*args, **kwargs)
         else:
-            noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=ctx)
-            args   , kwargs = [K, noise, cond], dict(single_out=config.explanation.get('single_out', False),  mkwargs=config.explanation.get('kwargs', {}))
+            kwargs = dict(single_out=config.explanation.get('single_out', False),  mkwargs=config.explanation.get('kwargs', {}))
             s_gen  , gen    = model.explain_top(*args, **kwargs)
             s_noise, s_cond = model.explain    (*args, **kwargs)
 
         info = {
-            'input/noise'          : noise.squeeze()          .asnumpy(),
-            'input/cond'           : cond.squeeze()           .asnumpy(),
+            'input/noise'          : noise                    .asnumpy(),
+            'input/cond'           : cond                     .asnumpy(),
             'generated'            : gen                      .asnumpy(),
             'prediction'           : model._out.argmax(axis=1).asnumpy(),
-            'label'                : cond_flat                .asnumpy(),
+            'label'                : cond      .argmax(axis=1).asnumpy(),
             'relevance/noise'      : s_noise.squeeze()        .asnumpy(),
             'relevance/cond'       : s_cond.squeeze()         .asnumpy(),
             'relevance/generated'  : s_gen                    .asnumpy(),
@@ -379,12 +378,11 @@ def visualize(args, config):
     if args.seed:
         random.seed(args.seed)
 
-    for vdesc in config.visualizers:
-        Visualizer = visualizers[vdesc['type']]
+    Visualizer = visualizers[config.visualizer.type]
 
-        with Visualizer(config, *vdesc.get('args', []), **vdesc.get('kwargs', {})) as vs:
-            for i in range(config.explanation.iterations):
-                vs.feed()
+    with Visualizer(config, *config.visualizer.get('args', []), **config.visualizer.get('kwargs', {})) as vs:
+        for i in range(config.explanation.iterations):
+            vs.feed()
 
 @register_command
 def learn_pattern(args, config):

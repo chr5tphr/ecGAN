@@ -18,8 +18,18 @@ def register_visualizer(func):
 def check_write(overwrite, fpath, func, args=[], kwargs={}):
     if not overwrite and os.path.isfile(fpath):
         getLogger('ecGAN').info('File already exits, skipping \'%s\'...', fpath)
+        return False
     else:
         func(*args, fpath=fpath, **kwargs)
+        return True
+
+def check_read(load, fpath, func, args=[], kwargs={}):
+    if load and os.path.isfile(fpath):
+        getLogger('ecGAN').info('File exits, loading \'%s\'...', fpath)
+        func(*args, fpath=fpath, **kwargs)
+        return True
+    else:
+        return False
 
 class Visualizer(object):
     def __init__(self, config):
@@ -173,9 +183,10 @@ class PlainVisualizer(Visualizer):
 
 @register_visualizer
 class MeanVisualizer(Visualizer):
-    def __init__(self, *args, pred_cond=False, **kwargs):
+    def __init__(self, *args, pred_cond=False, load=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.pred_cond = pred_cond
+        self.load = load
 
     def __enter__(self):
         if self.config.model.type == 'Classifier':
@@ -199,6 +210,10 @@ class MeanVisualizer(Visualizer):
         return self
 
     def feed(self):
+        if self.load:
+            getLogger('ecGAN').info('Counting iteration %d for loading.', self.comkw['iter'])
+            self.comkw['iter'] += 1
+            return
         if self.config.model.type == 'CGAN':
             return self._feed_cgan()
         elif self.config.model.type == 'Classifier':
@@ -250,6 +265,20 @@ class MeanVisualizer(Visualizer):
         save_data_h5(info, fpath)
         getLogger('ecGAN').info('Saved %s in \'%s\'.', 'mean cond result', fpath)
 
+    def _load_data(self, fpath):
+        with h5py.File(fpath, 'r') as fp:
+            items = fp.items()
+
+            self._acc['noise_a'] = items.pop('noise/all')
+            self._acc['cond_a' ] = items.pop('cond/all')
+            self._acc['count_a'] = items.pop('cont/all')
+
+            for key, val in items:
+                base, num = key.split('/')
+                self._acc.setdefault(base, {})[num] = val[:]
+        getLogger('ecGAN').info('Loaded %s from \'%s\'.', 'mean cond result', fpath)
+
+
     def _save_figure(self, fpath):
         num = len(self._acc['noise'])
 
@@ -270,12 +299,25 @@ class MeanVisualizer(Visualizer):
         #ax.set_yticks([])
 
         for i, ((key, noise), (_, cond), (_, count)) in enumerate(zip(*[sorted(self._acc[mk].items()) for mk in ['noise', 'cond', 'count']])):
+            mnoise = noise/count
+            mcond  = cond/count
+            if self.center:
+                mnoise -= anoi/acnt
+                mcond  -= acon/acnt
             nlen = len(noise)
             clen = len(cond)
             ax = fig.add_subplot(num//2+1, 2, i+1+2)
             ax.set_title('Mean with %s: %s'%(['label', 'predicted label'][self.pred_cond], key))
-            ax.bar(np.arange(nlen), noise/count, color='b')
-            ax.bar(np.arange(nlen, nlen + clen), cond/count, color='r')
+            # noise
+            ax.bar(np.arange(nlen), mnoise, color='b')
+
+            # cond
+            if i < 0:
+                ax.bar(nlen + np.arange(i), mcond[:i], color='r')
+            ax.bar([nlen + i], [mcond[i]], color='k')
+            if i < nlen:
+                ax.bar(nlen + np.arange(i+1, clen), mcond[i+1:], color='r')
+
             ax.set_xlim(-1, nlen + clen)
             #ax.set_xticks([])
             #ax.set_yticks([])

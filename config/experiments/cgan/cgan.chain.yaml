@@ -42,20 +42,9 @@ dict:
     genout: '${root_dir}/${exp_dir}/${data.func}/gen/${model.type}.${net}.${net_epoch}.${data_desc}.${iter}.${ftype}'
     gen_freq: 1
     cmap: 'bwr'
-    #visualizer:
-    #    type:   'PlainVisualizer'
-    #    args:   []
-    #    kwargs:
-    #        outshape: [5, 6]
-    visualizers:
-        -
-            type:   'PlainVisualizer'
-            args:   []
-            kwargs: {iterations: 1, outshape: [10, 10]}
-        -
-            type:   'MeanVisualizer'
-            args:   []
-            kwargs: {pred_cond: False}
+
+    sampler:
+        type: 'random_counter'
 
     pattern:
         save: '${root_dir}/${exp_dir}/${data.func}/params/${net_type}.${net_name}.${pattern.name}.${fit_epoch}.${ase_epoch}.pattern.params'
@@ -183,7 +172,7 @@ tail:
                                     pattern: {name: 'relu'}
                     - # Explaining GAN
                         &explaining
-                        tag: 'analyze'
+                        tag: 'explain'
                         dict:
                             data: {kwargs: {train: False}}
                             nets:
@@ -215,15 +204,8 @@ tail:
                                                     use_bias: True
                                                     alpha: 2.0
                                                     beta:  1.0
-                                        tail: &anactions
-                                            -
-                                                tag: 'explain'
-                                                priority: 3
-                                                action: 'explain'
-                                            -
-                                                tag: 'visualize'
-                                                priority: 4
-                                                action: 'visualize'
+                                        priority: 3
+                                        action: 'explain'
                                     -
                                         tag: 'dtd'
                                         dict:
@@ -238,7 +220,8 @@ tail:
                                                     use_bias: True
                                                     lo: -1.0
                                                     hi: 1.0
-                                        tail: *anactions
+                                        priority: 3
+                                        action: 'explain'
                             - # GradBased
                                 &gradbased
                                 dict:
@@ -252,7 +235,8 @@ tail:
                                                 desc: 'sensitivity'
                                                 kwargs:
                                                     method: 'sensitivity'
-                                        tail: *anactions
+                                        priority: 3
+                                        action: 'explain'
                                     -
                                         tag: 'intgrads'
                                         dict:
@@ -261,7 +245,8 @@ tail:
                                                 kwargs:
                                                     method: 'intgrads'
                                                     num: 1000
-                                        tail: *anactions
+                                        priority: 3
+                                        action: 'explain'
                             - # PatternNet
                                 &patternnet
                                 tag: 'pattern'
@@ -282,15 +267,108 @@ tail:
                                                     -
                                                         tag: 'patternnet'
                                                         dict: {pattern: {type: 'pattern'}}
-                                                        tail: *anactions
+                                                        priority: 3
+                                                        action: 'explain'
                                                     -
                                                         tag: 'attribution'
                                                         dict: {pattern: {type: 'attribution'}}
-                                                        tail: *anactions
+                                                        priority: 3
+                                                        action: 'explain'
                                     -
                                         tag: 'relu'
                                         dict: *relu_pattern
                                         tail: *explain_epochs
+                    - # Visualizing Explanation Plain GAN
+                        &plainvis
+                        tag: 'plain'
+                        dict:
+                            visualizer:
+                                type:   'PlainVisualizer'
+                                args:   []
+                                kwargs: {iterations: 1, outshape: [10, 10]}
+                            explanation:
+                                iterations: 1
+                        tail:
+                            - # General Visualization
+                                &visualizing
+                                tag: 'visualize'
+                                tail:
+                                    - # Layerwise
+                                        tag: 'layerwise'
+                                        dict:
+                                            use_pattern: False
+                                        tail:
+                                            -
+                                                tag: 'lrp'
+                                                dict:
+                                                    explanation:
+                                                        desc: 'lrp'
+                                                priority: 4
+                                                action: 'visualize'
+                                            -
+                                                tag: 'dtd'
+                                                dict:
+                                                    explanation:
+                                                        desc: 'dtd'
+                                                priority: 4
+                                                action: 'visualize'
+                                    - # GradBased
+                                        dict:
+                                            use_pattern: False
+                                        tail:
+                                            -
+                                                tag: 'sensitivity'
+                                                dict:
+                                                    explanation:
+                                                        desc: 'sensitivity'
+                                                priority: 4
+                                                action: 'visualize'
+                                            -
+                                                tag: 'intgrads'
+                                                dict:
+                                                    explanation:
+                                                        desc: 'intgrads'
+                                                priority: 4
+                                                action: 'visualize'
+                                    - # PatternNet
+                                        &patternnet
+                                        tag: 'pattern'
+                                        dict:
+                                            use_pattern: True
+                                        tail:
+                                            -
+                                                tag: 'linear'
+                                                dict:
+                                                    pattern:
+                                                        name: 'linear'
+                                                tail: &patvis_types
+                                                    -
+                                                        tag: 'patternnet'
+                                                        dict: {pattern: {type: 'pattern'}}
+                                                        priority: 4
+                                                        action: 'visualize'
+                                                    -
+                                                        tag: 'attribution'
+                                                        dict: {pattern: {type: 'attribution'}}
+                                                        priority: 4
+                                                        action: 'visualize'
+                                            -
+                                                tag: 'relu'
+                                                dict:
+                                                    pattern:
+                                                        name: 'relu'
+                                                tail: *patvis_types
+                    - # Visualizing Explanation Mean GAN
+                        &meanvis
+                        tag: 'mean'
+                        dict:
+                            sampler: {type: 'random_counter'}
+                            visualizer:
+                                type:   'MeanVisualizer'
+                                args:   []
+                                kwargs: {pred_cond: False, center: True}
+                        tail:
+                            - *visualizing
                     - # Explaining Discriminator
                         tag: 'dis'
                         dict:
@@ -304,6 +382,37 @@ tail:
                                 cls: {active: False}
                         tail:
                             - *explaining
+                            - *plainvis
+                    - # Explaining GAN with different samplers
+                        &multisampler
+                        tail:
+                            -
+                                tag: 'counter'
+                                dict:
+                                    sampler: {type: 'counter'}
+                                    explanation:
+                                        iterations: 1
+                                tail:
+                                    - *explaining
+                                    - *plainvis
+                            -
+                                tag: 'grow'
+                                dict:
+                                    sampler: {type: 'grow'}
+                                    explanation:
+                                        iterations: 1
+                                tail:
+                                    - *explaining
+                                    - *plainvis
+                            -
+                                tag: 'transform'
+                                dict:
+                                    sampler: {type: 'transform'}
+                                    explanation:
+                                        iterations: 1
+                                tail:
+                                    - *explaining
+                                    - *plainvis
             - # Classifier
                 tag: 'classifier'
                 dict: &classifier
@@ -365,7 +474,9 @@ tail:
                                 *fitting
                             - # Explaining Classifiers
                                 *explaining
-                            - # Explaining GANs
+                            - # Visualizing Explanation Classifiers
+                                *plainvis
+                            - # Explaining and Visualizing GANs
                                 tag: 'clsgan'
                                 dict:
                                     model:
@@ -379,6 +490,9 @@ tail:
                                         cls: {active: True}
                                 tail:
                                     - *explaining
+                                    - *plainvis
+                                    - *meanvis
+                                    - *multisampler
                     - # cnn_2convb_2dense
                         tag: 'cnn'
                         dict:
