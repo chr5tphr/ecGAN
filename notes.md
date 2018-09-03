@@ -36,6 +36,8 @@ since noise-mean + signal-mean cannot be decomposed
 ### PatternAttribution is negative on Generated Data but positive on Test Data
 - Problem : possibly, confidence for the input data is low, resulting in negative output, which in effect flips the sign
 
+### Skip image layer by using identity activation?
+
 ## Questions
 
 ### Why use even filters instead of odd ones?

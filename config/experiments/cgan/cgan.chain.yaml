@@ -1,7 +1,7 @@
 tag: 'root'
 dict:
     root_dir: '/home/chrstphr/projects/ecGAN/result'
-    exp_dir: 'cgan_pos' #'cgan'
+    exp_dir: 'cgan'
 
     device: 'gpu'
     device_id: 3
@@ -244,7 +244,7 @@ tail:
                                                 desc: 'intgrads'
                                                 kwargs:
                                                     method: 'intgrads'
-                                                    num: 1000
+                                                    num: 100
                                         priority: 3
                                         action: 'explain'
                             - # PatternNet
@@ -285,9 +285,9 @@ tail:
                             visualizer:
                                 type:   'PlainVisualizer'
                                 args:   []
-                                kwargs: {iterations: 1, outshape: [10, 10]}
+                                kwargs: {iterations: 20, outshape: [10, 10]}
                             explanation:
-                                iterations: 1
+                                iterations: 20
                         tail:
                             - # General Visualization
                                 &visualizing

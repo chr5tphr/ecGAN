@@ -3,6 +3,7 @@ from mxnet import nd, gluon, autograd
 from mxnet.gluon import nn
 import numpy as np
 
+import .func as gfunc
 from ... import base
 from ...func import im2col_indices, Mlist
 from .base import PatternNet, LinearPatternNet, ActPatternNet
@@ -135,7 +136,8 @@ class Identity(ActPatternNet, base.Identity):
         return y_sig
 
 class Tanh(ActPatternNet, base.Tanh):
-    pass
+    def forward_pattern(self, x):
+        return gfunc.tanh(x)
 
 class Clip(ActPatternNet, base.Clip):
     pass

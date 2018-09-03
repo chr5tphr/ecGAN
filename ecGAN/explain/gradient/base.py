@@ -34,6 +34,9 @@ class GradBasedExplainable(Block):
             for tar, val in zip(res, ret):
                 tar += val
 
+        for val, di in zip(res, diff):
+            val *= di/num
+
         if len(res) == 1:
             res = res[0]
         return res
