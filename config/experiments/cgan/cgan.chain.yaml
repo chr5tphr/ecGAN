@@ -194,9 +194,9 @@ tail:
                                         tag: 'lrp'
                                         dict:
                                             nets:
-                                                cls: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta'}}}
-                                                dis: {kwargs: {outact: 'relu', leakage: 0.2, explain: {relu: 'alphabeta'}}}
-                                                gen: {kwargs: {                              explain: {relu: 'alphabeta'}}}
+                                                cls: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'alphabeta', out: 'alphabeta'}}}
+                                                dis: {kwargs: {outact: 'relu', leakage: 0.2, explain: {relu: 'zclip'    , out: 'alphabeta'}}}
+                                                gen: {kwargs: {                              explain: {relu: 'alphabeta', out: 'zclip'}}}
                                             explanation:
                                                 desc: 'lrp'
                                                 kwargs:
@@ -210,9 +210,9 @@ tail:
                                         tag: 'dtd'
                                         dict:
                                             nets:
-                                                cls: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'zplus'}}}
-                                                dis: {kwargs: {outact: 'relu', leakage: 0.2, explain: {relu: 'zclip'}}}
-                                                gen: {kwargs: {                              explain: {relu: 'zplus'}}}
+                                                cls: {kwargs: {outact: 'relu', leakage: 0.0, explain: {relu: 'zplus', out: 'zplus'}}}
+                                                dis: {kwargs: {outact: 'relu', leakage: 0.2, explain: {relu: 'zclip', out: 'zplus'}}}
+                                                gen: {kwargs: {                              explain: {relu: 'zplus', out: 'zclip'}}}
                                             explanation:
                                                 desc: 'dtd'
                                                 kwargs:
@@ -368,6 +368,17 @@ tail:
                                 kwargs: {cond: 'label', center: True, outshape: [5, 2]}
                         tail:
                             - *visualizing
+                    - # Visualizing Explanation Similarities GAN
+                        &simvis
+                        tag: 'sim'
+                        dict:
+                            sampler: {type: 'random_counter'}
+                            visualizer:
+                                type:   'SimilarityVisualizer'
+                                args:   []
+                                kwargs: {}
+                        tail:
+                            - *visualizing
                     - # Explaining Discriminator
                         tag: 'dis'
                         dict:
@@ -402,6 +413,15 @@ tail:
                                                 kwargs: {cond: 'index', center: True, outshape: [10, 10]}
                                         tail:
                                             - *visualizing
+                                    - &indsimvis
+                                        tag: 'sim'
+                                        dict:
+                                            visualizer:
+                                                type:   'SimilarityVisualizer'
+                                                args:   []
+                                                kwargs: {}
+                                        tail:
+                                            - *visualizing
                             -
                                 tag: 'grow'
                                 dict:
@@ -410,6 +430,7 @@ tail:
                                     - *explaining
                                     - *plainvis
                                     - *indmeanvis
+                                    - *indsimvis
                             -
                                 tag: 'transform'
                                 dict:
@@ -418,6 +439,7 @@ tail:
                                     - *explaining
                                     - *plainvis
                                     - *indmeanvis
+                                    - *indsimvis
             - # Classifier
                 tag: 'classifier'
                 dict: &classifier
@@ -497,6 +519,7 @@ tail:
                                     - *explaining
                                     - *plainvis
                                     - *meanvis
+                                    - *simvis
                                     - *multisampler
                     - # cnn_2convb_2dense
                         tag: 'cnn'

@@ -3,7 +3,7 @@ from mxnet import nd, gluon, autograd
 from mxnet.gluon import nn
 import numpy as np
 
-import .func as gfunc
+from . import func as gfunc
 from ... import base
 from ...func import im2col_indices, Mlist
 from .base import PatternNet, LinearPatternNet, ActPatternNet
@@ -128,16 +128,15 @@ class ReLU(ActPatternNet, base.ReLU):
         return self.forward(y_sig)
 
 class LeakyReLU(ActPatternNet, base.LeakyReLU):
-    def backward_pattern(self, y_sig):
-        return self.forward(y_sig)
+    def forward_pattern(self, x):
+        return gfunc.leaky_relu(slope=self._alpha)(x)
 
 class Identity(ActPatternNet, base.Identity):
-    def backward_pattern(self, y_sig):
-        return y_sig
+    pass
 
 class Tanh(ActPatternNet, base.Tanh):
     def forward_pattern(self, x):
-        return gfunc.tanh(x)
+        return gfunc.tanh()(x)
 
 class Clip(ActPatternNet, base.Clip):
     pass
