@@ -148,8 +148,9 @@ class Classifier(Model):
             getLogger('ecGAN').info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
 
-    def test(self, data, batch_size):
-        data_iter = gluon.data.DataLoader(data, batch_size)
+    def test(self, dataset, batch_size):
+        K = len(dataset.classes)
+        data_iter = gluon.data.DataLoader(dataset, batch_size)
 
         metric = mx.metric.Accuracy()
         for i, (data, label) in enumerate(data_iter):
@@ -157,7 +158,8 @@ class Classifier(Model):
             label = label.as_in_context(self.ctx)
 
             output = self.netC(data)
-            metric.update([label, ], [output, ])
+            cout = output[:, :K]
+            metric.update([label, ], [cout, ])
 
         return metric.get()
 
@@ -594,6 +596,8 @@ class CGAN(GAN):
         netD = self.netD
         ctx = self.ctx
 
+        ohckw = dict(zip(['off_value', 'on_value'], config.get('ohcond', [0, 1])))
+
         K = len(dataset.classes)
 
         data_iter = gluon.data.DataLoader(dataset, batch_size, shuffle=True)
@@ -642,7 +646,7 @@ class CGAN(GAN):
 
                     data = data.as_in_context(ctx)
                     cond_dense = cond_dense.as_in_context(ctx).reshape((-1, ))
-                    cond = one_hot(cond_dense, K).reshape((num, -1, 1, 1))
+                    cond = one_hot(cond_dense, K, **ohckw).reshape((num, -1, 1, 1))
 
                     if config.semi_supervised:
                         real_dense = cond_dense
@@ -701,15 +705,17 @@ class CGAN(GAN):
                 if ( (self.save_freq > 0) and not ( (epoch + 1) % self.save_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
                     self.checkpoint(epoch+1)
                 if ( (self.gen_freq > 0) and not ( (epoch + 1) % self.gen_freq) ) or  ((epoch + 1) >= (self.start_epoch + nepochs)):
-                    cond = one_hot(nd.repeat(nd.arange(K, ctx=ctx), 29//K+1)[:30], K).reshape((30, K, 1, 1))
+                    cond = one_hot(nd.repeat(nd.arange(K, ctx=ctx), 29//K+1)[:30], K, **ohckw).reshape((30, K, 1, 1))
                     self.save_generated(epoch+1, cond)
         except KeyboardInterrupt:
             getLogger('ecGAN').info('Training interrupted by user.')
             self.checkpoint('I%d'%epoch)
-            cond = one_hot(nd.repeat(nd.arange(K, ctx=ctx), 29//K+1)[:30], K).reshape((30, K, 1, 1))
+            cond = one_hot(nd.repeat(nd.arange(K, ctx=ctx), 29//K+1)[:30], K, **ohckw).reshape((30, K, 1, 1))
             self.save_generated('I%d'%epoch, cond)
 
     def test(self, K, num, batch_size=64):
+        ohckw = dict(zip(['off_value', 'on_value'], self.config.get('ohcond', [0, 1])))
+
         noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
         cond = nd.random.uniform(0, K, shape=num, ctx=self.ctx).floor()
 
@@ -727,10 +733,11 @@ class CGAN(GAN):
         for i, (data, label) in enumerate(data_iter):
             data = data.as_in_context(self.ctx)
             label = label.as_in_context(self.ctx)
-            label_oh = nd.one_hot(label, K).reshape((label.shape[0], -1, 1, 1))
+            cond = nd.one_hot(label, K, **ohckw).reshape((label.shape[0], -1, 1, 1))
 
-            output = net([data, label_oh])
-            metric.update([label, ], [output, ])
+            output = net([data, cond])
+            cout = output[:, :K]
+            metric.update([label, ], [cout, ])
             #confusion += nd.one_hot(label, K) == nd.one_hot(nd.argmax(output, axis=1), K)
 
         return metric.get()
@@ -751,6 +758,7 @@ class CGAN(GAN):
                                what='%s(…) epoch %s'%(gen_n, epoch))
 
     def learn_pattern(self, dataset, batch_size):
+        ohckw = dict(zip(['off_value', 'on_value'], self.config.get('ohcond', [0, 1])))
         K = len(dataset.classes)
         data_iter = gluon.data.DataLoader(dataset, batch_size)
 
@@ -764,7 +772,7 @@ class CGAN(GAN):
 
             # === Data Pass ===
             noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
-            cond = nd.one_hot(label, K).reshape((num, -1, 1, 1))
+            cond = nd.one_hot(label, K, **ohckw).reshape((num, -1, 1, 1))
 
             self.netG.forward_logged([noise, cond])
             self.netD.forward_logged(data)
@@ -774,7 +782,7 @@ class CGAN(GAN):
             # === Fake Pass ===
             noise = nd.random_normal(shape=(num, 100, 1, 1), ctx=self.ctx)
             rand_cond = nd.random.uniform(0,K,shape=num, ctx=self.ctx).floor()
-            cond = nd.one_hot(rand_cond, K).reshape((num, -1, 1, 1))
+            cond = nd.one_hot(rand_cond, K, **ohckw).reshape((num, -1, 1, 1))
 
             net.forward_logged([noise, cond])
 
@@ -973,6 +981,7 @@ class CGAN(GAN):
         return R
 
     def sample_noise(self, K=None, noise=None, cond=None, num=None, ctx=None):
+        ohckw = dict(zip(['off_value', 'on_value'], self.config.get('ohcond', [0, 1])))
         if num is None:
             if noise is not None:
                 num = len(noise)
@@ -985,7 +994,7 @@ class CGAN(GAN):
                 K = cond.shape[0]
             else:
                 raise RuntimeError('Either number of classes or labels have to be supplied!')
-        nsam, csam = asim(*samplers[self.config.sampler.type](num, K, self.ctx))
+        nsam, csam = asim(*samplers[self.config.sampler.type](num, K, self.ctx, ohkw=ohckw))
         if noise is None:
             noise = nsam
         if cond is None:

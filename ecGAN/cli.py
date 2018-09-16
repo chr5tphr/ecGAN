@@ -201,10 +201,10 @@ def test(args, config):
 
     ctx        = ress(make_ctx, config.device, config.device_id)
     batch_size = config.batch_size
-    data       = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
+    dataset    = ress(data_funcs[config.data.func], *(config.data.args), ctx=ctx, **(config.data.kwargs))
 
     model      = models[config.model.type](ctx=ctx, config=config, **config.model.kwargs)
-    metr, acc  = model.test(data=data, batch_size=batch_size)
+    metr, acc  = model.test(dataset=dataset, batch_size=batch_size)
 
     top_n      = '%s<%s>'%tuple([config.nets[config.model.kwargs.classifier].get(nam, '') for nam in ['name', 'type']])
     getLogger('ecGAN').info('%s("%s"): %s=%.4f', top_n, config.data.func, metr, acc)
@@ -236,9 +236,10 @@ def generate(args, config):
     netnam    = net_desc.name
     net_epoch = net_desc.epoch
     templ     = config.genout
+    ohckw     = dict(zip(['off_value', 'on_value'], config.get('ohcond', [0, 1])))
 
     for i in range(config.iterations):
-        noise, cond = samplers[config.sampler.type](num, K, ctx)
+        noise, cond = samplers[config.sampler.type](num, K, ctx, ohkw=ohckw)
         gen   = model.generate(noise=noise, cond=cond)
 
         comkw = dict(iter=i, net=netnam, net_epoch=net_epoch)
@@ -306,6 +307,7 @@ def explain_clss(args, config):
         info = {
             'input'      : data                     .asnumpy(),
             'prediction' : model._out.argmax(axis=1).asnumpy(),
+            'out'        : model._out               .asnumpy(),
             'label'      : label                    .asnumpy(),
             'relevance'  : relevance                .asnumpy(),
         }
@@ -328,6 +330,7 @@ def explain_cgan(args, config):
     net_desc  = config.nets[config.model.kwargs.discriminator]
     netnam    = '%s<%s>'%(net_desc.name, net_desc.type)
     net_epoch = net_desc.epoch
+    ohckw     = dict(zip(['off_value', 'on_value'], config.get('ohcond', [0, 1])))
     if config.use_pattern:
         templ     = config.pattern.output
     else:
@@ -344,7 +347,7 @@ def explain_cgan(args, config):
             getLogger('ecGAN').info('File already exits, skipping \'%s\'...', fpath)
             continue
 
-        noise, cond = samplers[config.sampler.type](num, K, ctx)
+        noise, cond = samplers[config.sampler.type](num, K, ctx, ohkw=ohckw)
 
         args = [K] + asim(noise, cond)
         if config.use_pattern:
@@ -361,6 +364,7 @@ def explain_cgan(args, config):
             'input/cond'           : cond                     .asnumpy(),
             'generated'            : gen                      .asnumpy(),
             'prediction'           : model._out.argmax(axis=1).asnumpy(),
+            'out'                  : model._out               .asnumpy(),
             'label'                : cond      .argmax(axis=1).asnumpy(),
             'relevance/noise'      : s_noise.squeeze()        .asnumpy(),
             'relevance/cond'       : s_cond.squeeze()         .asnumpy(),

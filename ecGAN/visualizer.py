@@ -51,11 +51,12 @@ class Visualizer(object):
 
 @register_visualizer
 class PlainVisualizer(Visualizer):
-    def __init__(self, *args, outshape=[5, 6], iterations=None, globlim=False, **kwargs):
+    def __init__(self, *args, outshape=[5, 6], iterations=None, globlim=False, plot=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.outshape = outshape
         self.iterations = iterations
         self.globlim = globlim
+        self.plot = plot
 
     def __enter__(self):
         if self.config.model.type == 'Classifier':
@@ -88,6 +89,8 @@ class PlainVisualizer(Visualizer):
             raise NotImplementedError
 
     def _save_figure(self, noise, cond, noise_s, cond_s, fpath, outshape=[10,10]):
+        if not self.plot:
+            return
         num = len(noise)
         hei, wid = self.outshape
 
@@ -122,6 +125,8 @@ class PlainVisualizer(Visualizer):
         getLogger('ecgan').info('Saved %s in \'%s\'.', 'plain figure', fpath)
 
     def _save_figure_noise(self, noise, noise_s, fpath, outshape=[10,10]):
+        if not self.plot:
+            return
         num = len(noise)
         hei, wid = self.outshape
 
@@ -153,6 +158,8 @@ class PlainVisualizer(Visualizer):
         getLogger('ecgan').info('Saved %s in \'%s\'.', 'plain noise figure', fpath)
 
     def _save_figure_cond(self, cond, cond_s, fpath, outshape=[10,10]):
+        if not self.plot:
+            return
         num = len(cond)
         hei, wid = self.outshape
 
@@ -308,12 +315,13 @@ class PlainVisualizer(Visualizer):
 
 @register_visualizer
 class SimilarityVisualizer(Visualizer):
-    def __init__(self, *args, globlim=True, outshape=[10,10], figiter=5, **kwargs):
+    def __init__(self, *args, globlim=True, outshape=[10,10], figiter=5, plot=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.outshape = outshape
         self.globlim = globlim
         self.figiter = figiter
         self._acc = {}
+        self.plot = plot
 
     def __enter__(self):
         if self.config.model.type == 'Classifier':
@@ -374,6 +382,16 @@ class SimilarityVisualizer(Visualizer):
                 argmax += [0]
         argmax = np.array(argmax)
 
+        absmax = []
+        for x,y in zip(in_cond, s_cond):
+            act = x > 0.
+            nact = act.sum()
+            if nact > 0:
+                absmax += [(act * np.eye(len(x), dtype=bool)[np.argsort(np.abs(y))[::-1][:nact]].sum(axis=0)).sum() / nact]
+            else:
+                absmax += [0]
+        absmax = np.array(absmax)
+
         inrm = (in_cond**2).sum(1, keepdims=True)**.5
         snrm = (s_cond**2).sum(1, keepdims=True)**.5
         euclid = 1. - ((in_cond/(inrm + (inrm==0.)) - s_cond/(snrm + (snrm == 0.)))**2).sum(axis=1)**.5/2
@@ -382,7 +400,7 @@ class SimilarityVisualizer(Visualizer):
         cosine = (1 + (in_cond * s_cond).sum(1) / (denomcos + (denomcos == 0.)))/2.
         abscos = np.abs((in_cond * s_cond).sum(1) / (denomcos + (denomcos == 0.)))
 
-        for _in_cond, _ncrate, _argmax, _euclid, _cosine, _abscos in zip(in_cond, ncrate, argmax, euclid, cosine, abscos):
+        for _in_cond, _ncrate, _argmax, _absmax, _euclid, _cosine, _abscos in zip(in_cond, ncrate, argmax, absmax, euclid, cosine, abscos):
             hkey = ';'.join(['%.2f'%val for val in _in_cond])
 
             ldict = self._acc.setdefault(hkey, {})
@@ -392,6 +410,9 @@ class SimilarityVisualizer(Visualizer):
 
             d_argmax = ldict.setdefault('argmax', np.zeros([1], dtype=float))
             d_argmax += _argmax
+
+            d_absmax = ldict.setdefault('absmax', np.zeros([1], dtype=float))
+            d_absmax += _absmax
 
             d_euclid = ldict.setdefault('euclid', np.zeros([1], dtype=float))
             d_euclid += _euclid
@@ -410,19 +431,19 @@ class SimilarityVisualizer(Visualizer):
             'data'   : {
                 'fpath'  : self.config.exsub(self.templ, data_desc='sim<%s>'%desc, ftype='h5', **self.comkw),
                 'func'   : self._save_data,
-                'args'   : [ncrate, argmax, euclid, cosine, abscos],
+                'args'   : [ncrate, argmax, absmax, euclid, cosine, abscos],
                 'kwargs' : {},
             },
             'figure' : {
                 'fpath'  : self.config.exsub(self.templ, data_desc='sim<%s>'%desc, ftype='svg', **self.comkw),
                 'func'   : self._save_figure,
-                'args'   : [ncrate, argmax, euclid, cosine, abscos],
+                'args'   : [ncrate, argmax, absmax, euclid, cosine, abscos],
                 'kwargs' : {},
             },
             'samfigure' : {
                 'fpath'  : self.config.exsub(self.templ, data_desc='samsim<%s>'%desc, ftype='svg', **self.comkw),
                 'func'   : self._save_figure_sample,
-                'args'   : [in_cond, ncrate, argmax, euclid, cosine, abscos],
+                'args'   : [in_cond, ncrate, argmax, absmax, euclid, cosine, abscos],
                 'kwargs' : {},
             },
         }
@@ -433,10 +454,11 @@ class SimilarityVisualizer(Visualizer):
     def _feed_clss(self):
         pass
 
-    def _save_data(self, ncrate, argmax, euclid, cosine, abscos, fpath):
+    def _save_data(self, ncrate, argmax, absmax, euclid, cosine, abscos, fpath):
         info = {
             'ncrate' : ncrate,
             'argmax' : argmax,
+            'absmax' : absmax,
             'euclid' : euclid,
             'cosine' : cosine,
             'abscos' : abscos,
@@ -444,17 +466,19 @@ class SimilarityVisualizer(Visualizer):
         save_data_h5(info, fpath)
         getLogger('ecGAN').info('Saved %s in \'%s\'.', 'similarities result', fpath)
 
-    def _save_figure(self, ncrate, argmax, euclid, cosine, abscos, fpath):
+    def _save_figure(self, ncrate, argmax, absmax, euclid, cosine, abscos, fpath):
         if self.comkw['iter'] >= self.figiter:
+            return
+        if not self.plot:
             return
         num = len(ncrate)
 
         fig = plt.figure(figsize=(num/10, 8))
-        nams = ['ncrate', 'argmax', 'euclid', 'cosine', 'abscos']
-        cols = ['r', 'g', 'b', 'm', 'c']
+        nams = ['ncrate', 'argmax', 'absmax', 'euclid', 'cosine', 'abscos']
+        cols = ['r', 'g', 0x00aa00, 'b', 'm', 'c']
         vlen = len(nams)
 
-        for i, (val, nam, col) in enumerate(zip([ncrate, argmax, euclid, cosine, abscos], nams, cols)):
+        for i, (val, nam, col) in enumerate(zip([ncrate, argmax, absmax, euclid, cosine, abscos], nams, cols)):
             ax = fig.add_subplot(vlen, 1, i+1)
 
             ax.set_title('Similarity to input condition using %s'%nam)
@@ -469,21 +493,23 @@ class SimilarityVisualizer(Visualizer):
         plt.close(fig)
         getLogger('ecGAN').info('Saved %s in \'%s\'.', 'mean cond figure', fpath)
 
-    def _save_figure_sample(self, in_cond, ncrate, argmax, euclid, cosine, abscos, fpath):
+    def _save_figure_sample(self, in_cond, ncrate, argmax, absmax, euclid, cosine, abscos, fpath):
         if self.comkw['iter'] >= self.figiter:
+            return
+        if not self.plot:
             return
 
         hei, wid = self.outshape
         num = len(in_cond)
 
-        nams = ['ncrate', 'argmax', 'euclid', 'cosine', 'abscos']
-        cols = ['r', 'g', 'b', 'm', 'c']
+        nams = ['ncrate', 'argmax', 'absmax', 'euclid', 'cosine', 'abscos']
+        cols = ['r', 'g', 0x00aa00, 'b', 'm', 'c']
 
         frows = (num-1)//wid + 1
         fcols = wid
         fig = plt.figure(figsize=(2*fcols, 4*frows))
 
-        for i, vals in enumerate(zip(in_cond, ncrate, argmax, euclid, cosine, abscos)):
+        for i, vals in enumerate(zip(in_cond, ncrate, argmax, absmax, euclid, cosine, abscos)):
             ic = vals[0]
             dval = vals[1:]
             vlen = len(dval)
@@ -507,12 +533,13 @@ class SimilarityVisualizer(Visualizer):
         getLogger('ecGAN').info('Saved %s in \'%s\'.', 'sample sim figure', fpath)
 
     def _save_mean_figure(self, fpath):
+        if not self.plot:
+            return
         num = len(self._acc)
         hei, wid = self.outshape
 
-
-        nams = ['ncrate', 'argmax', 'euclid', 'cosine', 'abscos']
-        cols = ['r', 'g', 'b', 'm', 'c']
+        nams = ['ncrate', 'argmax', 'absmax', 'euclid', 'cosine', 'abscos']
+        cols = ['r', 'g', 0x00aa00, 'b', 'm', 'c']
 
         vlen = len(nams)
         gsvals = np.zeros(vlen)
@@ -566,7 +593,7 @@ class SimilarityVisualizer(Visualizer):
 
     def _save_mean_data(self, fpath):
         info = {}
-        nams = ['ncrate', 'argmax', 'euclid', 'cosine', 'abscos']
+        nams = ['ncrate', 'argmax', 'absmax', 'euclid', 'cosine', 'abscos']
         vlen = len(nams)
         gsvals = np.zeros(vlen)
         gcount = 0.
@@ -586,8 +613,10 @@ class SimilarityVisualizer(Visualizer):
         getLogger('ecGAN').info('Saved %s in \'%s\'.', 'mean sim data', fpath)
 
     def _save_mean_json(self, fpath):
+        if not self.plot:
+            return
         info = {}
-        nams = ['ncrate', 'argmax', 'euclid', 'cosine', 'abscos']
+        nams = ['ncrate', 'argmax', 'absmax', 'euclid', 'cosine', 'abscos']
         vlen = len(nams)
         gsvals = np.zeros(vlen)
         gcount = 0.
@@ -644,7 +673,7 @@ class SimilarityVisualizer(Visualizer):
 
 @register_visualizer
 class MeanVisualizer(Visualizer):
-    def __init__(self, *args, cond='label', load=True, center=True, globlim=False, normalize=True, outshape=[5,2], **kwargs):
+    def __init__(self, *args, cond='label', load=True, center=True, globlim=False, normalize=True, outshape=[5,2], plot=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.cond = cond
         self.load = load
@@ -653,6 +682,7 @@ class MeanVisualizer(Visualizer):
         self.outshape = outshape
         self.globlim = globlim
         self.normalize = normalize
+        self.plot = plot
 
     def __enter__(self):
         if self.config.model.type == 'Classifier':
@@ -776,6 +806,8 @@ class MeanVisualizer(Visualizer):
 
 
     def _save_figure(self, fpath):
+        if not self.plot:
+            return
         num = len(self._acc['noise'])
         hei, wid = self.outshape
 
@@ -842,6 +874,8 @@ class MeanVisualizer(Visualizer):
         getLogger('ecGAN').info('Saved %s in \'%s\'.', 'mean cond figure', fpath)
 
     def _save_figure_cond(self, fpath):
+        if not self.plot:
+            return
         num = len(self._acc['cond'])
         hei, wid = self.outshape
 
@@ -898,6 +932,8 @@ class MeanVisualizer(Visualizer):
         getLogger('ecGAN').info('Saved %s in \'%s\'.', 'mean cond figure', fpath)
 
     def _save_figure_noise(self, fpath):
+        if not self.plot:
+            return
         num = len(self._acc['noise'])
         hei, wid = self.outshape
 
