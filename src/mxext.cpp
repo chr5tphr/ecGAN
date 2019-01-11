@@ -5,7 +5,7 @@
 
 #include "operator/nn/im2col.h"
 
-//g++ -fPIC -shared -I/usr/include/python3.6m -I/home/chrstphr/libs/mxnet/{{.,nnvm,dmlc-core,dlpack}/include,mshadow,src} -o mxext.so mxext.cpp -DMSHADOW_USE_{MKL,CUDA}=0
+//g++ -fPIC -shared -I/usr/include/python3.6m -Ilibs/mxnet/{{.,nnvm,dmlc-core,dlpack}/include,mshadow,src} -o mxext.so mxext.cpp -DMSHADOW_USE_{MKL,CUDA}=0
 
 static PyObject * mxext_nddict2raw(PyObject *self, PyObject *args) {
 

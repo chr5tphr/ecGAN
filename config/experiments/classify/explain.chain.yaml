@@ -1,4 +1,4 @@
-fname: '/home/chrstphr/projects/ecGAN/result/classify/CLASS.yaml'
+fname: 'result/classify/CLASS.yaml'
 tag: 'root'
 tail:
     - #MNIST

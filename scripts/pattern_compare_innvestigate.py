@@ -26,7 +26,7 @@ y_test  = to_categorical(y_test_raw , K)
 net        = mlp_3dense(inshape, K)
 model      = Model(inputs=net['in'], outputs=net['out'])
 
-fname   = '/home/chrstphr/tmp/mlp_3dense.h5'
+fname   = 'tmp/mlp_3dense.h5'
 retrain = False
 
 if retrain or not isfile(fname):

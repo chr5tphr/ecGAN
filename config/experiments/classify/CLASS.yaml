@@ -1,4 +1,4 @@
-root_dir: '/home/chrstphr/projects/ecGAN/result'
+root_dir: 'result'
 exp_dir: 'classify'
 
 device: 'gpu'

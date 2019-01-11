@@ -1,4 +1,4 @@
-fname: '/home/chrstphr/projects/ecGAN/result/conv/CLASS.yaml'
+fname: 'result/conv/CLASS.yaml'
 tail:
     - #Model Training
         priority: 0

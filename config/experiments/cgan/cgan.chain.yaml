@@ -1,6 +1,6 @@
 tag: 'root'
 dict:
-    root_dir: '/home/chrstphr/projects/ecGAN/result'
+    root_dir: 'result'
     exp_dir: 'cgan'
 
     device: 'gpu'
